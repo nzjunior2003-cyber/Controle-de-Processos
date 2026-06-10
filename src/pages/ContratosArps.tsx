@@ -10,68 +10,16 @@ import { useMilitares } from '../hooks/useMilitares';
 import { MilitarAutocomplete } from '../components/MilitarAutocomplete';
 
 // Mocks para Contratos
-const initialContratosMock = [
-  {
-    id: '1', pae: '2026/012345', numero: '001/2026', objeto: 'Aquisição de viaturas operacionais tipo ABT', 
-    vigenciaInicio: '2026-06-01', vigenciaFim: '2027-06-01', valor: 2500000, saldo: 500000,
-    fornecedor: 'AUTO VEÍCULOS LTDA', cnpj: '12.345.678/0001-99', fonte: 'Tesouro Estadual',
-    fiscalTitular: 'CAP QOBM SILVA', fiscalTitularContato: '(91) 99999-1111',
-    fiscalSuplente: '1º TEN QOBM SANTOS', fiscalSuplenteContato: '(91) 99999-2222',
-    contatoEmail: 'contato@autoveiculos.com', contatoTelefone: '(91) 98888-7777',
-    aditivos: [],
-    linkContrato: 'https://sei.pa.gov.br/'
-  },
-  {
-    id: '2', pae: '2025/000456', numero: '045/2025', objeto: 'Manutenção preventiva e corretiva de equipamentos de mergulho', 
-    vigenciaInicio: '2025-03-10', vigenciaFim: '2026-03-10', valor: 150000, saldo: 150000,
-    fornecedor: 'MERGULHO PRO EIRELI', cnpj: '98.765.432/0001-11', fonte: 'FESPDS',
-    fiscalTitular: 'MAJ QOBM ALMEIDA', fiscalTitularContato: '(91) 99888-3333',
-    fiscalSuplente: '2º TEN QOBM LIMA', fiscalSuplenteContato: '(91) 99888-4444',
-    contatoEmail: 'financeiro@mergulhopro.com', contatoTelefone: '(91) 97777-6666',
-    aditivos: ['1º Termo Aditivo - Prazo (+12 meses)'],
-    linkContrato: 'https://sei.pa.gov.br/'
-  }
-];
+const initialContratosMock: any[] = [];
 
 // Mocks para Pregões, Dispensas, etc.
-const initialProcedimentosMock = [
-  {
-    id: '1', pae: '2026/012345', modalidade: 'Pregão Eletrônico', numero: '01/2026',
-    objeto: 'Aquisição de viaturas operacionais tipo ABT', 
-    fase: 'Publicação de Edital', dataPublicacao: '2026-05-10', previsaoAbertura: '2026-06-01'
-  },
-  {
-    id: '2', pae: '2024/000456', modalidade: 'Dispensa', numero: '05/2024',
-    objeto: 'Contratação emergencial de empresa de engenharia', 
-    fase: 'Aviso de Ratificação', dataPublicacao: '2024-05-15', previsaoAbertura: '-'
-  },
-  {
-    id: '3', pae: '2024/000789', modalidade: 'Inexigibilidade', numero: '02/2024',
-    objeto: 'Contratação de curso de especialização para oficiais', 
-    fase: 'Em Análise', dataPublicacao: '-', previsaoAbertura: '-'
-  }
-];
+const initialProcedimentosMock: any[] = [];
 
 // Mocks para Processos Sancionatórios
-const initialSancionatoriosMock = [
-  {
-    id: '1', processo: '2026/099887', empresa: 'TECH FORNECIMENTOS LTDA',
-    motivo: 'Atraso na entrega de equipamentos de proteção', 
-    fase: 'Defesa Prévia', dataAbertura: '2026-05-20'
-  }
-];
+const initialSancionatoriosMock: any[] = [];
 
 // Mocks para Portarias de Fiscais
-const initialPortariasMock = [
-  { 
-    id: '1', contrato: '053/2020', empresa: 'LUIZ VIANA TRANSPORTE LTDA', 
-    fiscalTitular: '1º TEN QOABM JOELMIR', fiscalEmail: 'ten.nunes17@gmail.com', portaria: '045/2024', dataPublicacao: '2024-01-10'
-  },
-  { 
-    id: '2', contrato: '041/2021', empresa: 'PRODEPA', 
-    fiscalTitular: 'MAJ QOBM EMERSON', fiscalEmail: 'emersoncsmoraes@gmail.com', portaria: '012/2024', dataPublicacao: '2024-02-15'
-  }
-];
+const initialPortariasMock: any[] = [];
 
 export default function ContratosArps() {
   const { processos, pcas, usuarioAtual } = useApp();
@@ -117,8 +65,42 @@ export default function ContratosArps() {
     { id: 'portarias', nome: 'Portarias de Fiscais', icone: BookOpen, color: 'gray-500', bgClass: 'bg-gray-50/50', borderLClass: 'border-l-gray-500', ringClass: 'ring-gray-500', borderClass: 'border-gray-200', textClass: 'text-gray-500', textThemeClass: 'text-gray-800', textNumClass: 'text-gray-900' },
   ] as const;
 
+  const autoProcedimentos = processos
+    .filter(p => {
+      if (procedimentos.some(proc => proc.pae === p.numero_processo)) return false;
+      return p.rito_processual === 'Adesão ARP' || 
+             p.rito_processual === 'Gerenciador da ARP' || 
+             p.rito_processual === 'Partícipe de ARP' ||
+             p.rito_processual?.includes('Pregão') ||
+             p.rito_processual?.includes('Dispensa') ||
+             p.rito_processual?.includes('Inexigibilidade');
+    })
+    .map(p => {
+      let modalidade = '';
+      if (p.rito_processual === 'Adesão ARP') modalidade = 'Adesão';
+      else if (p.rito_processual === 'Gerenciador da ARP') modalidade = 'Pregão Eletrônico (Gerenciador)';
+      else if (p.rito_processual === 'Partícipe de ARP') modalidade = 'Partícipe';
+      else if (p.rito_processual?.includes('Pregão')) modalidade = 'Pregão Eletrônico';
+      else if (p.rito_processual?.includes('Dispensa')) modalidade = 'Dispensa';
+      else if (p.rito_processual?.includes('Inexigibilidade')) modalidade = 'Inexigibilidade';
+      
+      return {
+        id: `auto-${p.id}`,
+        pae: p.numero_processo,
+        numero: 'Aguardando',
+        modalidade,
+        objeto: p.objeto,
+        fase: 'Pendente',
+        dataPublicacao: '-',
+        previsaoAbertura: '-',
+        isAuto: true
+      };
+    });
+
+  const todosProcedimentos = [...procedimentos, ...autoProcedimentos] as any[];
+
   const filtrarProcedimentos = (busca: string, tipoModalidade: string) => {
-    return procedimentos.filter(p => 
+    return todosProcedimentos.filter(p => 
       p.modalidade.toLowerCase().includes(tipoModalidade.toLowerCase()) &&
       (p.modalidade.toLowerCase().includes(busca.toLowerCase()) ||
        p.numero.includes(busca) ||
@@ -366,7 +348,14 @@ export default function ContratosArps() {
         else if (abaAtiva === 'adesoes') modalidade = 'Adesão';
         else if (abaAtiva === 'participe') modalidade = 'Partícipe';
       }
-      setProcedimentos([...procedimentos, { ...formData, id: newId, modalidade } as any]);
+      const linkedProcesso = processos.find(p => p.numero_processo === formData.pae);
+      const dataToSave = { 
+        ...formData, 
+        id: newId, 
+        modalidade, 
+        objeto: formData.objeto || linkedProcesso?.objeto || 'Objeto não informado' 
+      };
+      setProcedimentos([...procedimentos, dataToSave as any]);
     }
     
     setModalOpen(false);
@@ -667,7 +656,22 @@ export default function ContratosArps() {
                       <div className="md:col-span-2 flex items-end justify-between border-b border-gray-100 pb-4">
                         <div className="flex-1 mr-4">
                           <label className="block text-sm font-medium text-gray-700 mb-1">Nº PAE</label>
-                          <input type="text" name="pae" value={formData.pae || ''} onChange={handleInputChange} className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" />
+                          <input 
+                            type="text" 
+                            name="pae" 
+                            value={formData.pae || ''} 
+                            onChange={handleInputChange} 
+                            list="processos-list"
+                            className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" 
+                            placeholder="Selecione ou digite o PAE..."
+                          />
+                          <datalist id="processos-list">
+                            {processos.map((p) => (
+                              <option key={p.id} value={p.numero_processo}>
+                                {p.rito_processual ? `${p.rito_processual} - ${p.objeto}` : p.objeto}
+                              </option>
+                            ))}
+                          </datalist>
                         </div>
                         {abaAtiva === 'pregoes' && (
                           <div className="flex items-center mb-2">
@@ -686,28 +690,36 @@ export default function ContratosArps() {
                         )}
                       </div>
                       
-                      <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 border-l-4 border-blue-500 pl-4 py-3 bg-blue-50/50 rounded-r-md">
-                        <div className="sm:col-span-1">
-                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Demandante</label>
-                          <input type="text" className="mt-1 block w-full bg-transparent border-0 border-b border-gray-300 py-1 text-sm focus:ring-0 text-gray-600" placeholder="Vinculado automaticamente" readOnly />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Objeto</label>
-                          <input type="text" className="mt-1 block w-full bg-transparent border-0 border-b border-gray-300 py-1 text-sm focus:ring-0 text-gray-600" placeholder="Vinculado automaticamente" readOnly />
-                        </div>
-                        <div className="sm:col-span-1">
-                           <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Fonte / Dotação Orçamentária</label>
-                           <input type="text" className="mt-1 block w-full bg-transparent border-0 border-b border-gray-300 py-1 text-sm focus:ring-0 text-gray-600" placeholder="Vinculado automaticamente" readOnly />
-                        </div>
-                        <div className="sm:col-span-1">
-                           <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Estimado</label>
-                           <input type="text" className="mt-1 block w-full bg-transparent border-0 border-b border-gray-300 py-1 text-sm focus:ring-0 text-gray-600" placeholder="Vinculado automaticamente" readOnly />
-                        </div>
-                        <div className="sm:col-span-1">
-                           <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Nº do Parecer / BG</label>
-                           <input type="text" className="mt-1 block w-full bg-transparent border-0 border-b border-gray-300 py-1 text-sm focus:ring-0 text-gray-600" placeholder="Vinculado automaticamente" readOnly />
-                        </div>
-                      </div>
+                      {(() => {
+                        const linkedProcesso = processos.find(p => p.numero_processo === formData.pae);
+                        const linkedPca = linkedProcesso?.pca_id ? pcas.find(pca => pca.id === linkedProcesso.pca_id) : null;
+                        const valorFormatado = linkedPca?.valor_previsto ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(linkedPca.valor_previsto) : '';
+                        
+                        return (
+                          <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 border-l-4 border-blue-500 pl-4 py-3 bg-blue-50/50 rounded-r-md">
+                            <div className="sm:col-span-1">
+                              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Demandante</label>
+                              <input type="text" value={linkedProcesso?.unidade_demandante || ''} className="mt-1 block w-full bg-transparent border-0 border-b border-gray-300 py-1 text-sm focus:ring-0 text-gray-800 font-medium" placeholder="Vinculado automaticamente" readOnly />
+                            </div>
+                            <div className="sm:col-span-2">
+                              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Objeto</label>
+                              <input type="text" value={linkedProcesso?.objeto || ''} className="mt-1 block w-full bg-transparent border-0 border-b border-gray-300 py-1 text-sm focus:ring-0 text-gray-800 font-medium truncate" title={linkedProcesso?.objeto} placeholder="Vinculado automaticamente" readOnly />
+                            </div>
+                            <div className="sm:col-span-1">
+                               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Fonte / Dotação Orçamentária</label>
+                               <input type="text" value={linkedPca?.fonte_recurso || linkedProcesso?.fonte || ''} className="mt-1 block w-full bg-transparent border-0 border-b border-gray-300 py-1 text-sm focus:ring-0 text-gray-800 font-medium" placeholder="Vinculado automaticamente" readOnly />
+                            </div>
+                            <div className="sm:col-span-1">
+                               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Estimado</label>
+                               <input type="text" value={valorFormatado} className="mt-1 block w-full bg-transparent border-0 border-b border-gray-300 py-1 text-sm focus:ring-0 text-gray-800 font-medium" placeholder="Vinculado automaticamente" readOnly />
+                            </div>
+                            <div className="sm:col-span-1">
+                               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Nº do Parecer / BG</label>
+                               <input type="text" className="mt-1 block w-full bg-transparent border-0 border-b border-gray-300 py-1 text-sm focus:ring-0 text-gray-800 font-medium" placeholder="Vinculado automaticamente" readOnly />
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 

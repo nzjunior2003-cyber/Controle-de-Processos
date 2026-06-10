@@ -11,53 +11,7 @@ import { getOrCreateFolder, uploadFileToDrive } from '../lib/driveService';
 import { AlertasModal } from '../components/AlertasModal';
 
 // Mocks baseados fielmente nas colunas das planilhas enviadas
-const contratosMock = [
-  { 
-    id: '1', pae: '2020/201212', contrato: '053/2020', empresa: 'LUIZ VIANA TRANSPORTE LTDA', 
-    objeto: 'Locação de veículos tipo pick-up/ Auto Busca e Salvamento',
-    valorGlobal: 1089417.12, inicioVigencia: '2025-06-23', fimVigencia: '2026-06-23', 
-    fiscalTitular: '1º TEN QOABM JOELMIR', fiscalEmail: 'ten.nunes17@gmail.com', portaria: '045/2024',
-    fiscalSuplente: '2º TEN QOABM SILVA', fiscalSuplenteEmail: 'silva@gmail.com', contatosFornecedor: '(91) 98888-7777 / contato@luizviana.com.br',
-    fonteRecurso: 'Tesouro Estadual', prd: '123/2020', empenho: '2020NE00123', dotacao: '06.122.1407.4776.0000',
-    linkContrato: 'https://sei.pa.gov.br/sei/controlador.php?acao=documento_visualizar&acao_origem=arvore_visualizar&id_documento=11111'
-  },
-  { 
-    id: '2', pae: '2020/209232', contrato: '041/2021', empresa: 'PRODEPA', 
-    objeto: 'Prestação de serviços de tecnologia da informação e comunicação.',
-    valorGlobal: 459468.48, inicioVigencia: '2025-04-03', fimVigencia: '2026-04-02', 
-    fiscalTitular: 'MAJ QOBM EMERSON', fiscalEmail: 'emersoncsmoraes@gmail.com', portaria: '012/2024',
-    fiscalSuplente: 'CAP QOBM ANDRÉ', fiscalSuplenteEmail: 'andre@gmail.com', contatosFornecedor: '(91) 99999-8888 / comercial@prodepa.pa.gov.br',
-    fonteRecurso: 'FESPDS', prd: '456/2021', empenho: '2021NE00456', dotacao: '06.126.1407.4776.0000',
-    linkContrato: 'https://sei.pa.gov.br/sei/controlador.php?acao=documento_visualizar&acao_origem=arvore_visualizar&id_documento=22222'
-  },
-  { 
-    id: '3', pae: '2022/406950', contrato: '146/2022', empresa: 'PRINT SOLUTION SERVIÇOS', 
-    objeto: 'Contratação de empresa especializada na solução de terceirização de impressão',
-    valorGlobal: 503259.54, inicioVigencia: '2024-12-24', fimVigencia: '2025-12-23', 
-    fiscalTitular: 'CAP QOBM SILVA', fiscalEmail: 'silva.print@cbmpa.gov.br', portaria: '118/2024',
-    fiscalSuplente: '1º TEN QOBM PEREIRA', fiscalSuplenteEmail: 'pereira@gmail.com', contatosFornecedor: '(11) 97777-6666 / print@printsolution.com.br',
-    fonteRecurso: 'Tesouro Estadual', prd: '789/2022', empenho: '2022NE00789', dotacao: '06.122.1407.4776.0000',
-    linkContrato: null
-  },
-  { 
-    id: '4', pae: '2023/882222', contrato: '105/2023', empresa: 'O.I.S.A', 
-    objeto: 'Prestação de Serviços de Comunicação Corporativa de Link de Internet',
-    valorGlobal: 1101119.40, inicioVigencia: '2025-09-14', fimVigencia: '2026-09-14', 
-    fiscalTitular: 'CEL QOBM LUCIANO', fiscalEmail: 'mesoluciano@gmail.com', portaria: '089/2025',
-    fiscalSuplente: 'MAJ QOBM PEREZ', fiscalSuplenteEmail: 'perez@gmail.com', contatosFornecedor: '(91) 98888-1111 / oisa@oisa.com',
-    fonteRecurso: 'FESPDS', prd: '111/2023', empenho: '2023NE00111', dotacao: '06.126.1407.4776.0000',
-    linkContrato: null
-  },
-  { 
-    id: '5', pae: '2026/012345', contrato: '055/2021', empresa: 'NF CAPACITAÇÃO E SOLUÇÕES', 
-    objeto: 'Acesso a banco de dados',
-    valorGlobal: 10743.11, inicioVigencia: '2025-06-22', fimVigencia: '2026-06-21', 
-    fiscalTitular: 'SGT QBM RARRARA', fiscalEmail: 'kitarrarabm@hotmail.com', portaria: '034/2024',
-    fiscalSuplente: 'CB BM JUNIOR', fiscalSuplenteEmail: 'junior@gmail.com', contatosFornecedor: '(61) 97777-2222 / nf@nfcapacitacao.com.br',
-    fonteRecurso: 'Tesouro Estadual', prd: '222/2021', empenho: '2021NE00222', dotacao: '06.126.1407.4776.0000',
-    linkContrato: null
-  }
-];
+const contratosMock: any[] = [];
 
 export default function GestaoContratos() {
   const { processos, pcas, usuarioAtual } = useApp();
@@ -66,10 +20,7 @@ export default function GestaoContratos() {
   const [abaAtiva, setAbaAtiva] = useState<'geral' | 'alertas'>('geral');
   const [modalExecucao, setModalExecucao] = useState(false);
   const [contratoSelecionado, setContratoSelecionado] = useState<any>(null);
-  const [execucoes, setExecucoes] = useState<any[]>([
-    { id: 1, contratoId: '1', nf: '001234', data: '2025-07-15', valor: 50000, observacao: 'Faturamento ref ao mês de Junho/2025', arquivoLink: null },
-    { id: 2, contratoId: '1', nf: '001289', data: '2025-08-16', valor: 45000, observacao: 'Faturamento ref ao mês de Julho/2025', arquivoLink: null },
-  ]);
+  const [execucoes, setExecucoes] = useState<any[]>([]);
   const [novaNota, setNovaNota] = useState<{ nf: string, data: string, valor: string, observacao: string, arquivo: File | null }>({ nf: '', data: '', valor: '', observacao: '', arquivo: null });
   const [isUploading, setIsUploading] = useState(false);
   const [abaModal, setAbaModal] = useState<'execucao' | 'notificacoes'>('execucao');
