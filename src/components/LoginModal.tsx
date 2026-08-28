@@ -146,6 +146,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                 label="Senha"
                 icon={Lock}
                 type="password"
+                showToggle
                 required
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
