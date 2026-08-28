@@ -1,4 +1,41 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+  type User as FirebaseUser,
+} from 'firebase/auth';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  onSnapshot,
+  setDoc,
+  updateDoc,
+  writeBatch,
+} from 'firebase/firestore';
+import {
+  criarContaAuthIsolada,
+  getDb,
+  getFirebaseAuth,
+  isFirebaseConfigured,
+  mensagemErroAuth,
+  requireDb,
+  requireFirebaseAuth,
+} from '../lib/firebase';
+import { mapSheetArrayToPca, mapSheetRowToPca, type LinhaPlanilha } from '../lib/csv';
 import {
   Processo,
   Setor,
@@ -7,7 +44,14 @@ import {
   PCA,
   Alerta,
   Parecer,
+  Contrato,
+  ProcedimentoLicitatorio,
+  ProcessoSancionatorio,
+  PortariaFiscal,
 } from '../types';
+
+const URL_PLANILHA_PCA =
+  'https://docs.google.com/spreadsheets/d/1-XrRG5oLqrcMPLNHePm3KS4671vCp1r0/gviz/tq?tqx=out:csv&sheet=GERAL%20PCA';
 
 interface AppContextData {
   setores: Setor[];
@@ -17,347 +61,619 @@ interface AppContextData {
   movimentacoes: MovimentacaoProcesso[];
   alertas: Alerta[];
   pareceres: Parecer[];
+  contratos: Contrato[];
+  procedimentos: ProcedimentoLicitatorio[];
+  sancionatorios: ProcessoSancionatorio[];
+  portarias: PortariaFiscal[];
   usuarioAtual: Usuario | null;
   isAuthenticated: boolean;
-  login: (email: string, senha?: string) => void;
-  logout: () => void;
-  addProcesso: (processo: Omit<Processo, 'id' | 'criado_em' | 'atualizado_em' | 'status' | 'possui_alerta' | 'data_abertura'>) => void;
-  updateProcessoStatus: (id: string, status: Processo['status'], fase_id?: string) => void;
-  updateProcesso: (id: string, dados: Partial<Processo>) => void;
-  addMovimentacao: (movimentacao: Omit<MovimentacaoProcesso, 'id' | 'data_movimentacao'>) => void;
+  /** true enquanto o estado de autenticação ainda não foi resolvido. */
+  carregandoAuth: boolean;
+  /** false quando faltam as variáveis VITE_FIREBASE_* no .env. */
+  firebaseConfigurado: boolean;
+  login: (email: string, senha?: string) => Promise<void>;
+  logout: () => Promise<void>;
+  solicitarAcesso: (dados: {
+    nome: string;
+    email: string;
+    senha: string;
+    cargo?: string;
+  }) => Promise<void>;
+  enviarResetSenha: (email: string) => Promise<void>;
+  addProcesso: (
+    processo: Omit<
+      Processo,
+      'id' | 'criado_em' | 'atualizado_em' | 'status' | 'possui_alerta' | 'data_abertura'
+    >,
+  ) => Promise<void>;
+  updateProcessoStatus: (
+    id: string,
+    status: Processo['status'],
+    fase_id?: string,
+  ) => Promise<void>;
+  updateProcesso: (id: string, dados: Partial<Processo>) => Promise<void>;
+  addMovimentacao: (
+    movimentacao: Omit<MovimentacaoProcesso, 'id' | 'data_movimentacao'>,
+  ) => Promise<void>;
   syncPcasFromPublicUrl: (url: string) => Promise<void>;
-  updateUsuario: (id: string, dados: Partial<Usuario>) => void;
-  addUsuario: (dados: Omit<Usuario, 'id'>) => void;
-  deleteUsuario: (id: string) => void;
+  updateUsuario: (id: string, dados: Partial<Usuario>) => Promise<void>;
+  addUsuario: (dados: Omit<Usuario, 'id'> & { senha?: string }) => Promise<void>;
+  deleteUsuario: (id: string) => Promise<void>;
+  addContrato: (dados: Omit<Contrato, 'id'>) => Promise<void>;
+  updateContrato: (id: string, dados: Partial<Contrato>) => Promise<void>;
+  deleteContrato: (id: string) => Promise<void>;
+  addProcedimento: (dados: Omit<ProcedimentoLicitatorio, 'id'>) => Promise<void>;
+  updateProcedimento: (id: string, dados: Partial<ProcedimentoLicitatorio>) => Promise<void>;
+  addSancionatorio: (dados: Omit<ProcessoSancionatorio, 'id'>) => Promise<void>;
+  updateSancionatorio: (id: string, dados: Partial<ProcessoSancionatorio>) => Promise<void>;
+  addPortaria: (dados: Omit<PortariaFiscal, 'id'>) => Promise<void>;
+  updatePortaria: (id: string, dados: Partial<PortariaFiscal>) => Promise<void>;
 }
 
+/**
+ * Setores são configuração estática do fluxo do CBMPA (não são dados de
+ * usuário), por isso continuam no código.
+ */
 const SETORES: Setor[] = [
   { id: '1', nome: 'Demandante', sigla: 'DEM', ordem_fluxo: 1 },
   { id: '2', nome: 'Diretoria de Finanças / FEBOM', sigla: 'DF/FEBOM', ordem_fluxo: 2 },
   { id: '3', nome: 'Gabinete do Cmt Geral', sigla: 'GCG', ordem_fluxo: 3 },
   { id: '4', nome: 'Secretaria de Planejamento e Admnistração', sigla: 'SEPLAD', ordem_fluxo: 4 },
-  { id: '5', nome: 'Grupo de Trabalho de Acompanhamento Financeiro', sigla: 'GTAF', ordem_fluxo: 5 },
+  {
+    id: '5',
+    nome: 'Grupo de Trabalho de Acompanhamento Financeiro',
+    sigla: 'GTAF',
+    ordem_fluxo: 5,
+  },
   { id: '6', nome: 'Consultoria Jurídica', sigla: 'CONJUR', ordem_fluxo: 6 },
   { id: '7', nome: 'Delegacia de Controle Administrativo', sigla: 'DCA', ordem_fluxo: 7 },
 ];
 
-const USUARIOS: Usuario[] = [
-  {
-    id: 'u1',
-    nome: 'CBMPA Admin',
-    email: 'admin@cbmpa.gov.br',
-    setor_id: '1',
-    perfil: 'master',
-    ativo: true,
-  },
-  {
-    id: 'u2',
-    nome: 'Usuário Master',
-    email: 'master@cbmpa.gov.br',
-    setor_id: '1',
-    perfil: 'master',
-    ativo: true,
-  },
-  {
-    id: 'u3',
-    nome: '1º TEN QOABM JOELMIR',
-    email: 'ten.nunes17@gmail.com',
-    setor_id: '1',
-    perfil: 'fiscal',
-    ativo: true,
-  },
-  {
-    id: 'u4',
-    nome: 'SGT QBM RARRARA',
-    email: 'kitarrarabm@hotmail.com',
-    setor_id: '1',
-    perfil: 'fiscal',
-    ativo: true,
-  }
-];
-
-const PCAS: PCA[] = [
-  {
-    id: 'pca-1',
-    codigo_pca: 'PCA-2026-001',
-    objeto_pca: 'Aquisição de Viaturas de Resgate',
-    exercicio: 2026,
-    unidade_responsavel: 'Logística',
-    valor_previsto: 1500000.00,
-    item_pca: 'Item 1',
-    grupo_pca: 'Grupo 1',
-    fonte_recurso: 'Fonte 1',
-  },
-  {
-    id: 'pca-2',
-    codigo_pca: 'PCA-2026-002',
-    objeto_pca: 'Contratação de Serviço de Manutenção de EPIs',
-    exercicio: 2026,
-    unidade_responsavel: 'Logística',
-    valor_previsto: 500000.00,
-    item_pca: 'Item 2',
-    grupo_pca: 'Grupo 2',
-    fonte_recurso: 'Fonte 2',
-  }
-];
-
 const AppContext = createContext<AppContextData>({} as AppContextData);
 
-export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [processos, setProcessos] = useState<Processo[]>([]);
-  const [movimentacoes, setMovimentacoes] = useState<MovimentacaoProcesso[]>([]);
-  const [alertas, setAlertas] = useState<Alerta[]>([]);
-  const [pareceres, setPareceres] = useState<Parecer[]>([]);
-  const [pcas, setPcas] = useState<PCA[]>(PCAS);
-  const [usuarioAtual, setUsuarioAtual] = useState<Usuario | null>(null);
-
-  const [usuarios, setUsuarios] = useState<Usuario[]>(USUARIOS);
-  const isAuthenticated = !!usuarioAtual;
-
-  const login = (email: string, senha?: string) => {
-    // mock login logic
-    const user = usuarios.find(u => u.email === email);
-    
-    if (!user) {
-      alert("Usuário não encontrado!");
-      return false;
-    }
-    
-    if (!user.ativo) {
-      alert("Seu usuário não está ativo. Aguarde aprovação.");
-      return false;
-    }
-    
-    if (user.senha && user.senha !== senha && senha !== '123456') { // Allowing a backdoor for mock purposes just in case
-      alert("Senha incorreta!");
-      return false;
-    }
-
-    setUsuarioAtual(user);
-    return true;
-  };
-
-  const logout = () => {
-    setUsuarioAtual(null);
-  };
+/** Assina uma coleção do Firestore em tempo real (somente quando autenticado). */
+function useColecao<T extends { id: string }>(nome: string, ativo: boolean): T[] {
+  const [dados, setDados] = useState<T[]>([]);
 
   useEffect(() => {
-    const fetchPcas = async () => {
-      try {
-        const fetchUrl = 'https://docs.google.com/spreadsheets/d/1-XrRG5oLqrcMPLNHePm3KS4671vCp1r0/gviz/tq?tqx=out:csv&sheet=GERAL%20PCA';
-        const res = await fetch(fetchUrl);
-        if (!res.ok) return;
-        
-        const csvText = await res.text();
-        const Papa = (await import('papaparse')).default;
-        
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            const rows = results.data as any[];
-            if (rows.length > 0) {
-              const newPcas: PCA[] = rows.map((row, index) => {
-                // Ensure we get raw text values correctly
-                const getVal = (key: string) => row[key] || '';
-                
-                return {
-                  id: `pca-sheet-${index}`,
-                  codigo_pca: getVal('ORDEM'),
-                  objeto_pca: getVal('DESCRIÇÃO'),
-                  exercicio: new Date().getFullYear(),
-                  unidade_responsavel: getVal('DEMANDANTE'),
-                  valor_previsto: parseFloat(String(getVal('VALOR DO RECURSO')).replace(/[^\d.,-]/g, '').replace(/\./g, '').replace(',', '.')) || 0,
-                  item_pca: getVal('ITEM'),
-                  grupo_pca: getVal('GRUPO'),
-                  fonte_recurso: getVal('FONTE DO RECURSO'),
-                };
-              });
-              setPcas(newPcas.filter(p => !!p.codigo_pca)); // filter out empty rows
-            }
-          }
-        });
-      } catch (err) {
-        console.error("Erro ao carregar PCAs automaticamente", err);
-      }
-    };
+    const db = getDb();
+    if (!ativo || !db) {
+      setDados([]);
+      return;
+    }
 
-    fetchPcas();
+    const cancelar = onSnapshot(
+      collection(db, nome),
+      (snapshot) => {
+        setDados(
+          snapshot.docs.map((documento) => ({
+            ...(documento.data() as object),
+            id: documento.id,
+          })) as T[],
+        );
+      },
+      (erro) => {
+        console.error(`Erro ao carregar a coleção "${nome}":`, erro);
+      },
+    );
+
+    return () => cancelar();
+  }, [nome, ativo]);
+
+  return dados;
+}
+
+export const AppProvider = ({ children }: { children: ReactNode }) => {
+  const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
+  const [perfil, setPerfil] = useState<Usuario | null>(null);
+  const [carregandoAuth, setCarregandoAuth] = useState(isFirebaseConfigured);
+
+  // --- Autenticação -------------------------------------------------------
+  useEffect(() => {
+    const auth = getFirebaseAuth();
+    if (!auth) {
+      setCarregandoAuth(false);
+      return;
+    }
+
+    return onAuthStateChanged(auth, (user) => {
+      setAuthUser(user);
+      if (!user) {
+        setPerfil(null);
+        setCarregandoAuth(false);
+      }
+    });
   }, []);
 
-  const syncPcasFromPublicUrl = async (url: string) => {
-    // Mantém a função para retrocompatibilidade, mas pode não ser mais necessária se é automático
+  // Documento de perfil (coleção `usuarios`, id = UID do Firebase Auth).
+  useEffect(() => {
+    const db = getDb();
+    if (!authUser || !db) {
+      setPerfil(null);
+      return;
+    }
 
+    setCarregandoAuth(true);
+    const cancelar = onSnapshot(
+      doc(db, 'usuarios', authUser.uid),
+      (snapshot) => {
+        setPerfil(
+          snapshot.exists()
+            ? ({ ...(snapshot.data() as object), id: snapshot.id } as Usuario)
+            : null,
+        );
+        setCarregandoAuth(false);
+      },
+      (erro) => {
+        console.error('Erro ao carregar o perfil do usuário:', erro);
+        setPerfil(null);
+        setCarregandoAuth(false);
+      },
+    );
+
+    return () => cancelar();
+  }, [authUser]);
+
+  const usuarioAtual = perfil && perfil.ativo ? perfil : null;
+  const isAuthenticated = !!usuarioAtual;
+
+  // --- Coleções -----------------------------------------------------------
+  const usuarios = useColecao<Usuario>('usuarios', isAuthenticated);
+  const processos = useColecao<Processo>('processos', isAuthenticated);
+  const movimentacoes = useColecao<MovimentacaoProcesso>('movimentacoes', isAuthenticated);
+  const pcas = useColecao<PCA>('pcas', isAuthenticated);
+  const alertas = useColecao<Alerta>('alertas', isAuthenticated);
+  const pareceres = useColecao<Parecer>('pareceres', isAuthenticated);
+  const contratos = useColecao<Contrato>('contratos', isAuthenticated);
+  const procedimentos = useColecao<ProcedimentoLicitatorio>('procedimentos', isAuthenticated);
+  const sancionatorios = useColecao<ProcessoSancionatorio>('sancionatorios', isAuthenticated);
+  const portarias = useColecao<PortariaFiscal>('portarias', isAuthenticated);
+
+  // --- Autenticação: ações ------------------------------------------------
+  const login = useCallback(async (email: string, senha?: string) => {
     try {
-      const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      if (!match) throw new Error("URL inválida. Não foi possível encontrar o ID da planilha.");
-      const spreadsheetId = match[1];
+      const auth = requireFirebaseAuth();
+      const db = requireDb();
+      const credencial = await signInWithEmailAndPassword(auth, email, senha ?? '');
+      const perfilSnap = await getDoc(doc(db, 'usuarios', credencial.user.uid));
 
-      // Use the gviz/tq endpoint which allows CORS and outputs CSV for public sheets
-      const fetchUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv`;
-      
-      const res = await fetch(fetchUrl);
-      if (!res.ok) throw new Error("Não foi possível acessar a planilha. Verifique se ela está pública ('Qualquer pessoa com o link').");
-      
-      const csvText = await res.text();
-      
-      // We will parse with PapaParse
-      const Papa = (await import('papaparse')).default;
-      
-      Papa.parse(csvText, {
-        header: false,
-        skipEmptyLines: true,
-        complete: (results) => {
-          const rows = results.data as string[][];
-          if (rows.length > 1) { // Skip header assuming row 0 is header
-            const newPcas: PCA[] = rows.slice(1).map((row: string[], index: number) => ({
-              id: `pca-sheet-${index}`,
-              codigo_pca: row[0] || `PCA-X-${index}`,
-              objeto_pca: row[1] || 'Sem Objeto',
-              exercicio: parseInt(row[2]) || new Date().getFullYear(),
-              unidade_responsavel: row[3] || 'Desconhecida',
-              valor_previsto: parseFloat(row[4]?.replace(/[^\d.,-]/g, '').replace(',', '.')) || 0,
-              item_pca: row[5] || '',
-              grupo_pca: row[6] || '',
-              fonte_recurso: row[7] || '',
-            }));
-            setPcas(newPcas);
-            alert(`Sincronizado ${newPcas.length} itens do PCA!`);
-          } else {
-            alert('A planilha parece estar vazia ou a estrutura não foi reconhecida.');
-          }
-        },
-        error: (error: any) => {
-          throw new Error('Erro ao processar as colunas: ' + error.message);
-        }
-      });
-    } catch (err: any) {
-      console.error("Sync error: ", err);
-      alert('Erro ao sincronizar planilha: ' + err.message);
-    }
-  };
-
-  const addProcesso = (dados: Omit<Processo, 'id' | 'criado_em' | 'atualizado_em' | 'status' | 'possui_alerta' | 'data_abertura'>) => {
-    const novoProcesso: Processo = {
-      ...dados,
-      id: crypto.randomUUID(),
-      status: 'em_andamento',
-      fase_atual_id: dados.fase_atual_id || '1', 
-      possui_alerta: false,
-      data_abertura: new Date().toISOString(),
-      data_entrada: dados.data_entrada || new Date().toISOString(),
-      ultima_tramitacao: dados.ultima_tramitacao || new Date().toISOString(),
-      criado_em: new Date().toISOString(),
-      atualizado_em: new Date().toISOString(),
-    };
-    
-    setProcessos(prev => [...prev, novoProcesso]);
-    
-    // Auto start first movement
-    addMovimentacao({
-      processo_id: novoProcesso.id,
-      setor_id: novoProcesso.fase_atual_id,
-      usuario_id: usuarioAtual?.id || 'u1',
-      status_movimentacao: 'concluido',
-      observacao: 'Abertura do processo',
-    });
-  };
-
-  const updateProcessoStatus = (id: string, status: Processo['status'], fase_id?: string) => {
-    setProcessos(prev => prev.map(p => {
-      if (p.id === id) {
-        return {
-          ...p,
-          status,
-          ...(fase_id ? { fase_atual_id: fase_id, ultima_tramitacao: new Date().toISOString() } : {}),
-          atualizado_em: new Date().toISOString(),
-        };
+      if (!perfilSnap.exists()) {
+        await signOut(auth);
+        throw new Error(
+          'Perfil de usuário não encontrado no sistema. Solicite acesso ao administrador.',
+        );
       }
-      return p;
-    }));
-  };
 
-  const updateProcesso = (id: string, dados: Partial<Processo>) => {
-    setProcessos(prev => prev.map(p => {
-      if (p.id === id) {
-        return {
-          ...p,
-          ...dados,
-          atualizado_em: new Date().toISOString(),
-        };
+      const perfilCarregado = {
+        ...(perfilSnap.data() as object),
+        id: perfilSnap.id,
+      } as Usuario;
+
+      if (!perfilCarregado.ativo) {
+        await signOut(auth);
+        throw new Error('Seu usuário ainda não foi aprovado por um administrador.');
       }
-      return p;
-    }));
-  };
 
-  const addMovimentacao = (dados: Omit<MovimentacaoProcesso, 'id' | 'data_movimentacao'>) => {
-    const novaMov = {
-      ...dados,
-      id: crypto.randomUUID(),
-      data_movimentacao: new Date().toISOString(),
-    };
-    setMovimentacoes(prev => [...prev, novaMov]);
-  };
+      setPerfil(perfilCarregado);
+    } catch (erro) {
+      throw new Error(mensagemErroAuth(erro));
+    }
+  }, []);
 
-  const updateUsuario = (id: string, dados: Partial<Usuario>) => {
-    setUsuarios(prev => prev.map(u => {
-      if (u.id === id) {
-        return {
-          ...u,
-          ...dados,
-        };
+  const logout = useCallback(async () => {
+    const auth = getFirebaseAuth();
+    if (auth) await signOut(auth);
+    setPerfil(null);
+    setAuthUser(null);
+  }, []);
+
+  const solicitarAcesso = useCallback(
+    async ({
+      nome,
+      email,
+      senha,
+      cargo,
+    }: {
+      nome: string;
+      email: string;
+      senha: string;
+      cargo?: string;
+    }) => {
+      try {
+        const auth = requireFirebaseAuth();
+        const db = requireDb();
+        const credencial = await createUserWithEmailAndPassword(auth, email, senha);
+
+        // O perfil nasce inativo: um master precisa aprovar em /sistema/usuarios.
+        await setDoc(doc(db, 'usuarios', credencial.user.uid), {
+          nome,
+          email,
+          cargo: cargo ?? '',
+          perfil: 'fiscal',
+          setor_id: '1',
+          ativo: false,
+        });
+
+        await signOut(auth);
+      } catch (erro) {
+        throw new Error(mensagemErroAuth(erro));
       }
-      return u;
-    }));
-    // Se for o usuário atual, atualiza
-    if (usuarioAtual?.id === id) {
-      setUsuarioAtual(prev => prev ? { ...prev, ...dados } : null);
-    }
-  };
-
-  const addUsuario = (dados: Omit<Usuario, 'id'>) => {
-    const novoUsuario: Usuario = {
-      ativo: false, // Default if not provided
-      ...dados,
-      id: crypto.randomUUID(),
-    };
-    setUsuarios(prev => [...prev, novoUsuario]);
-  };
-
-  const deleteUsuario = (id: string) => {
-    setUsuarios(prev => prev.filter(u => u.id !== id));
-    if (usuarioAtual?.id === id) {
-      logout();
-    }
-  };
-
-  return (
-    <AppContext.Provider
-      value={{
-        setores: SETORES,
-        usuarios,
-        processos,
-        pcas,
-        movimentacoes,
-        alertas,
-        pareceres,
-        usuarioAtual,
-        isAuthenticated,
-        login,
-        logout,
-        addProcesso,
-        updateProcessoStatus,
-        updateProcesso,
-        addMovimentacao,
-        syncPcasFromPublicUrl,
-        updateUsuario,
-        addUsuario,
-        deleteUsuario,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
+    },
+    [],
   );
+
+  const enviarResetSenha = useCallback(async (email: string) => {
+    try {
+      const auth = requireFirebaseAuth();
+      await sendPasswordResetEmail(auth, email);
+    } catch (erro) {
+      throw new Error(mensagemErroAuth(erro));
+    }
+  }, []);
+
+  // --- PCA ----------------------------------------------------------------
+  const gravarPcas = useCallback(async (novos: PCA[]) => {
+    const db = getDb();
+    if (!db || novos.length === 0) return;
+
+    // Firestore aceita no máximo 500 operações por lote.
+    for (let inicio = 0; inicio < novos.length; inicio += 400) {
+      const lote = writeBatch(db);
+      novos.slice(inicio, inicio + 400).forEach((pca) => {
+        const campos: Record<string, unknown> = { ...pca };
+        lote.set(doc(db, 'pcas', pca.id), campos);
+      });
+      await lote.commit();
+    }
+  }, []);
+
+  /**
+   * Importa o PCA da planilha pública do CBMPA e persiste em `pcas`.
+   * Roda apenas uma vez, quando o usuário está autenticado e a coleção
+   * ainda está vazia — depois disso os dados vêm do Firestore.
+   */
+  useEffect(() => {
+    if (!isAuthenticated || pcas.length > 0) return;
+
+    let cancelado = false;
+
+    const importarPcas = async () => {
+      try {
+        const resposta = await fetch(URL_PLANILHA_PCA);
+        if (!resposta.ok) return;
+
+        const csv = await resposta.text();
+        const Papa = (await import('papaparse')).default;
+
+        Papa.parse<LinhaPlanilha>(csv, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (resultado) => {
+            if (cancelado) return;
+            const novos = resultado.data
+              .map((linha, indice) => mapSheetRowToPca(linha, indice))
+              .filter((pca) => !!pca.codigo_pca);
+            if (novos.length > 0) {
+              gravarPcas(novos).catch((erro) =>
+                console.error('Erro ao gravar o PCA no Firestore:', erro),
+              );
+            }
+          },
+        });
+      } catch (erro) {
+        console.error('Erro ao carregar PCAs automaticamente', erro);
+      }
+    };
+
+    importarPcas();
+    return () => {
+      cancelado = true;
+    };
+  }, [isAuthenticated, pcas.length, gravarPcas]);
+
+  const syncPcasFromPublicUrl = useCallback(
+    async (url: string) => {
+      try {
+        const correspondencia = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (!correspondencia) {
+          throw new Error('URL inválida. Não foi possível encontrar o ID da planilha.');
+        }
+
+        const fetchUrl = `https://docs.google.com/spreadsheets/d/${correspondencia[1]}/gviz/tq?tqx=out:csv`;
+        const resposta = await fetch(fetchUrl);
+        if (!resposta.ok) {
+          throw new Error(
+            "Não foi possível acessar a planilha. Verifique se ela está pública ('Qualquer pessoa com o link').",
+          );
+        }
+
+        const csv = await resposta.text();
+        const Papa = (await import('papaparse')).default;
+
+        const resultado = Papa.parse<string[]>(csv, {
+          header: false,
+          skipEmptyLines: true,
+        });
+
+        const linhas = resultado.data;
+        if (linhas.length <= 1) {
+          alert('A planilha parece estar vazia ou a estrutura não foi reconhecida.');
+          return;
+        }
+
+        const novos = linhas
+          .slice(1)
+          .map((colunas, indice) => mapSheetArrayToPca(colunas, indice));
+
+        await gravarPcas(novos);
+        alert(`Sincronizado ${novos.length} itens do PCA!`);
+      } catch (erro) {
+        console.error('Sync error: ', erro);
+        alert(
+          'Erro ao sincronizar planilha: ' +
+            (erro instanceof Error ? erro.message : String(erro)),
+        );
+      }
+    },
+    [gravarPcas],
+  );
+
+  // --- Movimentações / Processos ------------------------------------------
+  const addMovimentacao = useCallback(
+    async (dados: Omit<MovimentacaoProcesso, 'id' | 'data_movimentacao'>) => {
+      const db = requireDb();
+      await addDoc(collection(db, 'movimentacoes'), {
+        ...dados,
+        data_movimentacao: new Date().toISOString(),
+      });
+    },
+    [],
+  );
+
+  const addProcesso = useCallback(
+    async (
+      dados: Omit<
+        Processo,
+        'id' | 'criado_em' | 'atualizado_em' | 'status' | 'possui_alerta' | 'data_abertura'
+      >,
+    ) => {
+      const db = requireDb();
+      const agora = new Date().toISOString();
+      const novoProcesso = {
+        ...dados,
+        status: 'em_andamento' as const,
+        fase_atual_id: dados.fase_atual_id || '1',
+        possui_alerta: false,
+        data_abertura: agora,
+        data_entrada: dados.data_entrada || agora,
+        ultima_tramitacao: dados.ultima_tramitacao || agora,
+        criado_em: agora,
+        atualizado_em: agora,
+      };
+
+      const referencia = await addDoc(collection(db, 'processos'), novoProcesso);
+
+      await addMovimentacao({
+        processo_id: referencia.id,
+        setor_id: novoProcesso.fase_atual_id,
+        usuario_id: usuarioAtual?.id ?? '',
+        status_movimentacao: 'concluido',
+        observacao: 'Abertura do processo',
+      });
+    },
+    [addMovimentacao, usuarioAtual],
+  );
+
+  const updateProcesso = useCallback(async (id: string, dados: Partial<Processo>) => {
+    const db = requireDb();
+    await updateDoc(doc(db, 'processos', id), {
+      ...dados,
+      atualizado_em: new Date().toISOString(),
+    });
+  }, []);
+
+  const updateProcessoStatus = useCallback(
+    async (id: string, status: Processo['status'], fase_id?: string) => {
+      const db = requireDb();
+      await updateDoc(doc(db, 'processos', id), {
+        status,
+        ...(fase_id
+          ? { fase_atual_id: fase_id, ultima_tramitacao: new Date().toISOString() }
+          : {}),
+        atualizado_em: new Date().toISOString(),
+      });
+    },
+    [],
+  );
+
+  // --- Usuários -----------------------------------------------------------
+  const updateUsuario = useCallback(async (id: string, dados: Partial<Usuario>) => {
+    const db = requireDb();
+    const campos: Record<string, unknown> = { ...dados };
+    delete campos.id;
+    delete campos.senha;
+    await updateDoc(doc(db, 'usuarios', id), campos);
+  }, []);
+
+  /**
+   * Cria a conta no Firebase Auth (numa instância isolada, para não derrubar a
+   * sessão do master) e o documento de perfil correspondente. A senha nunca é
+   * gravada no Firestore.
+   */
+  const addUsuario = useCallback(
+    async (dados: Omit<Usuario, 'id'> & { senha?: string }) => {
+      try {
+        const db = requireDb();
+        const { senha, ...perfilNovo } = dados;
+        if (!senha) {
+          throw new Error('Informe uma senha inicial para o novo usuário.');
+        }
+
+        const uid = await criarContaAuthIsolada(perfilNovo.email, senha);
+        const campos: Record<string, unknown> = { ...perfilNovo };
+        delete campos.senha;
+        await setDoc(doc(db, 'usuarios', uid), campos);
+      } catch (erro) {
+        throw new Error(mensagemErroAuth(erro));
+      }
+    },
+    [],
+  );
+
+  /**
+   * Remove o documento de perfil. A conta no Firebase Authentication só pode
+   * ser excluída pelo Console ou pelo Admin SDK (não é possível pelo cliente).
+   */
+  const deleteUsuario = useCallback(
+    async (id: string) => {
+      const db = requireDb();
+      await deleteDoc(doc(db, 'usuarios', id));
+      if (usuarioAtual?.id === id) {
+        await logout();
+      }
+    },
+    [logout, usuarioAtual],
+  );
+
+  // --- Contratos e afins --------------------------------------------------
+  const criarEm = useCallback(async (colecao: string, dados: object) => {
+    const db = requireDb();
+    const agora = new Date().toISOString();
+    const campos: Record<string, unknown> = { ...dados };
+    delete campos.id;
+    campos.criado_em = agora;
+    campos.atualizado_em = agora;
+    await addDoc(collection(db, colecao), campos);
+  }, []);
+
+  const atualizarEm = useCallback(async (colecao: string, id: string, dados: object) => {
+    const db = requireDb();
+    const campos: Record<string, unknown> = { ...dados };
+    delete campos.id;
+    campos.atualizado_em = new Date().toISOString();
+    await updateDoc(doc(db, colecao, id), campos);
+  }, []);
+
+  const addContrato = useCallback(
+    (dados: Omit<Contrato, 'id'>) => criarEm('contratos', dados),
+    [criarEm],
+  );
+  const updateContrato = useCallback(
+    (id: string, dados: Partial<Contrato>) => atualizarEm('contratos', id, dados),
+    [atualizarEm],
+  );
+  const deleteContrato = useCallback(async (id: string) => {
+    const db = requireDb();
+    await deleteDoc(doc(db, 'contratos', id));
+  }, []);
+
+  const addProcedimento = useCallback(
+    (dados: Omit<ProcedimentoLicitatorio, 'id'>) => criarEm('procedimentos', dados),
+    [criarEm],
+  );
+  const updateProcedimento = useCallback(
+    (id: string, dados: Partial<ProcedimentoLicitatorio>) =>
+      atualizarEm('procedimentos', id, dados),
+    [atualizarEm],
+  );
+
+  const addSancionatorio = useCallback(
+    (dados: Omit<ProcessoSancionatorio, 'id'>) => criarEm('sancionatorios', dados),
+    [criarEm],
+  );
+  const updateSancionatorio = useCallback(
+    (id: string, dados: Partial<ProcessoSancionatorio>) =>
+      atualizarEm('sancionatorios', id, dados),
+    [atualizarEm],
+  );
+
+  const addPortaria = useCallback(
+    (dados: Omit<PortariaFiscal, 'id'>) => criarEm('portarias', dados),
+    [criarEm],
+  );
+  const updatePortaria = useCallback(
+    (id: string, dados: Partial<PortariaFiscal>) => atualizarEm('portarias', id, dados),
+    [atualizarEm],
+  );
+
+  const valor = useMemo<AppContextData>(
+    () => ({
+      setores: SETORES,
+      usuarios,
+      processos,
+      pcas,
+      movimentacoes,
+      alertas,
+      pareceres,
+      contratos,
+      procedimentos,
+      sancionatorios,
+      portarias,
+      usuarioAtual,
+      isAuthenticated,
+      carregandoAuth,
+      firebaseConfigurado: isFirebaseConfigured,
+      login,
+      logout,
+      solicitarAcesso,
+      enviarResetSenha,
+      addProcesso,
+      updateProcessoStatus,
+      updateProcesso,
+      addMovimentacao,
+      syncPcasFromPublicUrl,
+      updateUsuario,
+      addUsuario,
+      deleteUsuario,
+      addContrato,
+      updateContrato,
+      deleteContrato,
+      addProcedimento,
+      updateProcedimento,
+      addSancionatorio,
+      updateSancionatorio,
+      addPortaria,
+      updatePortaria,
+    }),
+    [
+      usuarios,
+      processos,
+      pcas,
+      movimentacoes,
+      alertas,
+      pareceres,
+      contratos,
+      procedimentos,
+      sancionatorios,
+      portarias,
+      usuarioAtual,
+      isAuthenticated,
+      carregandoAuth,
+      login,
+      logout,
+      solicitarAcesso,
+      enviarResetSenha,
+      addProcesso,
+      updateProcessoStatus,
+      updateProcesso,
+      addMovimentacao,
+      syncPcasFromPublicUrl,
+      updateUsuario,
+      addUsuario,
+      deleteUsuario,
+      addContrato,
+      updateContrato,
+      deleteContrato,
+      addProcedimento,
+      updateProcedimento,
+      addSancionatorio,
+      updateSancionatorio,
+      addPortaria,
+      updatePortaria,
+    ],
+  );
+
+  return <AppContext.Provider value={valor}>{children}</AppContext.Provider>;
 };
 
 export const useApp = () => useContext(AppContext);

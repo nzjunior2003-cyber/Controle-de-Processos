@@ -34,6 +34,9 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  // Usada pelo Painel de Alertas de contratos (src/components/AlertasModal.tsx).
+  // NÃO é mais usada para recuperação de senha: isso agora é feito pelo
+  // Firebase Authentication (sendPasswordResetEmail).
   app.post("/api/send-email", async (req, res) => {
     try {
       const { to, subject, text, html } = req.body;

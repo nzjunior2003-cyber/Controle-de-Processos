@@ -1,24 +1,36 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, Send, AlertTriangle, Clock, Activity, CheckCircle } from 'lucide-react';
+import type { Contrato } from '../types';
+import type { ExecucaoContrato } from '../lib/contratos';
 
 interface AlertasModalProps {
   isOpen: boolean;
   onClose: () => void;
-  contratos: any[];
+  contratos: Contrato[];
+  /** Execuções lançadas, usadas para calcular o saldo remanescente. */
+  execucoes?: ExecucaoContrato[];
 }
 
-export function AlertasModal({ isOpen, onClose, contratos }: AlertasModalProps) {
+export function AlertasModal({ isOpen, onClose, contratos, execucoes = [] }: AlertasModalProps) {
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<{sucesso: boolean, mensagem: string} | null>(null);
-  
+
   if (!isOpen) return null;
 
   // Analisa contratos que precisam de alerta
   const hoje = new Date();
-  
+
+  const saldoDoContrato = (contrato: Contrato) => {
+    const executado = execucoes
+      .filter((e) => e.contratoId === contrato.id)
+      .reduce((acc, atual) => acc + atual.valor, 0);
+    return (contrato.valorGlobal || 0) - executado;
+  };
+
   const alertasVencimento = contratos.filter(c => {
-    if (!c.vigenciaFim) return false;
-    const fim = new Date(c.vigenciaFim);
+    if (!c.fimVigencia) return false;
+    const fim = new Date(c.fimVigencia);
+    if (Number.isNaN(fim.getTime())) return false;
     const diffTime = Math.abs(fim.getTime() - hoje.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     // Alerta se faltam menos de 60 dias
@@ -27,8 +39,8 @@ export function AlertasModal({ isOpen, onClose, contratos }: AlertasModalProps) 
 
   const alertasSaldo = contratos.filter(c => {
     // Alerta se o saldo for menor ou igual a 20% do valor total
-    if (!c.valor || !c.saldo) return false;
-    const porcentagem = (c.saldo / c.valor) * 100;
+    if (!c.valorGlobal) return false;
+    const porcentagem = (saldoDoContrato(c) / c.valorGlobal) * 100;
     return porcentagem <= 20;
   });
 
@@ -41,34 +53,35 @@ export function AlertasModal({ isOpen, onClose, contratos }: AlertasModalProps) 
     
     try {
       for (const contrato of alertasGeral) {
-        let motivoStr = [];
+        const motivoStr: string[] = [];
         if (alertasVencimento.includes(contrato)) motivoStr.push('vencimento próximo');
         if (alertasSaldo.includes(contrato)) motivoStr.push('saldo baixo (< 20%)');
 
         const corpo = `
           <h2>Alerta de Contrato - ${contrato.numero}</h2>
           <p>Prezado Fiscal,</p>
-          <p>Este é um alerta automático do sistema informando as seguintes urgências para o contrato <b>${contrato.numero}</b> (${contrato.fornecedor}):</p>
+          <p>Este é um alerta automático do sistema informando as seguintes urgências para o contrato <b>${contrato.numero}</b> (${contrato.empresa}):</p>
           <ul>
             ${motivoStr.map(m => `<li><b>Atenção:</b> ${m}</li>`).join('')}
           </ul>
           <p>Lembre-se também de observar o prazo regular para o envio de e conferência de Notas Fiscais/Faturas e recibos para pagamento em tempo hábil.</p>
           <hr/>
           <p><b>Dados do Contrato:</b></p>
-          <p>Fim da Vigência: ${contrato.vigenciaFim}<br/>Saldo Atual: R$ ${String(contrato.saldo)}</p>
+          <p>Fim da Vigência: ${contrato.fimVigencia}<br/>Saldo Atual: R$ ${saldoDoContrato(contrato).toFixed(2)}</p>
         `;
 
-        if (contrato.contatoEmail) {
+        const destinatario = contrato.fiscalEmail || contrato.contatoEmail;
+        if (destinatario) {
           const res = await fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              to: contrato.contatoEmail, // Envia para o contato cadastrado ou do fiscal (simulado)
+              to: destinatario,
               subject: `[ALERTA AUTOMÁTICO] Contrato ${contrato.numero} - Ações Necessárias`,
               html: corpo
             })
           });
-          
+
           if (res.ok) {
             enviados++;
           }
@@ -157,7 +170,7 @@ export function AlertasModal({ isOpen, onClose, contratos }: AlertasModalProps) 
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {c.fiscalTitular || 'N/A'}<br/>
-                        <span className="text-xs text-gray-400">{c.contatoEmail || 'Sem email'}</span>
+                        <span className="text-xs text-gray-400">{c.fiscalEmail || c.contatoEmail || 'Sem email'}</span>
                       </td>
                     </tr>
                   ))}

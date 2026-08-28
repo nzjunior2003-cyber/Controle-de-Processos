@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Search, LogIn, PieChart as PieChartIcon } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
@@ -23,7 +22,6 @@ export default function PublicHome() {
            pcaVal.includes(term);
   });
 
-  const total = processos.length;
   const concluidos = processos.filter(p => p.status === 'concluido').length;
   const emAndamento = processos.filter(p => p.status === 'em_andamento').length;
 

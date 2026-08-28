@@ -1,9 +1,19 @@
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
+/**
+ * Google Sign-In usado APENAS para obter um access token do Google Drive
+ * (anexar arquivos a contratos/execuções). É independente da autenticação
+ * por e-mail/senha do sistema: roda numa instância secundária do Firebase
+ * ("drive"), de forma que abrir o popup do Google não derruba a sessão do
+ * usuário logado no sistema.
+ */
+import {
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithPopup,
+  type User,
+} from 'firebase/auth';
+import { getFirebaseAuth, requireFirebaseAuth } from './firebase';
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const auth = getAuth(app);
+const DRIVE_APP = 'drive';
 
 const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/drive.file');
@@ -13,9 +23,15 @@ let cachedAccessToken: string | null = null;
 
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
-  onAuthFailure?: () => void
+  onAuthFailure?: () => void,
 ) => {
-  return onAuthStateChanged(auth, async (user: User | null) => {
+  const auth = getFirebaseAuth(DRIVE_APP);
+  if (!auth) {
+    if (onAuthFailure) onAuthFailure();
+    return () => undefined;
+  }
+
+  return onAuthStateChanged(auth, (user: User | null) => {
     if (user) {
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
@@ -33,15 +49,16 @@ export const initAuth = (
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
   try {
     isSigningIn = true;
+    const auth = requireFirebaseAuth(DRIVE_APP);
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (!credential?.accessToken) {
-      throw new Error('Failed to get access token from Firebase Auth');
+      throw new Error('Não foi possível obter o access token do Google.');
     }
 
     cachedAccessToken = credential.accessToken;
     return { user: result.user, accessToken: cachedAccessToken };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Sign in error:', error);
     throw error;
   } finally {
@@ -54,6 +71,7 @@ export const getAccessToken = async (): Promise<string | null> => {
 };
 
 export const logoutGoogle = async () => {
-  await auth.signOut();
+  const auth = getFirebaseAuth(DRIVE_APP);
+  if (auth) await auth.signOut();
   cachedAccessToken = null;
 };

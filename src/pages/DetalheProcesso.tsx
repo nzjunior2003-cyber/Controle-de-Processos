@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, CheckCircle, Clock, FileText, Send, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { CHECKLISTS_RITOS } from '../types';
 
 export default function DetalheProcesso() {
@@ -230,7 +229,7 @@ export default function DetalheProcesso() {
               <div className="w-full h-8 flex rounded-md overflow-hidden ring-1 ring-gray-200">
                 {(() => {
                   let dataInicio = new Date(processo.data_entrada || processo.data_abertura);
-                  const timelineData = historico.map((mov, idx) => {
+                  const timelineData = historico.map((mov) => {
                     const s = setores.find(st => st.id === mov.setor_id);
                     const dataFim = new Date(mov.data_movimentacao);
                     const dias = Math.max(0, differenceInDays(dataFim, dataInicio));
@@ -287,7 +286,7 @@ export default function DetalheProcesso() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
                 {(() => {
                   let dataInicio = new Date(processo.data_entrada || processo.data_abertura);
-                  const timelineData = historico.map((mov, idx) => {
+                  const timelineData = historico.map((mov) => {
                     const s = setores.find(st => st.id === mov.setor_id);
                     const dataFim = new Date(mov.data_movimentacao);
                     const dias = Math.max(0, differenceInDays(dataFim, dataInicio));

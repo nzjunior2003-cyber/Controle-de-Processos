@@ -39,26 +39,33 @@ export default function NovoProcesso() {
   const [dataEntrada, setDataEntrada] = useState(today);
   const [ultimaTramitacao, setUltimaTramitacao] = useState(today);
 
-  const handleSalvar = (e: React.FormEvent) => {
+  const handleSalvar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!numeroProcesso || !objeto || !unidadeDemandante) return;
-    
-    addProcesso({
-      numero_processo: numeroProcesso,
-      objeto,
-      descricao,
-      unidade_demandante: unidadeDemandante,
-      demandante_id: usuarioAtual?.id || 'u1',
-      pca_id: pcaId || undefined,
-      rito_processual: ritoProcessual,
-      checklist_rito: checklistLocal,
-      fase_atual_id: faseAtualId,
-      andamento,
-      data_entrada: new Date(dataEntrada).toISOString(),
-      ultima_tramitacao: new Date(ultimaTramitacao).toISOString(),
-    });
-    
-    navigate('/sistema/aquisicoes');
+
+    try {
+      await addProcesso({
+        numero_processo: numeroProcesso,
+        objeto,
+        descricao,
+        unidade_demandante: unidadeDemandante,
+        demandante_id: usuarioAtual?.id || '',
+        pca_id: pcaId || undefined,
+        rito_processual: ritoProcessual,
+        checklist_rito: checklistLocal,
+        fase_atual_id: faseAtualId,
+        andamento,
+        data_entrada: new Date(dataEntrada).toISOString(),
+        ultima_tramitacao: new Date(ultimaTramitacao).toISOString(),
+      });
+
+      navigate('/sistema/aquisicoes');
+    } catch (erro) {
+      alert(
+        'Não foi possível salvar o processo: ' +
+          (erro instanceof Error ? erro.message : String(erro)),
+      );
+    }
   };
 
   return (

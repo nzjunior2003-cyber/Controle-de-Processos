@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, UserCircle, LogOut, Menu } from 'lucide-react';
+import { Bell, LogOut, Menu } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 interface HeaderProps {

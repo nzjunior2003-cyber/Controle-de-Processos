@@ -1,0 +1,96 @@
+rules_version = '2';
+
+// Regras do Sistema de Controle de Processos — CBMPA
+//
+// Deploy (requer Firebase CLI autenticado):
+//   firebase deploy --only firestore:rules
+//
+// Modelo: todo usuário autenticado e ATIVO enxerga os dados operacionais;
+// a coleção `usuarios` (aprovação de acesso e mudança de perfil) é restrita
+// ao perfil `master`, com uma exceção controlada para autocadastro.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function perfilDoc() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function ativo() {
+      return autenticado()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && perfilDoc().ativo == true;
+    }
+
+    function master() {
+      return ativo() && perfilDoc().perfil == 'master';
+    }
+
+    match /usuarios/{usuarioId} {
+      // Qualquer usuário autenticado lê a lista (nomes/fiscais aparecem nas telas);
+      // o próprio usuário sempre consegue ler seu documento para saber se foi aprovado.
+      allow read: if autenticado();
+
+      // Autocadastro ("Solicitar acesso"): só o próprio UID, sempre inativo e
+      // sem se autopromover a master.
+      allow create: if autenticado()
+        && request.auth.uid == usuarioId
+        && request.resource.data.ativo == false
+        && request.resource.data.perfil != 'master'
+        && !('senha' in request.resource.data);
+
+      // Master cria (cadastro manual), aprova, muda perfil e remove.
+      allow create, update: if master() && !('senha' in request.resource.data);
+      allow delete: if master();
+
+      // O próprio usuário pode ajustar dados de contato, nunca perfil/ativo.
+      allow update: if autenticado()
+        && request.auth.uid == usuarioId
+        && request.resource.data.perfil == resource.data.perfil
+        && request.resource.data.ativo == resource.data.ativo
+        && !('senha' in request.resource.data);
+    }
+
+    // Demais coleções operacionais: leitura e escrita para usuários ativos.
+    match /processos/{documento} {
+      allow read, write: if ativo();
+    }
+    match /movimentacoes/{documento} {
+      allow read, write: if ativo();
+    }
+    match /pcas/{documento} {
+      allow read, write: if ativo();
+    }
+    match /alertas/{documento} {
+      allow read, write: if ativo();
+    }
+    match /pareceres/{documento} {
+      allow read, write: if ativo();
+    }
+    match /contratos/{documento} {
+      allow read: if ativo();
+      allow write: if ativo()
+        && perfilDoc().perfil in ['master', 'contratos', 'gestao'];
+    }
+    match /procedimentos/{documento} {
+      allow read: if ativo();
+      allow write: if ativo() && perfilDoc().perfil in ['master', 'contratos'];
+    }
+    match /sancionatorios/{documento} {
+      allow read: if ativo();
+      allow write: if ativo() && perfilDoc().perfil in ['master', 'contratos'];
+    }
+    match /portarias/{documento} {
+      allow read: if ativo();
+      allow write: if ativo() && perfilDoc().perfil in ['master', 'contratos'];
+    }
+
+    // Nada mais é acessível.
+    match /{documento=**} {
+      allow read, write: if false;
+    }
+  }
+}

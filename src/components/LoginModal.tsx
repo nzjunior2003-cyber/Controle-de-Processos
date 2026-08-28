@@ -2,97 +2,98 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Lock, Mail, User, Briefcase } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import FormField from './ui/FormField';
 
 type ModalView = 'login' | 'solicitar' | 'esqueci';
 
 export default function LoginModal({ onClose }: { onClose: () => void }) {
-  const { login, addUsuario, usuarios } = useApp();
+  const { login, solicitarAcesso, enviarResetSenha, firebaseConfigurado } = useApp();
   const navigate = useNavigate();
-  
+
   const [view, setView] = useState<ModalView>('login');
-  
-  // Login State
+  const [erro, setErro] = useState<string | null>(null);
+  const [aguardando, setAguardando] = useState(false);
+
+  // Login
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
-  
-  // Solicitar Accesso State
+
+  // Solicitar acesso
   const [nome, setNome] = useState('');
   const [cargo, setCargo] = useState('');
   const [newSenha, setNewSenha] = useState('');
   const [confirmSenha, setConfirmSenha] = useState('');
-  
-  const handleLogin = (e: React.FormEvent) => {
+
+  const trocarView = (nova: ModalView) => {
+    setErro(null);
+    setView(nova);
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = login(email, senha);
-    if (success) {
+    setErro(null);
+    setAguardando(true);
+    try {
+      await login(email, senha);
       onClose();
       navigate('/sistema');
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : 'Não foi possível entrar.');
+    } finally {
+      setAguardando(false);
     }
   };
 
-  const handleSolicitar = (e: React.FormEvent) => {
+  const handleSolicitar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newSenha.length !== 6) {
-      alert("A senha deve ter exatamente 6 dígitos.");
+    setErro(null);
+
+    if (newSenha.length < 6) {
+      setErro('A senha deve ter pelo menos 6 caracteres.');
       return;
     }
     if (newSenha !== confirmSenha) {
-      alert("As senhas não coincidem.");
+      setErro('As senhas não coincidem.');
       return;
     }
-    
-    addUsuario({
-      nome,
-      email,
-      cargo,
-      senha: newSenha,
-      perfil: 'fiscal', // Default applied, master can change
-      setor_id: '1', // Default demandante
-      ativo: false
-    });
-    
-    alert("Solicitação enviada com sucesso! Aguarde a aprovação pelo administrador.");
-    setView('login');
-  };
 
-  const [isSending, setIsSending] = useState(false);
+    setAguardando(true);
+    try {
+      await solicitarAcesso({ nome, email, senha: newSenha, cargo });
+      alert('Solicitação enviada com sucesso! Aguarde a aprovação pelo administrador.');
+      setNewSenha('');
+      setConfirmSenha('');
+      trocarView('login');
+    } catch (error) {
+      setErro(
+        error instanceof Error ? error.message : 'Não foi possível enviar a solicitação.',
+      );
+    } finally {
+      setAguardando(false);
+    }
+  };
 
   const handleEsqueci = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = usuarios.find(u => u.email === email);
-    if (user) {
-      setIsSending(true);
-      try {
-        const response = await fetch('/api/send-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: email,
-            subject: 'Sua senha do Sistema',
-            text: `Olá ${user.nome},\n\nSua senha de acesso ao sistema é: ${user.senha || '123456 (senha padrão)'}\n\nAtenciosamente,\nEquipe do Sistema`,
-          }),
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          alert(data.mock ? "Simulação de envio (mock). Adicione variáveis SMTP no Settings > API Keys (.env) da plataforma para envio real." : `Email enviado com sucesso para ${email}!`);
-          setView('login');
-        } else {
-          alert('Erro ao enviar email: ' + (data.error || 'Erro desconhecido'));
-        }
-      } catch (error) {
-        console.error('Email error:', error);
-        alert('Erro ao conectar ao servidor de email.');
-      } finally {
-        setIsSending(false);
-      }
-    } else {
-      alert("Email não encontrado.");
+    setErro(null);
+    setAguardando(true);
+    try {
+      await enviarResetSenha(email);
+      alert(
+        `Se houver uma conta para ${email}, um link de redefinição de senha foi enviado. Verifique sua caixa de entrada e o spam.`,
+      );
+      trocarView('login');
+    } catch (error) {
+      setErro(
+        error instanceof Error ? error.message : 'Não foi possível enviar o e-mail.',
+      );
+    } finally {
+      setAguardando(false);
     }
   };
+
+  const classeBotaoPrimario =
+    'w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
@@ -103,61 +104,74 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
             {view === 'solicitar' && 'Solicitar Acesso'}
             {view === 'esqueci' && 'Recuperar Senha'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-500 rounded-full p-1 hover:bg-gray-100 transition-colors">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-500 rounded-full p-1 hover:bg-gray-100 transition-colors"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
-        
+
+        {!firebaseConfigurado && (
+          <div className="mx-6 mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            O Firebase ainda não foi configurado neste ambiente. Defina as variáveis
+            <span className="font-mono"> VITE_FIREBASE_*</span> no arquivo{' '}
+            <span className="font-mono">.env</span> (veja o README) para habilitar o login.
+          </div>
+        )}
+
+        {erro && (
+          <div
+            role="alert"
+            className="mx-6 mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+          >
+            {erro}
+          </div>
+        )}
+
         {view === 'login' && (
           <form onSubmit={handleLogin} className="p-6 space-y-6">
+            <FormField
+              label="Email"
+              icon={Mail}
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="usuario@email.com"
+            />
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                  placeholder="usuario@email.com"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="password"
-                  required
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                  placeholder="••••••••"
-                />
-              </div>
+              <FormField
+                label="Senha"
+                icon={Lock}
+                type="password"
+                required
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="••••••••"
+              />
               <div className="flex justify-start mt-2">
-                <button type="button" onClick={() => setView('esqueci')} className="text-sm font-medium text-red-600 hover:text-red-500">
+                <button
+                  type="button"
+                  onClick={() => trocarView('esqueci')}
+                  className="text-sm font-medium text-red-600 hover:text-red-500"
+                >
                   Esqueci a senha
                 </button>
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-            >
-              Entrar
+            <button type="submit" disabled={aguardando} className={classeBotaoPrimario}>
+              {aguardando ? 'Entrando...' : 'Entrar'}
             </button>
             <div className="text-center mt-4 border-t pt-4">
               <p className="text-sm text-gray-600">Não possui conta?</p>
-              <button type="button" onClick={() => setView('solicitar')} className="mt-2 w-full flex justify-center py-2 px-4 border border-red-200 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+              <button
+                type="button"
+                onClick={() => trocarView('solicitar')}
+                className="mt-2 w-full flex justify-center py-2 px-4 border border-red-200 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+              >
                 Solicitar Acesso
               </button>
             </div>
@@ -166,99 +180,69 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
 
         {view === 'solicitar' && (
           <form onSubmit={handleSolicitar} className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  required
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                  placeholder="Seu nome completo"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cargo / Patente</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Briefcase className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  required
-                  value={cargo}
-                  onChange={(e) => setCargo(e.target.value)}
-                  className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                  placeholder="Ex: 1º TEN QOABM"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                  placeholder="usuario@email.com"
-                />
-              </div>
-            </div>
+            <FormField
+              label="Nome Completo"
+              icon={User}
+              type="text"
+              required
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Seu nome completo"
+            />
+            <FormField
+              label="Cargo / Patente"
+              icon={Briefcase}
+              type="text"
+              required
+              value={cargo}
+              onChange={(e) => setCargo(e.target.value)}
+              placeholder="Ex: 1º TEN QOABM"
+            />
+            <FormField
+              label="Email"
+              icon={Mail}
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="usuario@email.com"
+            />
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Senha (6 dígitos)</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="password"
-                    required
-                    maxLength={6}
-                    value={newSenha}
-                    onChange={(e) => setNewSenha(e.target.value)}
-                    className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                    placeholder="••••••"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar Senha</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="password"
-                    required
-                    maxLength={6}
-                    value={confirmSenha}
-                    onChange={(e) => setConfirmSenha(e.target.value)}
-                    className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                    placeholder="••••••"
-                  />
-                </div>
-              </div>
+              <FormField
+                label="Senha (mín. 6)"
+                icon={Lock}
+                type="password"
+                required
+                minLength={6}
+                value={newSenha}
+                onChange={(e) => setNewSenha(e.target.value)}
+                placeholder="••••••"
+              />
+              <FormField
+                label="Confirmar Senha"
+                icon={Lock}
+                type="password"
+                required
+                minLength={6}
+                value={confirmSenha}
+                onChange={(e) => setConfirmSenha(e.target.value)}
+                placeholder="••••••"
+              />
             </div>
 
             <button
               type="submit"
-              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors mt-2"
+              disabled={aguardando}
+              className={`${classeBotaoPrimario} mt-2`}
             >
-              Enviar Solicitação
+              {aguardando ? 'Enviando...' : 'Enviar Solicitação'}
             </button>
             <div className="text-center mt-2">
-              <button type="button" onClick={() => setView('login')} className="text-sm font-medium text-gray-600 hover:text-gray-900">
+              <button
+                type="button"
+                onClick={() => trocarView('login')}
+                className="text-sm font-medium text-gray-600 hover:text-gray-900"
+              >
                 Voltar para o Login
               </button>
             </div>
@@ -268,34 +252,28 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
         {view === 'esqueci' && (
           <form onSubmit={handleEsqueci} className="p-6 space-y-6">
             <p className="text-sm text-gray-600">
-              Digite seu email cadastrado para receber sua senha.
+              Digite seu e-mail cadastrado. Você receberá um link seguro para cadastrar
+              uma nova senha.
             </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                  placeholder="usuario@email.com"
-                />
-              </div>
-            </div>
-            
-            <button
-              type="submit"
-              disabled={isSending}
-              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors disabled:opacity-50"
-            >
-              {isSending ? 'Enviando...' : 'Enviar Senha'}
+            <FormField
+              label="Email"
+              icon={Mail}
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="usuario@email.com"
+            />
+
+            <button type="submit" disabled={aguardando} className={classeBotaoPrimario}>
+              {aguardando ? 'Enviando...' : 'Enviar link de redefinição'}
             </button>
             <div className="text-center mt-2">
-              <button type="button" onClick={() => setView('login')} className="text-sm font-medium text-gray-600 hover:text-gray-900">
+              <button
+                type="button"
+                onClick={() => trocarView('login')}
+                className="text-sm font-medium text-gray-600 hover:text-gray-900"
+              >
                 Voltar para o Login
               </button>
             </div>

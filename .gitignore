@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Configuração do Firebase nunca é versionada (use .env / VITE_FIREBASE_*)
+firebase-applet-config.json

@@ -8,12 +8,11 @@ import Aquisicoes from './pages/Aquisicoes';
 import NovoProcesso from './pages/NovoProcesso';
 import Dashboard from './pages/Dashboard';
 import DetalheProcesso from './pages/DetalheProcesso';
-import ContratosArps from './pages/ContratosArps';
-import GestaoContratos from './pages/GestaoContratos';
+import ContratosArps from './pages/contratos-arps';
+import GestaoContratos from './pages/gestao-contratos';
 import Usuarios from './pages/Usuarios';
-import IntegracaoPCA from './pages/IntegracaoPCA';
 import ProtectedRoute from './components/ProtectedRoute';
-import FiscalContrato from './pages/FiscalContrato';
+import FiscalContrato from './pages/fiscal-contrato';
 
 export default function App() {
   return (

@@ -20,10 +20,15 @@ export default function Usuarios() {
   });
 
   const [usuarioExcluindo, setUsuarioExcluindo] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
-  const confirmDelete = () => {
-    if (usuarioExcluindo) {
-      deleteUsuario(usuarioExcluindo);
+  const confirmDelete = async () => {
+    if (!usuarioExcluindo) return;
+    try {
+      await deleteUsuario(usuarioExcluindo);
+    } catch (erro) {
+      alert(erro instanceof Error ? erro.message : 'Não foi possível excluir o usuário.');
+    } finally {
       setUsuarioExcluindo(null);
     }
   };
@@ -41,44 +46,56 @@ export default function Usuarios() {
     u.email.toLowerCase().includes(busca.toLowerCase())
   );
 
-  const handleSalvarEdicao = (e: React.FormEvent) => {
+  const handleSalvarEdicao = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (usuarioEditando) {
-      updateUsuario(usuarioEditando.id, {
+    if (!usuarioEditando) return;
+    try {
+      await updateUsuario(usuarioEditando.id, {
         perfil: usuarioEditando.perfil,
         ativo: usuarioEditando.ativo
       });
       setUsuarioEditando(null);
+    } catch (erro) {
+      alert(erro instanceof Error ? erro.message : 'Não foi possível salvar as alterações.');
     }
   };
 
-  const handleCriarUsuario = (e: React.FormEvent) => {
+  const handleCriarUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
     const { nome, email, senha, perfil, setor_id, ativo } = novoUsuarioForm;
     if (!nome || !email || !senha) {
       alert("Preencha todos os campos obrigatórios.");
       return;
     }
-    
-    addUsuario({
-      nome,
-      email,
-      senha,
-      perfil,
-      setor_id,
-      cargo: 'Não Especificado',
-      ativo
-    });
 
-    setIsNovoUsuarioOpen(false);
-    setNovoUsuarioForm({
-      nome: '',
-      email: '',
-      senha: '',
-      perfil: 'fiscal' as Perfil,
-      setor_id: setores[0]?.id || '1',
-      ativo: true,
-    });
+    setSalvando(true);
+    try {
+      // A senha vai apenas para o Firebase Authentication; nunca é gravada
+      // no Firestore.
+      await addUsuario({
+        nome,
+        email,
+        senha,
+        perfil,
+        setor_id,
+        cargo: 'Não Especificado',
+        ativo
+      });
+
+      setIsNovoUsuarioOpen(false);
+      setNovoUsuarioForm({
+        nome: '',
+        email: '',
+        senha: '',
+        perfil: 'fiscal' as Perfil,
+        setor_id: setores[0]?.id || '1',
+        ativo: true,
+      });
+    } catch (erro) {
+      alert(erro instanceof Error ? erro.message : 'Não foi possível criar o usuário.');
+    } finally {
+      setSalvando(false);
+    }
   };
 
   return (
@@ -345,9 +362,10 @@ export default function Usuarios() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                  disabled={salvando}
+                  className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Criar Usuário
+                  {salvando ? 'Criando...' : 'Criar Usuário'}
                 </button>
               </div>
             </form>
@@ -361,6 +379,8 @@ export default function Usuarios() {
             <h3 className="text-lg font-medium text-gray-900 mb-4">Confirmar Exclusão</h3>
             <p className="text-sm text-gray-500 mb-6">
               Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.
+              O perfil de acesso é removido do sistema; a conta no Firebase
+              Authentication precisa ser excluída pelo Console.
             </p>
             <div className="flex justify-end space-x-3">
               <button
