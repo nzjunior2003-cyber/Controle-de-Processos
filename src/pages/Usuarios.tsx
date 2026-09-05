@@ -10,14 +10,30 @@ export default function Usuarios() {
   const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
   const [isNovoUsuarioOpen, setIsNovoUsuarioOpen] = useState(false);
   
-  const [novoUsuarioForm, setNovoUsuarioForm] = useState({
+  const [novoUsuarioForm, setNovoUsuarioForm] = useState<{
+    nome: string;
+    email: string;
+    senha: string;
+    perfil: Perfil;
+    setor_id: string;
+    ativo: boolean;
+    gestorResponsavelId?: string;
+  }>({
     nome: '',
     email: '',
     senha: '',
-    perfil: 'fiscal' as Perfil,
+    perfil: 'fiscal',
     setor_id: setores[0]?.id || '1',
     ativo: true,
+    gestorResponsavelId: undefined,
   });
+
+  /** Perfis que podem ter um Gestor responsável (Auxiliar de um Gestor "raiz"). */
+  const perfilTemHierarquiaGestor = (perfil: Perfil) => perfil === 'contratos' || perfil === 'gestao';
+
+  /** Demais usuários do mesmo perfil que são Gestor "raiz" (sem gestorResponsavelId). */
+  const candidatosGestorRaiz = (perfil: Perfil, idExcluir?: string) =>
+    usuarios.filter((u) => u.perfil === perfil && !u.gestorResponsavelId && u.id !== idExcluir);
 
   const [usuarioExcluindo, setUsuarioExcluindo] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -52,7 +68,10 @@ export default function Usuarios() {
     try {
       await updateUsuario(usuarioEditando.id, {
         perfil: usuarioEditando.perfil,
-        ativo: usuarioEditando.ativo
+        ativo: usuarioEditando.ativo,
+        gestorResponsavelId: perfilTemHierarquiaGestor(usuarioEditando.perfil)
+          ? usuarioEditando.gestorResponsavelId || ''
+          : '',
       });
       setUsuarioEditando(null);
     } catch (erro) {
@@ -62,7 +81,7 @@ export default function Usuarios() {
 
   const handleCriarUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { nome, email, senha, perfil, setor_id, ativo } = novoUsuarioForm;
+    const { nome, email, senha, perfil, setor_id, ativo, gestorResponsavelId } = novoUsuarioForm;
     if (!nome || !email || !senha) {
       alert("Preencha todos os campos obrigatórios.");
       return;
@@ -79,7 +98,8 @@ export default function Usuarios() {
         perfil,
         setor_id,
         cargo: 'Não Especificado',
-        ativo
+        ativo,
+        gestorResponsavelId: perfilTemHierarquiaGestor(perfil) ? gestorResponsavelId || '' : '',
       });
 
       setIsNovoUsuarioOpen(false);
@@ -90,6 +110,7 @@ export default function Usuarios() {
         perfil: 'fiscal' as Perfil,
         setor_id: setores[0]?.id || '1',
         ativo: true,
+        gestorResponsavelId: undefined,
       });
     } catch (erro) {
       alert(erro instanceof Error ? erro.message : 'Não foi possível criar o usuário.');
@@ -222,7 +243,16 @@ export default function Usuarios() {
                 </label>
                 <select
                   value={usuarioEditando.perfil}
-                  onChange={(e) => setUsuarioEditando({...usuarioEditando, perfil: e.target.value as Perfil})}
+                  onChange={(e) => {
+                    const perfil = e.target.value as Perfil;
+                    setUsuarioEditando({
+                      ...usuarioEditando,
+                      perfil,
+                      gestorResponsavelId: perfilTemHierarquiaGestor(perfil)
+                        ? usuarioEditando.gestorResponsavelId
+                        : undefined,
+                    });
+                  }}
                   className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md border"
                 >
                   {Object.entries(PERFIL_LABELS).map(([key, label]) => (
@@ -233,6 +263,32 @@ export default function Usuarios() {
                   Define qual módulo este usuário poderá acessar e editar. Administradores Master têm acesso total.
                 </p>
               </div>
+
+              {perfilTemHierarquiaGestor(usuarioEditando.perfil) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Auxilia qual Gestor? (opcional)
+                  </label>
+                  <select
+                    value={usuarioEditando.gestorResponsavelId || ''}
+                    onChange={(e) =>
+                      setUsuarioEditando({
+                        ...usuarioEditando,
+                        gestorResponsavelId: e.target.value || undefined,
+                      })
+                    }
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md border"
+                  >
+                    <option value="">Nenhum (Gestor raiz — vê todos os contratos)</option>
+                    {candidatosGestorRaiz(usuarioEditando.perfil, usuarioEditando.id).map((u) => (
+                      <option key={u.id} value={u.id}>{u.nome}</option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Se selecionado, este usuário só verá os contratos cadastrados pelo Gestor escolhido.
+                  </p>
+                </div>
+              )}
 
               <div className="flex items-center mt-4">
                 <input
@@ -330,7 +386,16 @@ export default function Usuarios() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Módulo / Perfil de Acesso</label>
                 <select
                   value={novoUsuarioForm.perfil}
-                  onChange={(e) => setNovoUsuarioForm({...novoUsuarioForm, perfil: e.target.value as Perfil})}
+                  onChange={(e) => {
+                    const perfil = e.target.value as Perfil;
+                    setNovoUsuarioForm({
+                      ...novoUsuarioForm,
+                      perfil,
+                      gestorResponsavelId: perfilTemHierarquiaGestor(perfil)
+                        ? novoUsuarioForm.gestorResponsavelId
+                        : undefined,
+                    });
+                  }}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm"
                 >
                   {Object.entries(PERFIL_LABELS).map(([key, label]) => (
@@ -338,6 +403,32 @@ export default function Usuarios() {
                   ))}
                 </select>
               </div>
+
+              {perfilTemHierarquiaGestor(novoUsuarioForm.perfil) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Auxilia qual Gestor? (opcional)
+                  </label>
+                  <select
+                    value={novoUsuarioForm.gestorResponsavelId || ''}
+                    onChange={(e) =>
+                      setNovoUsuarioForm({
+                        ...novoUsuarioForm,
+                        gestorResponsavelId: e.target.value || undefined,
+                      })
+                    }
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                  >
+                    <option value="">Nenhum (Gestor raiz — vê todos os contratos)</option>
+                    {candidatosGestorRaiz(novoUsuarioForm.perfil).map((u) => (
+                      <option key={u.id} value={u.id}>{u.nome}</option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Se selecionado, este usuário só verá os contratos cadastrados pelo Gestor escolhido.
+                  </p>
+                </div>
+              )}
 
               <div className="flex items-center mt-4">
                 <input

@@ -16,6 +16,12 @@ export interface Usuario {
   perfil: Perfil;
   ativo: boolean;
   cargo?: string;
+  /**
+   * Id do documento `usuarios` do Gestor que este usuário auxilia. Só se
+   * aplica a perfis 'contratos'/'gestao'; quando ausente, o usuário é um
+   * Gestor "raiz" (vê todos os contratos, não só os do seu próprio grupo).
+   */
+  gestorResponsavelId?: string;
 }
 
 export interface Setor {
@@ -237,6 +243,13 @@ export interface Contrato {
   empenho?: string;
   dotacao?: string;
   linkContrato?: string | null;
+  /**
+   * Id do documento `usuarios` do Gestor "raiz" ao qual este contrato está
+   * amarrado — gravado automaticamente no cadastro (mesmo quando quem
+   * digitou é um Auxiliar), e usado para restringir a visão do Auxiliar
+   * aos contratos do seu Gestor responsável.
+   */
+  gestorGeralId?: string;
   criado_em?: string;
   atualizado_em?: string;
 }

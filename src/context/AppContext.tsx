@@ -40,6 +40,7 @@ import { mapSheetArrayToPca, mapSheetRowToPca, type LinhaPlanilha } from '../lib
 import {
   abaterSaldo,
   devolverSaldo,
+  gestorRaizDe,
   validarLimiteFiscal,
   type ExecucaoContrato,
   type Ocorrencia,
@@ -578,17 +579,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // O saldo atual sempre nasce igual ao saldo inicial informado pelo
-      // Gestor no cadastro, independente do que vier em `dados`.
+      // Gestor no cadastro, e o contrato sempre fica amarrado ao Gestor
+      // "raiz" correto — independente do que vier em `dados` ou de quem
+      // efetivamente preencheu o cadastro (Gestor ou seu Auxiliar).
       const contratoCompleto: Omit<Contrato, 'id'> = {
         ...dados,
         saldoAtualFinanceiro: dados.saldoInicialFinanceiro,
         ...(typeof dados.saldoInicialQuantitativo === 'number'
           ? { saldoAtualQuantitativo: dados.saldoInicialQuantitativo }
           : {}),
+        ...(gestorRaizDe(usuarioAtual) ? { gestorGeralId: gestorRaizDe(usuarioAtual) } : {}),
       };
       return criarEm('contratos', contratoCompleto);
     },
-    [criarEm, contratos],
+    [criarEm, contratos, usuarioAtual],
   );
   const updateContrato = useCallback(
     (id: string, dados: Partial<Contrato>) => {

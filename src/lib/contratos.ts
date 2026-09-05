@@ -57,6 +57,31 @@ export function filtrarContratosDoFiscal<T extends Contrato>(
   );
 }
 
+/**
+ * Id do Gestor "raiz" responsável por um usuário: ele mesmo, se for raiz
+ * (sem `gestorResponsavelId`), ou o `gestorResponsavelId`, se for
+ * Auxiliar de outro Gestor.
+ */
+export function gestorRaizDe(
+  usuario: { id: string; gestorResponsavelId?: string } | null | undefined,
+): string | undefined {
+  if (!usuario) return undefined;
+  return usuario.gestorResponsavelId || usuario.id;
+}
+
+/**
+ * Restringe a lista de contratos aos do Gestor responsável por um Auxiliar
+ * (via `gestorGeralId` do contrato); um Gestor "raiz" (sem
+ * `gestorResponsavelId`) vê todos os contratos normalmente.
+ */
+export function filtrarContratosPorGestor<T extends Contrato>(
+  contratos: T[],
+  usuario: { gestorResponsavelId?: string } | null | undefined,
+): T[] {
+  if (!usuario?.gestorResponsavelId) return contratos;
+  return contratos.filter((c) => c.gestorGeralId === usuario.gestorResponsavelId);
+}
+
 /** Máximo de contratos ativos que um mesmo Fiscal Titular pode acumular. */
 export const LIMITE_CONTRATOS_FISCAL = 3;
 

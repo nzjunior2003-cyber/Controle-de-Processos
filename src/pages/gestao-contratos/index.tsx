@@ -9,7 +9,12 @@ import TabelaContratosVigencia from '../../components/contratos/TabelaContratosV
 import ExecucaoModal from '../../components/contratos/ExecucaoModal';
 import ContratoFormModal from '../../components/contratos/ContratoFormModal';
 import type { Contrato } from '../../types';
-import { buscarContratos, calcularStatusContrato, type ContratoComStatus } from '../../lib/contratos';
+import {
+  buscarContratos,
+  calcularStatusContrato,
+  filtrarContratosPorGestor,
+  type ContratoComStatus,
+} from '../../lib/contratos';
 
 export default function GestaoContratos() {
   const {
@@ -46,9 +51,15 @@ export default function GestaoContratos() {
     return null;
   };
 
+  /** Um Auxiliar só vê os contratos do seu Gestor responsável; um Gestor "raiz" vê todos. */
+  const contratosDoEscopo = useMemo(
+    () => filtrarContratosPorGestor(contratos, usuarioAtual),
+    [contratos, usuarioAtual],
+  );
+
   const contratosComStatus = useMemo(
-    () => contratos.map((contrato) => calcularStatusContrato(contrato)),
-    [contratos],
+    () => contratosDoEscopo.map((contrato) => calcularStatusContrato(contrato)),
+    [contratosDoEscopo],
   );
 
   const filtrados = useMemo(() => {

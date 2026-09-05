@@ -5,6 +5,8 @@ import {
   calcularStatusContrato,
   devolverSaldo,
   filtrarContratosDoFiscal,
+  filtrarContratosPorGestor,
+  gestorRaizDe,
   validarLimiteFiscal,
 } from './contratos';
 import type { Contrato } from '../types';
@@ -193,6 +195,41 @@ describe('validarLimiteFiscal', () => {
     const resultado = validarLimiteFiscal(contratos, fiscalEmail);
     expect(resultado.valido).toBe(true);
     expect(resultado.contratosAtivos).toBe(1);
+  });
+});
+
+describe('gestorRaizDe', () => {
+  it('devolve o próprio id quando o usuário é Gestor raiz (sem gestorResponsavelId)', () => {
+    expect(gestorRaizDe({ id: 'g1' })).toBe('g1');
+  });
+
+  it('devolve o gestorResponsavelId quando o usuário é Auxiliar', () => {
+    expect(gestorRaizDe({ id: 'aux1', gestorResponsavelId: 'g1' })).toBe('g1');
+  });
+
+  it('devolve undefined sem usuário', () => {
+    expect(gestorRaizDe(null)).toBeUndefined();
+  });
+});
+
+describe('filtrarContratosPorGestor', () => {
+  const doGestor1 = { ...base, id: 'c1', gestorGeralId: 'g1' };
+  const doGestor2 = { ...base, id: 'c2', gestorGeralId: 'g2' };
+  const semGestor = { ...base, id: 'c3', gestorGeralId: undefined };
+  const contratos = [doGestor1, doGestor2, semGestor];
+
+  it('um Gestor raiz (sem gestorResponsavelId) vê todos os contratos', () => {
+    const resultado = filtrarContratosPorGestor(contratos, {});
+    expect(resultado).toEqual(contratos);
+  });
+
+  it('um Auxiliar só vê os contratos do seu Gestor responsável', () => {
+    const resultado = filtrarContratosPorGestor(contratos, { gestorResponsavelId: 'g1' });
+    expect(resultado.map((c) => c.id)).toEqual(['c1']);
+  });
+
+  it('devolve todos os contratos sem usuário (nada para restringir)', () => {
+    expect(filtrarContratosPorGestor(contratos, null)).toEqual(contratos);
   });
 });
 
