@@ -37,7 +37,13 @@ import {
   requireFirebaseAuth,
 } from '../lib/firebase';
 import { mapSheetArrayToPca, mapSheetRowToPca, type LinhaPlanilha } from '../lib/csv';
-import { abaterSaldo, devolverSaldo, type ExecucaoContrato, type Ocorrencia } from '../lib/contratos';
+import {
+  abaterSaldo,
+  devolverSaldo,
+  validarLimiteFiscal,
+  type ExecucaoContrato,
+  type Ocorrencia,
+} from '../lib/contratos';
 import {
   Processo,
   Setor,
@@ -565,6 +571,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const addContrato = useCallback(
     (dados: Omit<Contrato, 'id'>) => {
+      if (dados.fiscalEmail && !validarLimiteFiscal(contratos, dados.fiscalEmail).valido) {
+        throw new Error(
+          'Este fiscal já possui 3 contratos ativos sob sua titularidade (limite atingido).',
+        );
+      }
+
       // O saldo atual sempre nasce igual ao saldo inicial informado pelo
       // Gestor no cadastro, independente do que vier em `dados`.
       const contratoCompleto: Omit<Contrato, 'id'> = {
@@ -576,11 +588,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       };
       return criarEm('contratos', contratoCompleto);
     },
-    [criarEm],
+    [criarEm, contratos],
   );
   const updateContrato = useCallback(
-    (id: string, dados: Partial<Contrato>) => atualizarEm('contratos', id, dados),
-    [atualizarEm],
+    (id: string, dados: Partial<Contrato>) => {
+      if (dados.fiscalEmail && !validarLimiteFiscal(contratos, dados.fiscalEmail, id).valido) {
+        throw new Error(
+          'Este fiscal já possui 3 contratos ativos sob sua titularidade (limite atingido).',
+        );
+      }
+      return atualizarEm('contratos', id, dados);
+    },
+    [atualizarEm, contratos],
   );
   const deleteContrato = useCallback(async (id: string) => {
     const db = requireDb();

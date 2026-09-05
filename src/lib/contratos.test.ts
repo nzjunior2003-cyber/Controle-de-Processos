@@ -5,6 +5,7 @@ import {
   calcularStatusContrato,
   devolverSaldo,
   filtrarContratosDoFiscal,
+  validarLimiteFiscal,
 } from './contratos';
 import type { Contrato } from '../types';
 
@@ -130,6 +131,68 @@ describe('devolverSaldo', () => {
     const depoisDeAbater = abaterSaldo(original, execucao);
     const depoisDeDevolver = devolverSaldo(depoisDeAbater, execucao);
     expect(depoisDeDevolver).toEqual(original);
+  });
+});
+
+describe('validarLimiteFiscal', () => {
+  const fiscalEmail = 'fiscal@cbmpa.gov.br';
+
+  const contratoAtivo = (id: string): Contrato => ({
+    ...base,
+    id,
+    fiscalEmail,
+    fimVigencia: '2099-12-31',
+  });
+
+  const contratoVencido = (id: string): Contrato => ({
+    ...base,
+    id,
+    fiscalEmail,
+    fimVigencia: '2000-01-01',
+  });
+
+  it('permite quando o fiscal tem menos de 3 contratos ativos', () => {
+    const contratos = [contratoAtivo('c1'), contratoAtivo('c2')];
+    const resultado = validarLimiteFiscal(contratos, fiscalEmail);
+    expect(resultado.valido).toBe(true);
+    expect(resultado.contratosAtivos).toBe(2);
+  });
+
+  it('bloqueia o 4º contrato quando o fiscal já tem 3 ativos', () => {
+    const contratos = [contratoAtivo('c1'), contratoAtivo('c2'), contratoAtivo('c3')];
+    const resultado = validarLimiteFiscal(contratos, fiscalEmail);
+    expect(resultado.valido).toBe(false);
+    expect(resultado.contratosAtivos).toBe(3);
+  });
+
+  it('não conta contratos vencidos', () => {
+    const contratos = [
+      contratoAtivo('c1'),
+      contratoAtivo('c2'),
+      contratoVencido('c3'),
+      contratoVencido('c4'),
+    ];
+    const resultado = validarLimiteFiscal(contratos, fiscalEmail);
+    expect(resultado.valido).toBe(true);
+    expect(resultado.contratosAtivos).toBe(2);
+  });
+
+  it('não conta o próprio contrato sendo editado', () => {
+    const contratos = [contratoAtivo('c1'), contratoAtivo('c2'), contratoAtivo('c3')];
+    const resultado = validarLimiteFiscal(contratos, fiscalEmail, 'c3');
+    expect(resultado.valido).toBe(true);
+    expect(resultado.contratosAtivos).toBe(2);
+  });
+
+  it('ignora contratos de outros fiscais', () => {
+    const contratos = [
+      contratoAtivo('c1'),
+      { ...contratoAtivo('c2'), fiscalEmail: 'outro@cbmpa.gov.br' },
+      { ...contratoAtivo('c3'), fiscalEmail: 'outro@cbmpa.gov.br' },
+    ];
+    const resultado = validarLimiteFiscal(contratos, fiscalEmail);
+    expect(resultado.valido).toBe(true);
+    expect(resultado.contratosAtivos).toBe(1);
   });
 });
 

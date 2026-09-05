@@ -57,6 +57,31 @@ export function filtrarContratosDoFiscal<T extends Contrato>(
   );
 }
 
+/** Máximo de contratos ativos que um mesmo Fiscal Titular pode acumular. */
+export const LIMITE_CONTRATOS_FISCAL = 3;
+
+/**
+ * Verifica se um Fiscal Titular pode assumir mais um contrato sem
+ * ultrapassar o limite de {@link LIMITE_CONTRATOS_FISCAL} contratos ativos
+ * simultâneos. "Ativo" é todo contrato cujo status (via
+ * `calcularStatusContrato`) não seja 'VENCIDO'. Em edição, informe
+ * `contratoIdExcluir` para não contar o próprio contrato sendo editado.
+ */
+export function validarLimiteFiscal(
+  contratos: Contrato[],
+  fiscalEmail: string,
+  contratoIdExcluir?: string,
+): { valido: boolean; contratosAtivos: number } {
+  const contratosAtivos = contratos.filter(
+    (c) =>
+      c.fiscalEmail === fiscalEmail &&
+      c.id !== contratoIdExcluir &&
+      calcularStatusContrato(c).status !== 'VENCIDO',
+  ).length;
+
+  return { valido: contratosAtivos < LIMITE_CONTRATOS_FISCAL, contratosAtivos };
+}
+
 /** Busca textual usada nas telas de contratos. */
 export function buscarContratos<T extends Contrato>(contratos: T[], busca: string): T[] {
   const termo = busca.trim().toLowerCase();
