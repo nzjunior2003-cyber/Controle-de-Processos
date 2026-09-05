@@ -37,7 +37,15 @@ const EXECUCAO_VAZIA: NovaExecucao = {
   arquivo: null,
 };
 
-const TIPOS_OCORRENCIA_PADRAO: TipoOcorrencia[] = ['OCORRENCIA', 'ADITIVO', 'ESCLARECIMENTO'];
+const TIPOS_OCORRENCIA_PADRAO: TipoOcorrencia[] = [
+  'OCORRENCIA',
+  'ATRASO_ENTREGA',
+  'DESCONFORMIDADE',
+  'ITEM_NAO_ENTREGUE',
+  'ADITIVO',
+  'ESCLARECIMENTO',
+  'OUTRO',
+];
 
 interface Props {
   contrato: ContratoComStatus;

@@ -123,18 +123,30 @@ export function devolverSaldo(
   };
 }
 
-export type TipoOcorrencia = 'OCORRENCIA' | 'ADITIVO' | 'ESCLARECIMENTO';
+export type TipoOcorrencia =
+  | 'OCORRENCIA'
+  | 'ADITIVO'
+  | 'ESCLARECIMENTO'
+  | 'ATRASO_ENTREGA'
+  | 'DESCONFORMIDADE'
+  | 'ITEM_NAO_ENTREGUE'
+  | 'OUTRO';
 
 export const TIPO_OCORRENCIA_LABELS: Record<TipoOcorrencia, string> = {
   OCORRENCIA: 'Ocorrência',
   ADITIVO: 'Solicitação de Aditivo',
   ESCLARECIMENTO: 'Solicitação de Esclarecimento',
+  ATRASO_ENTREGA: 'Atraso na Entrega',
+  DESCONFORMIDADE: 'Item em Desconformidade',
+  ITEM_NAO_ENTREGUE: 'Item Não Entregue',
+  OUTRO: 'Outro',
 };
 
 /**
- * Ocorrência registrada sobre um contrato: tanto um apontamento simples do
- * Gestor quanto uma solicitação de aditivo/esclarecimento do Fiscal — sem
- * workflow de aprovação, é só registro histórico.
+ * Ocorrência registrada sobre um contrato: um apontamento simples do
+ * Gestor, uma solicitação de aditivo/esclarecimento, ou um apontamento do
+ * Fiscal sobre a execução (atraso, desconformidade, item não entregue
+ * etc.) — sem workflow de aprovação, é só registro histórico.
  */
 export interface Ocorrencia {
   id: string;
