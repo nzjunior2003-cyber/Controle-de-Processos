@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, FileText, PieChart, Package, CheckSquare, Users, Menu, FileCheck } from 'lucide-react';
+import { Home, FileText, PieChart, Package, CheckSquare, Users, Menu, FileCheck, History } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 
@@ -24,6 +24,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     { name: 'Fiscal do Contrato', href: '/sistema/fiscal-contrato', icon: FileCheck, show: isMaster || perfil === 'fiscal' },
     { name: 'Dashboard Corporativo', href: '/sistema/dashboard', icon: PieChart, show: true },
     { name: 'Usuários', href: '/sistema/usuarios', icon: Users, show: isMaster },
+    { name: 'Auditoria', href: '/sistema/auditoria', icon: History, show: isMaster },
   ].filter(item => item.show);
 
   return (

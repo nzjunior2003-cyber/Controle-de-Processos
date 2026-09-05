@@ -23,6 +23,7 @@ import {
   getDoc,
   onSnapshot,
   runTransaction,
+  serverTimestamp,
   setDoc,
   updateDoc,
   writeBatch,
@@ -45,6 +46,12 @@ import {
   type ExecucaoContrato,
   type Ocorrencia,
 } from '../lib/contratos';
+import {
+  resumirAuditoria,
+  type AcaoAuditoria,
+  type LogAcesso,
+  type LogAuditoria,
+} from '../lib/auditoria';
 import {
   Processo,
   Setor,
@@ -76,6 +83,10 @@ interface AppContextData {
   procedimentos: ProcedimentoLicitatorio[];
   sancionatorios: ProcessoSancionatorio[];
   portarias: PortariaFiscal[];
+  /** Só é populado para o perfil 'master' (mesma restrição das firestore.rules). */
+  logsAcesso: LogAcesso[];
+  /** Só é populado para o perfil 'master' (mesma restrição das firestore.rules). */
+  logsAuditoria: LogAuditoria[];
   usuarioAtual: Usuario | null;
   isAuthenticated: boolean;
   /** true enquanto o estado de autenticação ainda não foi resolvido. */
@@ -244,37 +255,72 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const procedimentos = useColecao<ProcedimentoLicitatorio>('procedimentos', isAuthenticated);
   const sancionatorios = useColecao<ProcessoSancionatorio>('sancionatorios', isAuthenticated);
   const portarias = useColecao<PortariaFiscal>('portarias', isAuthenticated);
+  // Leitura restrita a 'master' nas firestore.rules — só assina quando fizer
+  // sentido, para não gerar erros de permissão para os demais perfis.
+  const podeVerLogs = isAuthenticated && usuarioAtual?.perfil === 'master';
+  const logsAcesso = useColecao<LogAcesso>('logs_acesso', podeVerLogs);
+  const logsAuditoria = useColecao<LogAuditoria>('logs_auditoria', podeVerLogs);
 
   // --- Autenticação: ações ------------------------------------------------
-  const login = useCallback(async (email: string, senha?: string) => {
-    try {
-      const auth = requireFirebaseAuth();
-      const db = requireDb();
-      const credencial = await signInWithEmailAndPassword(auth, email, senha ?? '');
-      const perfilSnap = await getDoc(doc(db, 'usuarios', credencial.user.uid));
-
-      if (!perfilSnap.exists()) {
-        await signOut(auth);
-        throw new Error(
-          'Perfil de usuário não encontrado no sistema. Solicite acesso ao administrador.',
-        );
+  /**
+   * Grava um log de acesso (coleção `logs_acesso`), sucesso ou falha. Nunca
+   * lança: uma falha ao registrar o log não pode travar o login.
+   */
+  const registrarLogAcesso = useCallback(
+    async (userId: string | null, email: string, sucesso: boolean) => {
+      try {
+        const db = getDb();
+        if (!db) return;
+        await addDoc(collection(db, 'logs_acesso'), {
+          userId,
+          email,
+          sucesso,
+          dataHora: serverTimestamp(),
+          userAgent: navigator.userAgent,
+        });
+      } catch (erro) {
+        console.error('Erro ao registrar log de acesso:', erro);
       }
+    },
+    [],
+  );
 
-      const perfilCarregado = {
-        ...(perfilSnap.data() as object),
-        id: perfilSnap.id,
-      } as Usuario;
+  const login = useCallback(
+    async (email: string, senha?: string) => {
+      let userIdParaLog: string | null = null;
+      try {
+        const auth = requireFirebaseAuth();
+        const db = requireDb();
+        const credencial = await signInWithEmailAndPassword(auth, email, senha ?? '');
+        userIdParaLog = credencial.user.uid;
+        const perfilSnap = await getDoc(doc(db, 'usuarios', credencial.user.uid));
 
-      if (!perfilCarregado.ativo) {
-        await signOut(auth);
-        throw new Error('Seu usuário ainda não foi aprovado por um administrador.');
+        if (!perfilSnap.exists()) {
+          await signOut(auth);
+          throw new Error(
+            'Perfil de usuário não encontrado no sistema. Solicite acesso ao administrador.',
+          );
+        }
+
+        const perfilCarregado = {
+          ...(perfilSnap.data() as object),
+          id: perfilSnap.id,
+        } as Usuario;
+
+        if (!perfilCarregado.ativo) {
+          await signOut(auth);
+          throw new Error('Seu usuário ainda não foi aprovado por um administrador.');
+        }
+
+        setPerfil(perfilCarregado);
+        await registrarLogAcesso(userIdParaLog, email, true);
+      } catch (erro) {
+        await registrarLogAcesso(userIdParaLog, email, false);
+        throw new Error(mensagemErroAuth(erro));
       }
-
-      setPerfil(perfilCarregado);
-    } catch (erro) {
-      throw new Error(mensagemErroAuth(erro));
-    }
-  }, []);
+    },
+    [registrarLogAcesso],
+  );
 
   const logout = useCallback(async () => {
     const auth = getFirebaseAuth();
@@ -502,14 +548,51 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
+  /**
+   * Grava um log de auditoria (coleção `logs_auditoria`) para uma alteração
+   * de dados. Nunca lança: uma falha ao registrar o log não pode impedir a
+   * operação principal que a chamou.
+   */
+  const registrarAuditoria = useCallback(
+    async (
+      colecao: string,
+      documentoId: string,
+      acao: AcaoAuditoria,
+      dados: object,
+      anterior?: object,
+    ) => {
+      try {
+        const db = getDb();
+        if (!db || !usuarioAtual) return;
+        await addDoc(collection(db, 'logs_auditoria'), {
+          colecao,
+          documentoId,
+          acao,
+          usuarioId: usuarioAtual.id,
+          usuarioNome: usuarioAtual.nome,
+          dataHora: serverTimestamp(),
+          resumo: resumirAuditoria(acao, dados, anterior),
+        });
+      } catch (erro) {
+        console.error('Erro ao registrar log de auditoria:', erro);
+      }
+    },
+    [usuarioAtual],
+  );
+
   // --- Usuários -----------------------------------------------------------
-  const updateUsuario = useCallback(async (id: string, dados: Partial<Usuario>) => {
-    const db = requireDb();
-    const campos: Record<string, unknown> = { ...dados };
-    delete campos.id;
-    delete campos.senha;
-    await updateDoc(doc(db, 'usuarios', id), campos);
-  }, []);
+  const updateUsuario = useCallback(
+    async (id: string, dados: Partial<Usuario>) => {
+      const db = requireDb();
+      const campos: Record<string, unknown> = { ...dados };
+      delete campos.id;
+      delete campos.senha;
+      const anterior = usuarios.find((u) => u.id === id);
+      await updateDoc(doc(db, 'usuarios', id), campos);
+      await registrarAuditoria('usuarios', id, 'UPDATE', campos, anterior);
+    },
+    [usuarios, registrarAuditoria],
+  );
 
   /**
    * Cria a conta no Firebase Auth (numa instância isolada, para não derrubar a
@@ -529,11 +612,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const campos: Record<string, unknown> = { ...perfilNovo };
         delete campos.senha;
         await setDoc(doc(db, 'usuarios', uid), campos);
+        await registrarAuditoria('usuarios', uid, 'CREATE', campos);
       } catch (erro) {
         throw new Error(mensagemErroAuth(erro));
       }
     },
-    [],
+    [registrarAuditoria],
   );
 
   /**
@@ -543,12 +627,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const deleteUsuario = useCallback(
     async (id: string) => {
       const db = requireDb();
+      const anterior = usuarios.find((u) => u.id === id);
       await deleteDoc(doc(db, 'usuarios', id));
+      await registrarAuditoria('usuarios', id, 'DELETE', {}, anterior);
       if (usuarioAtual?.id === id) {
         await logout();
       }
     },
-    [logout, usuarioAtual],
+    [logout, usuarioAtual, usuarios, registrarAuditoria],
   );
 
   // --- Contratos e afins --------------------------------------------------
@@ -559,7 +645,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     delete campos.id;
     campos.criado_em = agora;
     campos.atualizado_em = agora;
-    await addDoc(collection(db, colecao), campos);
+    const referencia = await addDoc(collection(db, colecao), campos);
+    return referencia.id;
   }, []);
 
   const atualizarEm = useCallback(async (colecao: string, id: string, dados: object) => {
@@ -571,7 +658,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const addContrato = useCallback(
-    (dados: Omit<Contrato, 'id'>) => {
+    async (dados: Omit<Contrato, 'id'>) => {
       if (dados.fiscalEmail && !validarLimiteFiscal(contratos, dados.fiscalEmail).valido) {
         throw new Error(
           'Este fiscal já possui 3 contratos ativos sob sua titularidade (limite atingido).',
@@ -590,25 +677,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           : {}),
         ...(gestorRaizDe(usuarioAtual) ? { gestorGeralId: gestorRaizDe(usuarioAtual) } : {}),
       };
-      return criarEm('contratos', contratoCompleto);
+      const id = await criarEm('contratos', contratoCompleto);
+      await registrarAuditoria('contratos', id, 'CREATE', contratoCompleto);
     },
-    [criarEm, contratos, usuarioAtual],
+    [criarEm, contratos, usuarioAtual, registrarAuditoria],
   );
   const updateContrato = useCallback(
-    (id: string, dados: Partial<Contrato>) => {
+    async (id: string, dados: Partial<Contrato>) => {
       if (dados.fiscalEmail && !validarLimiteFiscal(contratos, dados.fiscalEmail, id).valido) {
         throw new Error(
           'Este fiscal já possui 3 contratos ativos sob sua titularidade (limite atingido).',
         );
       }
-      return atualizarEm('contratos', id, dados);
+      const anterior = contratos.find((c) => c.id === id);
+      await atualizarEm('contratos', id, dados);
+      await registrarAuditoria('contratos', id, 'UPDATE', dados, anterior);
     },
-    [atualizarEm, contratos],
+    [atualizarEm, contratos, registrarAuditoria],
   );
-  const deleteContrato = useCallback(async (id: string) => {
-    const db = requireDb();
-    await deleteDoc(doc(db, 'contratos', id));
-  }, []);
+  const deleteContrato = useCallback(
+    async (id: string) => {
+      const db = requireDb();
+      const anterior = contratos.find((c) => c.id === id);
+      await deleteDoc(doc(db, 'contratos', id));
+      await registrarAuditoria('contratos', id, 'DELETE', {}, anterior);
+    },
+    [contratos, registrarAuditoria],
+  );
 
   /**
    * Lança uma execução (NF/fatura/recibo) e abate o saldo do contrato numa
@@ -643,7 +738,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       transacao.set(execucaoRef, { ...dados, criado_em: agora });
       transacao.update(contratoRef, { ...novoSaldo, atualizado_em: agora });
     });
-  }, []);
+
+    await registrarAuditoria('execucoes', execucaoRef.id, 'CREATE', dados);
+  }, [registrarAuditoria]);
 
   /** Remove uma execução e devolve valor/quantidade ao saldo atual do contrato. */
   const deleteExecucao = useCallback(async (id: string, contratoId: string) => {
@@ -651,7 +748,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const contratoRef = doc(db, 'contratos', contratoId);
     const execucaoRef = doc(db, 'execucoes', id);
 
-    await runTransaction(db, async (transacao) => {
+    const execucaoRemovida = await runTransaction(db, async (transacao) => {
       const [contratoSnap, execucaoSnap] = await Promise.all([
         transacao.get(contratoRef),
         transacao.get(execucaoRef),
@@ -665,8 +762,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       transacao.delete(execucaoRef);
       transacao.update(contratoRef, { ...novoSaldo, atualizado_em: new Date().toISOString() });
+      return execucao;
     });
-  }, []);
+
+    await registrarAuditoria('execucoes', id, 'DELETE', {}, execucaoRemovida);
+  }, [registrarAuditoria]);
 
   /**
    * Registra uma ocorrência sobre um contrato: um apontamento (atraso na
@@ -695,13 +795,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Você não tem permissão para registrar esta ocorrência neste contrato.');
       }
 
-      await criarEm('ocorrencias', dados);
+      const id = await criarEm('ocorrencias', dados);
+      await registrarAuditoria('ocorrencias', id, 'CREATE', dados);
     },
-    [criarEm, contratos, usuarioAtual],
+    [criarEm, contratos, usuarioAtual, registrarAuditoria],
   );
 
   const addProcedimento = useCallback(
-    (dados: Omit<ProcedimentoLicitatorio, 'id'>) => criarEm('procedimentos', dados),
+    async (dados: Omit<ProcedimentoLicitatorio, 'id'>) => {
+      await criarEm('procedimentos', dados);
+    },
     [criarEm],
   );
   const updateProcedimento = useCallback(
@@ -711,7 +814,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const addSancionatorio = useCallback(
-    (dados: Omit<ProcessoSancionatorio, 'id'>) => criarEm('sancionatorios', dados),
+    async (dados: Omit<ProcessoSancionatorio, 'id'>) => {
+      await criarEm('sancionatorios', dados);
+    },
     [criarEm],
   );
   const updateSancionatorio = useCallback(
@@ -721,7 +826,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const addPortaria = useCallback(
-    (dados: Omit<PortariaFiscal, 'id'>) => criarEm('portarias', dados),
+    async (dados: Omit<PortariaFiscal, 'id'>) => {
+      await criarEm('portarias', dados);
+    },
     [criarEm],
   );
   const updatePortaria = useCallback(
@@ -744,6 +851,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       procedimentos,
       sancionatorios,
       portarias,
+      logsAcesso,
+      logsAuditoria,
       usuarioAtual,
       isAuthenticated,
       carregandoAuth,
@@ -786,6 +895,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       procedimentos,
       sancionatorios,
       portarias,
+      logsAcesso,
+      logsAuditoria,
       usuarioAtual,
       isAuthenticated,
       carregandoAuth,

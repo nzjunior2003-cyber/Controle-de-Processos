@@ -13,6 +13,7 @@ import GestaoContratos from './pages/gestao-contratos';
 import Usuarios from './pages/Usuarios';
 import ProtectedRoute from './components/ProtectedRoute';
 import FiscalContrato from './pages/fiscal-contrato';
+import Auditoria from './pages/auditoria';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
                <Route path="processos/:id" element={<DetalheProcesso />} />
                <Route path="dashboard" element={<Dashboard />} />
                <Route path="usuarios" element={<Usuarios />} />
+               <Route path="auditoria" element={<Auditoria />} />
              </Route>
           </Route>
         </Routes>

@@ -114,6 +114,30 @@ service cloud.firestore {
       allow write: if ativo() && perfilDoc().perfil in ['master', 'contratos'];
     }
 
+    // Log de acesso (login bem-sucedido ou falho). Um login mal-sucedido
+    // (senha incorreta, e-mail inexistente) acontece ANTES de qualquer
+    // sessão válida — não há como exigir autenticação para essa escrita
+    // sem impedir justamente o registro das falhas, que é o caso mais
+    // importante para auditoria de segurança. Por isso a criação fica
+    // aberta, restrita ao formato mínimo esperado; leitura só para master.
+    match /logs_acesso/{documento} {
+      allow read: if master();
+      allow create: if request.resource.data.email is string
+        && request.resource.data.sucesso is bool
+        && request.resource.data.keys().hasOnly(['userId', 'email', 'sucesso', 'dataHora', 'userAgent']);
+      allow update, delete: if false;
+    }
+
+    // Log de auditoria de dados: qualquer usuário autenticado grava (o
+    // próprio sistema registra em nome de quem fez a ação, sempre como
+    // efeito colateral de uma ação já autorizada na coleção de origem);
+    // leitura só para master; sem edição/exclusão (trilha imutável).
+    match /logs_auditoria/{documento} {
+      allow read: if master();
+      allow create: if autenticado();
+      allow update, delete: if false;
+    }
+
     // Nada mais é acessível.
     match /{documento=**} {
       allow read, write: if false;
