@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, FileText, PlusCircle, ShieldCheck } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, Pencil, PlusCircle, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   formatarMoeda,
@@ -20,6 +20,8 @@ interface Props {
   notificacoes: NotificacaoContrato[];
   podeGerenciar: boolean;
   onGerenciar: (contrato: ContratoComStatus) => void;
+  /** Quando informado, exibe o botão de editar os dados cadastrais do contrato. */
+  onEditar?: (contrato: ContratoComStatus) => void;
   getPcaTitleByProcesso: (numeroProcesso: string) => string | null;
 }
 
@@ -34,6 +36,7 @@ export default function TabelaContratosVigencia({
   notificacoes,
   podeGerenciar,
   onGerenciar,
+  onEditar,
   getPcaTitleByProcesso,
 }: Props) {
   const [expandido, setExpandido] = useState<string | null>(null);
@@ -123,10 +126,19 @@ export default function TabelaContratosVigencia({
                             {podeGerenciar && (
                               <button
                                 onClick={() => onGerenciar(item)}
-                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
+                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none mr-2 mb-2"
                               >
                                 <PlusCircle className="w-4 h-4 mr-1.5" />
                                 Gerenciar Execução / Notificações
+                              </button>
+                            )}
+                            {onEditar && (
+                              <button
+                                onClick={() => onEditar(item)}
+                                className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none mb-2"
+                              >
+                                <Pencil className="w-4 h-4 mr-1.5" />
+                                Editar Contrato
                               </button>
                             )}
                           </div>
@@ -163,7 +175,9 @@ export default function TabelaContratosVigencia({
                             <div className="flex justify-between items-center mb-1">
                               <span className="font-semibold text-gray-900">Saldo Atual</span>
                               <span className="text-emerald-600 font-bold">
-                                {formatarMoeda(item.valorGlobal - valorExecutado)}
+                                {formatarMoeda(
+                                  item.saldoAtualFinanceiro ?? item.valorGlobal - valorExecutado,
+                                )}
                               </span>
                             </div>
                             <div className="h-2 bg-gray-200 rounded-full mt-2 mb-1 overflow-hidden pointer-events-none">

@@ -215,6 +215,14 @@ export interface Contrato {
   contatoEmail?: string;
   contatoTelefone?: string;
   valorGlobal: number;
+  /** Saldo financeiro de referência no cadastro (preenchido pelo Gestor). */
+  saldoInicialFinanceiro: number;
+  /** Saldo financeiro corrente, decrementado a cada execução (NF) lançada. */
+  saldoAtualFinanceiro: number;
+  /** Saldo em quantidade de referência, para contratos com controle por quantitativo. */
+  saldoInicialQuantitativo?: number;
+  /** Saldo em quantidade corrente, decrementado a cada execução lançada. */
+  saldoAtualQuantitativo?: number;
   inicioVigencia: string;
   fimVigencia: string;
   fiscalTitular?: string;

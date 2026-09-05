@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  abaterSaldo,
   buscarContratos,
   calcularStatusContrato,
+  devolverSaldo,
   filtrarContratosDoFiscal,
 } from './contratos';
 import type { Contrato } from '../types';
@@ -13,6 +15,8 @@ const base: Contrato = {
   objeto: 'Locação de veículos',
   empresa: 'LUIZ VIANA TRANSPORTE LTDA',
   valorGlobal: 1000,
+  saldoInicialFinanceiro: 1000,
+  saldoAtualFinanceiro: 1000,
   inicioVigencia: '2026-01-01',
   fimVigencia: '2026-12-31',
   fiscalEmail: 'fiscal@cbmpa.gov.br',
@@ -80,6 +84,52 @@ describe('filtrarContratosDoFiscal', () => {
 
   it('devolve lista vazia sem usuário', () => {
     expect(filtrarContratosDoFiscal([base, outro], null)).toEqual([]);
+  });
+});
+
+describe('abaterSaldo', () => {
+  it('subtrai o valor da execução do saldo financeiro atual', () => {
+    const resultado = abaterSaldo({ saldoAtualFinanceiro: 1000 }, { valor: 300 });
+    expect(resultado.saldoAtualFinanceiro).toBe(700);
+    expect(resultado.saldoAtualQuantitativo).toBeUndefined();
+  });
+
+  it('também abate a quantidade quando o contrato controla saldo quantitativo', () => {
+    const resultado = abaterSaldo(
+      { saldoAtualFinanceiro: 1000, saldoAtualQuantitativo: 50 },
+      { valor: 300, quantidade: 10 },
+    );
+    expect(resultado.saldoAtualFinanceiro).toBe(700);
+    expect(resultado.saldoAtualQuantitativo).toBe(40);
+  });
+
+  it('permite saldo negativo (a chamada decide se isso é um problema)', () => {
+    const resultado = abaterSaldo({ saldoAtualFinanceiro: 100 }, { valor: 300 });
+    expect(resultado.saldoAtualFinanceiro).toBe(-200);
+  });
+});
+
+describe('devolverSaldo', () => {
+  it('devolve o valor da execução removida ao saldo financeiro atual', () => {
+    const resultado = devolverSaldo({ saldoAtualFinanceiro: 700 }, { valor: 300 });
+    expect(resultado.saldoAtualFinanceiro).toBe(1000);
+  });
+
+  it('também devolve a quantidade quando o contrato controla saldo quantitativo', () => {
+    const resultado = devolverSaldo(
+      { saldoAtualFinanceiro: 700, saldoAtualQuantitativo: 40 },
+      { valor: 300, quantidade: 10 },
+    );
+    expect(resultado.saldoAtualFinanceiro).toBe(1000);
+    expect(resultado.saldoAtualQuantitativo).toBe(50);
+  });
+
+  it('abater seguido de devolver volta ao saldo original', () => {
+    const original = { saldoAtualFinanceiro: 1000, saldoAtualQuantitativo: 50 };
+    const execucao = { valor: 250, quantidade: 5 };
+    const depoisDeAbater = abaterSaldo(original, execucao);
+    const depoisDeDevolver = devolverSaldo(depoisDeAbater, execucao);
+    expect(depoisDeDevolver).toEqual(original);
   });
 });
 

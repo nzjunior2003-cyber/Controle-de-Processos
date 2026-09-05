@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, BellRing, Clock, FileText, Filter, Mail, Search, ShieldAlert } from 'lucide-react';
+import { AlertCircle, BellRing, Clock, FileText, Filter, Mail, PlusCircle, Search, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
 import { initAuth } from '../../lib/googleAuth';
@@ -7,24 +7,27 @@ import { AlertasModal } from '../../components/AlertasModal';
 import KpisContratos, { type FiltroKpi } from '../../components/contratos/KpisContratos';
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
 import ExecucaoModal from '../../components/contratos/ExecucaoModal';
+import ContratoFormModal from '../../components/contratos/ContratoFormModal';
+import type { Contrato } from '../../types';
 import {
   buscarContratos,
   calcularStatusContrato,
   type ContratoComStatus,
-  type ExecucaoContrato,
   type NotificacaoContrato,
 } from '../../lib/contratos';
 
 export default function GestaoContratos() {
-  const { processos, pcas, usuarioAtual, contratos } = useApp();
+  const { processos, pcas, usuarioAtual, contratos, execucoes, addExecucao, addContrato, updateContrato } =
+    useApp();
 
   const [busca, setBusca] = useState('');
   const [abaAtiva, setAbaAtiva] = useState<'geral' | 'alertas'>('geral');
   const [contratoSelecionado, setContratoSelecionado] = useState<ContratoComStatus | null>(null);
-  const [execucoes, setExecucoes] = useState<ExecucaoContrato[]>([]);
   const [notificacoes, setNotificacoes] = useState<NotificacaoContrato[]>([]);
   const [alertasModalOpen, setAlertasModalOpen] = useState(false);
   const [filtroKpi, setFiltroKpi] = useState<FiltroKpi>(null);
+  const [contratoEmEdicao, setContratoEmEdicao] = useState<Contrato | null>(null);
+  const [formularioAberto, setFormularioAberto] = useState(false);
 
   useEffect(() => {
     const cancelar = initAuth();
@@ -64,13 +67,27 @@ export default function GestaoContratos() {
             Acompanhamento e fiscalização dos contratos em vigor e vigências.
           </p>
         </div>
-        <button
-          onClick={() => setAlertasModalOpen(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-        >
-          <BellRing className="-ml-1 mr-2 h-5 w-5" />
-          Painel de Alertas
-        </button>
+        <div className="flex items-center gap-2">
+          {isMasterOrGestao && (
+            <button
+              onClick={() => {
+                setContratoEmEdicao(null);
+                setFormularioAberto(true);
+              }}
+              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800"
+            >
+              <PlusCircle className="-ml-1 mr-2 h-5 w-5" />
+              Novo Contrato
+            </button>
+          )}
+          <button
+            onClick={() => setAlertasModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            <BellRing className="-ml-1 mr-2 h-5 w-5" />
+            Painel de Alertas
+          </button>
+        </div>
       </div>
 
       <AlertasModal
@@ -136,6 +153,14 @@ export default function GestaoContratos() {
             notificacoes={notificacoes}
             podeGerenciar={isMasterOrGestao}
             onGerenciar={setContratoSelecionado}
+            onEditar={
+              isMasterOrGestao
+                ? (contrato) => {
+                    setContratoEmEdicao(contrato);
+                    setFormularioAberto(true);
+                  }
+                : undefined
+            }
             getPcaTitleByProcesso={getPcaTitleByProcesso}
           />
         )}
@@ -199,13 +224,11 @@ export default function GestaoContratos() {
       {contratoSelecionado && (
         <ExecucaoModal
           contrato={contratoSelecionado}
-          execucoes={execucoes}
+          execucoes={execucoes.filter((e) => e.contratoId === contratoSelecionado.id)}
           notificacoes={notificacoes}
           comNotificacoes
           usuarioNome={usuarioAtual?.nome}
-          onAddExecucao={(execucao) =>
-            setExecucoes((anteriores) => [...anteriores, { ...execucao, id: Date.now() }])
-          }
+          onAddExecucao={(execucao) => addExecucao(execucao)}
           onAddNotificacao={(texto) =>
             setNotificacoes((anteriores) => [
               {
@@ -218,6 +241,25 @@ export default function GestaoContratos() {
             ])
           }
           onFechar={() => setContratoSelecionado(null)}
+        />
+      )}
+
+      {formularioAberto && (
+        <ContratoFormModal
+          contrato={contratoEmEdicao}
+          onSalvar={async (dados) => {
+            if (contratoEmEdicao) {
+              await updateContrato(contratoEmEdicao.id, dados);
+            } else {
+              await addContrato(dados);
+            }
+            setFormularioAberto(false);
+            setContratoEmEdicao(null);
+          }}
+          onFechar={() => {
+            setFormularioAberto(false);
+            setContratoEmEdicao(null);
+          }}
         />
       )}
     </div>

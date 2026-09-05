@@ -10,16 +10,14 @@ import {
   calcularStatusContrato,
   filtrarContratosDoFiscal,
   type ContratoComStatus,
-  type ExecucaoContrato,
   type NotificacaoContrato,
 } from '../../lib/contratos';
 
 export default function FiscalContrato() {
-  const { processos, pcas, usuarioAtual, contratos } = useApp();
+  const { processos, pcas, usuarioAtual, contratos, execucoes, addExecucao } = useApp();
 
   const [busca, setBusca] = useState('');
   const [contratoSelecionado, setContratoSelecionado] = useState<ContratoComStatus | null>(null);
-  const [execucoes, setExecucoes] = useState<ExecucaoContrato[]>([]);
   const [notificacoes] = useState<NotificacaoContrato[]>([]);
 
   useEffect(() => {
@@ -107,13 +105,11 @@ export default function FiscalContrato() {
       {contratoSelecionado && (
         <ExecucaoModal
           contrato={contratoSelecionado}
-          execucoes={execucoes}
+          execucoes={execucoes.filter((e) => e.contratoId === contratoSelecionado.id)}
           notificacoes={notificacoes}
           comQuantidade
           usuarioNome={usuarioAtual?.nome}
-          onAddExecucao={(execucao) =>
-            setExecucoes((anteriores) => [...anteriores, { ...execucao, id: Date.now() }])
-          }
+          onAddExecucao={(execucao) => addExecucao(execucao)}
           onFechar={() => setContratoSelecionado(null)}
         />
       )}

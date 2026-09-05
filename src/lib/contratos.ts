@@ -72,7 +72,7 @@ export function buscarContratos<T extends Contrato>(contratos: T[], busca: strin
 
 /** Lançamento de execução financeira (NF/fatura/recibo) de um contrato. */
 export interface ExecucaoContrato {
-  id: number;
+  id: string;
   contratoId: string;
   tipo?: string;
   nf: string;
@@ -81,6 +81,46 @@ export interface ExecucaoContrato {
   quantidade?: number;
   observacao?: string;
   arquivoLink?: string | null;
+  criado_em?: string;
+}
+
+export interface SaldoContrato {
+  saldoAtualFinanceiro: number;
+  saldoAtualQuantitativo?: number;
+}
+
+/** Abate valor (e quantidade, quando controlada) de uma execução (NF) lançada do saldo atual do contrato. */
+export function abaterSaldo(
+  saldo: SaldoContrato,
+  execucao: Pick<ExecucaoContrato, 'valor' | 'quantidade'>,
+): SaldoContrato {
+  const controlaQuantidade = typeof saldo.saldoAtualQuantitativo === 'number';
+  return {
+    saldoAtualFinanceiro: (saldo.saldoAtualFinanceiro ?? 0) - (execucao.valor || 0),
+    ...(controlaQuantidade
+      ? {
+          saldoAtualQuantitativo:
+            (saldo.saldoAtualQuantitativo ?? 0) - (execucao.quantidade || 0),
+        }
+      : {}),
+  };
+}
+
+/** Devolve ao saldo atual do contrato o valor/quantidade de uma execução removida. */
+export function devolverSaldo(
+  saldo: SaldoContrato,
+  execucao: Pick<ExecucaoContrato, 'valor' | 'quantidade'>,
+): SaldoContrato {
+  const controlaQuantidade = typeof saldo.saldoAtualQuantitativo === 'number';
+  return {
+    saldoAtualFinanceiro: (saldo.saldoAtualFinanceiro ?? 0) + (execucao.valor || 0),
+    ...(controlaQuantidade
+      ? {
+          saldoAtualQuantitativo:
+            (saldo.saldoAtualQuantitativo ?? 0) + (execucao.quantidade || 0),
+        }
+      : {}),
+  };
 }
 
 /** Ocorrência/notificação registrada sobre um contrato. */

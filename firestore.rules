@@ -75,6 +75,11 @@ service cloud.firestore {
       allow write: if ativo()
         && perfilDoc().perfil in ['master', 'contratos', 'gestao'];
     }
+    match /execucoes/{documento} {
+      allow read: if ativo();
+      allow write: if ativo()
+        && perfilDoc().perfil in ['master', 'contratos', 'gestao'];
+    }
     match /procedimentos/{documento} {
       allow read: if ativo();
       allow write: if ativo() && perfilDoc().perfil in ['master', 'contratos'];

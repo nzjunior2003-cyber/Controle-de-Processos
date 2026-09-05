@@ -39,7 +39,7 @@ interface Props {
   contrato: ContratoComStatus;
   execucoes: ExecucaoContrato[];
   notificacoes: NotificacaoContrato[];
-  onAddExecucao: (execucao: Omit<ExecucaoContrato, 'id'>) => void;
+  onAddExecucao: (execucao: Omit<ExecucaoContrato, 'id'>) => void | Promise<void>;
   onAddNotificacao?: (texto: string) => void;
   /** Exibe a aba de notificações (módulo de Gestão). */
   comNotificacoes?: boolean;
@@ -71,7 +71,7 @@ export default function ExecucaoModal({
 
   const execucoesDoContrato = execucoes.filter((e) => e.contratoId === contrato.id);
   const valorExecutado = execucoesDoContrato.reduce((acc, atual) => acc + atual.valor, 0);
-  const saldo = (contrato.valorGlobal || 0) - valorExecutado;
+  const saldo = contrato.saldoAtualFinanceiro ?? (contrato.valorGlobal || 0) - valorExecutado;
   const percExec = contrato.valorGlobal
     ? ((valorExecutado / contrato.valorGlobal) * 100).toFixed(1)
     : '0.0';
@@ -113,7 +113,7 @@ export default function ExecucaoModal({
         }
       }
 
-      onAddExecucao({
+      await onAddExecucao({
         contratoId: contrato.id,
         tipo: novaExecucao.tipo,
         nf: novaExecucao.nf,
@@ -127,7 +127,11 @@ export default function ExecucaoModal({
       setNovaExecucao(EXECUCAO_VAZIA);
     } catch (erro) {
       console.error(erro);
-      alert('Erro ao realizar o upload para o Google Drive. Verifique suas permissões.');
+      alert(
+        erro instanceof Error
+          ? erro.message
+          : 'Erro ao registrar a execução. Verifique os dados e tente novamente.',
+      );
     } finally {
       setIsUploading(false);
     }

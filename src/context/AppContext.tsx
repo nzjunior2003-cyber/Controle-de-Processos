@@ -22,6 +22,7 @@ import {
   doc,
   getDoc,
   onSnapshot,
+  runTransaction,
   setDoc,
   updateDoc,
   writeBatch,
@@ -36,6 +37,7 @@ import {
   requireFirebaseAuth,
 } from '../lib/firebase';
 import { mapSheetArrayToPca, mapSheetRowToPca, type LinhaPlanilha } from '../lib/csv';
+import { abaterSaldo, devolverSaldo, type ExecucaoContrato } from '../lib/contratos';
 import {
   Processo,
   Setor,
@@ -62,6 +64,7 @@ interface AppContextData {
   alertas: Alerta[];
   pareceres: Parecer[];
   contratos: Contrato[];
+  execucoes: ExecucaoContrato[];
   procedimentos: ProcedimentoLicitatorio[];
   sancionatorios: ProcessoSancionatorio[];
   portarias: PortariaFiscal[];
@@ -102,6 +105,8 @@ interface AppContextData {
   addContrato: (dados: Omit<Contrato, 'id'>) => Promise<void>;
   updateContrato: (id: string, dados: Partial<Contrato>) => Promise<void>;
   deleteContrato: (id: string) => Promise<void>;
+  addExecucao: (dados: Omit<ExecucaoContrato, 'id'>) => Promise<void>;
+  deleteExecucao: (id: string, contratoId: string) => Promise<void>;
   addProcedimento: (dados: Omit<ProcedimentoLicitatorio, 'id'>) => Promise<void>;
   updateProcedimento: (id: string, dados: Partial<ProcedimentoLicitatorio>) => Promise<void>;
   addSancionatorio: (dados: Omit<ProcessoSancionatorio, 'id'>) => Promise<void>;
@@ -225,6 +230,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const alertas = useColecao<Alerta>('alertas', isAuthenticated);
   const pareceres = useColecao<Parecer>('pareceres', isAuthenticated);
   const contratos = useColecao<Contrato>('contratos', isAuthenticated);
+  const execucoes = useColecao<ExecucaoContrato>('execucoes', isAuthenticated);
   const procedimentos = useColecao<ProcedimentoLicitatorio>('procedimentos', isAuthenticated);
   const sancionatorios = useColecao<ProcessoSancionatorio>('sancionatorios', isAuthenticated);
   const portarias = useColecao<PortariaFiscal>('portarias', isAuthenticated);
@@ -555,7 +561,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const addContrato = useCallback(
-    (dados: Omit<Contrato, 'id'>) => criarEm('contratos', dados),
+    (dados: Omit<Contrato, 'id'>) => {
+      // O saldo atual sempre nasce igual ao saldo inicial informado pelo
+      // Gestor no cadastro, independente do que vier em `dados`.
+      const contratoCompleto: Omit<Contrato, 'id'> = {
+        ...dados,
+        saldoAtualFinanceiro: dados.saldoInicialFinanceiro,
+        ...(typeof dados.saldoInicialQuantitativo === 'number'
+          ? { saldoAtualQuantitativo: dados.saldoInicialQuantitativo }
+          : {}),
+      };
+      return criarEm('contratos', contratoCompleto);
+    },
     [criarEm],
   );
   const updateContrato = useCallback(
@@ -565,6 +582,64 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const deleteContrato = useCallback(async (id: string) => {
     const db = requireDb();
     await deleteDoc(doc(db, 'contratos', id));
+  }, []);
+
+  /**
+   * Lança uma execução (NF/fatura/recibo) e abate o saldo do contrato numa
+   * única transação, para não perder atualizações se duas NFs forem
+   * lançadas ao mesmo tempo.
+   */
+  const addExecucao = useCallback(async (dados: Omit<ExecucaoContrato, 'id'>) => {
+    const db = requireDb();
+    const contratoRef = doc(db, 'contratos', dados.contratoId);
+    const execucaoRef = doc(collection(db, 'execucoes'));
+    const agora = new Date().toISOString();
+
+    await runTransaction(db, async (transacao) => {
+      const contratoSnap = await transacao.get(contratoRef);
+      if (!contratoSnap.exists()) {
+        throw new Error('Contrato não encontrado.');
+      }
+      const contrato = contratoSnap.data() as Contrato;
+      const novoSaldo = abaterSaldo(contrato, dados);
+
+      if (novoSaldo.saldoAtualFinanceiro < 0) {
+        console.warn(
+          `Saldo financeiro do contrato ${dados.contratoId} ficou negativo: ${novoSaldo.saldoAtualFinanceiro}`,
+        );
+      }
+      if ((novoSaldo.saldoAtualQuantitativo ?? 0) < 0 && 'saldoAtualQuantitativo' in novoSaldo) {
+        console.warn(
+          `Saldo quantitativo do contrato ${dados.contratoId} ficou negativo: ${novoSaldo.saldoAtualQuantitativo}`,
+        );
+      }
+
+      transacao.set(execucaoRef, { ...dados, criado_em: agora });
+      transacao.update(contratoRef, { ...novoSaldo, atualizado_em: agora });
+    });
+  }, []);
+
+  /** Remove uma execução e devolve valor/quantidade ao saldo atual do contrato. */
+  const deleteExecucao = useCallback(async (id: string, contratoId: string) => {
+    const db = requireDb();
+    const contratoRef = doc(db, 'contratos', contratoId);
+    const execucaoRef = doc(db, 'execucoes', id);
+
+    await runTransaction(db, async (transacao) => {
+      const [contratoSnap, execucaoSnap] = await Promise.all([
+        transacao.get(contratoRef),
+        transacao.get(execucaoRef),
+      ]);
+      if (!contratoSnap.exists() || !execucaoSnap.exists()) {
+        throw new Error('Contrato ou execução não encontrados.');
+      }
+      const contrato = contratoSnap.data() as Contrato;
+      const execucao = execucaoSnap.data() as ExecucaoContrato;
+      const novoSaldo = devolverSaldo(contrato, execucao);
+
+      transacao.delete(execucaoRef);
+      transacao.update(contratoRef, { ...novoSaldo, atualizado_em: new Date().toISOString() });
+    });
   }, []);
 
   const addProcedimento = useCallback(
@@ -606,6 +681,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       alertas,
       pareceres,
       contratos,
+      execucoes,
       procedimentos,
       sancionatorios,
       portarias,
@@ -628,6 +704,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addContrato,
       updateContrato,
       deleteContrato,
+      addExecucao,
+      deleteExecucao,
       addProcedimento,
       updateProcedimento,
       addSancionatorio,
@@ -643,6 +721,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       alertas,
       pareceres,
       contratos,
+      execucoes,
       procedimentos,
       sancionatorios,
       portarias,
@@ -664,6 +743,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addContrato,
       updateContrato,
       deleteContrato,
+      addExecucao,
+      deleteExecucao,
       addProcedimento,
       updateProcedimento,
       addSancionatorio,
