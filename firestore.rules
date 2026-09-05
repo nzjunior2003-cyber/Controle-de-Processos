@@ -96,11 +96,9 @@ service cloud.firestore {
       allow write: if ativo()
         && perfilDoc().perfil in ['master', 'contratos', 'gestao'];
       // O Fiscal titular/suplente do contrato pode registrar qualquer tipo
-      // de ocorrência, exceto o apontamento simples 'OCORRENCIA' (reservado
-      // à gestão); sem edição/exclusão.
+      // de ocorrência para esse contrato; sem edição/exclusão.
       allow create: if ativo()
         && perfilDoc().perfil == 'fiscal'
-        && request.resource.data.tipo != 'OCORRENCIA'
         && fiscalDoContrato(request.resource.data.contratoId);
     }
     match /procedimentos/{documento} {

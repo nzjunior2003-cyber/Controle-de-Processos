@@ -10,17 +10,7 @@ import {
   calcularStatusContrato,
   filtrarContratosDoFiscal,
   type ContratoComStatus,
-  type TipoOcorrencia,
 } from '../../lib/contratos';
-
-const TIPOS_OCORRENCIA_FISCAL: TipoOcorrencia[] = [
-  'ATRASO_ENTREGA',
-  'DESCONFORMIDADE',
-  'ITEM_NAO_ENTREGUE',
-  'ADITIVO',
-  'ESCLARECIMENTO',
-  'OUTRO',
-];
 
 export default function FiscalContrato() {
   const { processos, pcas, usuarioAtual, contratos, execucoes, addExecucao, ocorrencias, addOcorrencia } =
@@ -118,7 +108,6 @@ export default function FiscalContrato() {
           ocorrencias={ocorrencias.filter((o) => o.contratoId === contratoSelecionado.id)}
           comQuantidade
           comOcorrencias
-          tiposOcorrenciaPermitidos={TIPOS_OCORRENCIA_FISCAL}
           onAddExecucao={(execucao) => addExecucao(execucao)}
           onAddOcorrencia={({ descricao, tipo }) =>
             addOcorrencia({

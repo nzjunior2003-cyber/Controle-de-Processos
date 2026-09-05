@@ -646,13 +646,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   /**
-   * Registra uma ocorrência sobre um contrato: um apontamento do Gestor,
-   * uma solicitação de aditivo/esclarecimento, ou um apontamento do Fiscal
-   * sobre a execução (atraso na entrega, item em desconformidade, item não
-   * entregue etc.). Master/Contratos/Gestão podem registrar qualquer tipo;
-   * um Fiscal só pode registrar para um contrato em que é titular ou
-   * suplente, e não pode usar o apontamento simples 'OCORRENCIA' (reservado
-   * à gestão) — mesma fronteira aplicada nas firestore.rules.
+   * Registra uma ocorrência sobre um contrato: um apontamento (atraso na
+   * entrega, atraso de pagamento, desconformidade, item não entregue etc.,
+   * descritos livremente em `descricao`) ou uma solicitação de aditivo/
+   * esclarecimento. Master/Contratos/Gestão podem registrar em qualquer
+   * contrato; um Fiscal só pode registrar (qualquer tipo) para um contrato
+   * em que é titular ou suplente — mesma fronteira aplicada nas
+   * firestore.rules.
    */
   const addOcorrencia = useCallback(
     async (dados: Omit<Ocorrencia, 'id'>) => {
@@ -660,7 +660,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const gestorOuContratos = perfil === 'master' || perfil === 'gestao' || perfil === 'contratos';
 
       let podeRegistrar = gestorOuContratos;
-      if (!podeRegistrar && perfil === 'fiscal' && dados.tipo !== 'OCORRENCIA') {
+      if (!podeRegistrar && perfil === 'fiscal') {
         const contrato = contratos.find((c) => c.id === dados.contratoId);
         podeRegistrar =
           !!contrato &&
