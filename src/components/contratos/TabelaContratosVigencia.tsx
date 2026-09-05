@@ -5,7 +5,7 @@ import {
   formatarMoeda,
   type ContratoComStatus,
   type ExecucaoContrato,
-  type NotificacaoContrato,
+  type Ocorrencia,
 } from '../../lib/contratos';
 
 const formatarData = (valor?: string) => {
@@ -17,7 +17,7 @@ const formatarData = (valor?: string) => {
 interface Props {
   dados: ContratoComStatus[];
   execucoes: ExecucaoContrato[];
-  notificacoes: NotificacaoContrato[];
+  ocorrencias: Ocorrencia[];
   podeGerenciar: boolean;
   onGerenciar: (contrato: ContratoComStatus) => void;
   /** Quando informado, exibe o botão de editar os dados cadastrais do contrato. */
@@ -33,7 +33,7 @@ interface Props {
 export default function TabelaContratosVigencia({
   dados,
   execucoes,
-  notificacoes,
+  ocorrencias,
   podeGerenciar,
   onGerenciar,
   onEditar,
@@ -61,7 +61,7 @@ export default function TabelaContratosVigencia({
             const percExec = item.valorGlobal
               ? ((valorExecutado / item.valorGlobal) * 100).toFixed(1)
               : '0.0';
-            const notificacoesDoContrato = notificacoes.filter((n) => n.contratoId === item.id);
+            const ocorrenciasDoContrato = ocorrencias.filter((o) => o.contratoId === item.id);
             const isExpanded = expandido === item.id;
 
             return (
@@ -193,7 +193,7 @@ export default function TabelaContratosVigencia({
                         <div className="space-y-2 lg:col-span-1 md:col-span-2">
                           <span className="font-semibold text-gray-900 block mb-1">Linha do Tempo (Últimos Eventos)</span>
                           <div className="relative pl-4 border-l-2 border-gray-200 space-y-4 mt-2">
-                            {notificacoesDoContrato.length > 0 || execucoesDoContrato.length > 0 ? (
+                            {ocorrenciasDoContrato.length > 0 || execucoesDoContrato.length > 0 ? (
                               <>
                                 {execucoesDoContrato.slice(0, 2).map((exec) => (
                                   <div key={exec.id} className="relative">
@@ -207,14 +207,14 @@ export default function TabelaContratosVigencia({
                                     </div>
                                   </div>
                                 ))}
-                                {notificacoesDoContrato.slice(0, 2).map((noti) => (
-                                  <div key={`not-${noti.id}`} className="relative">
+                                {ocorrenciasDoContrato.slice(0, 2).map((ocorrencia) => (
+                                  <div key={`oco-${ocorrencia.id}`} className="relative">
                                     <div className="absolute -left-[21px] bg-amber-500 h-2 w-2 rounded-full border-2 border-white"></div>
                                     <div className="text-xs font-medium text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis">
                                       Ocorrência
                                     </div>
                                     <div className="text-[10px] text-gray-500">
-                                      {noti.texto} ({formatarData(noti.data)})
+                                      {ocorrencia.descricao} ({formatarData(ocorrencia.data)})
                                     </div>
                                   </div>
                                 ))}

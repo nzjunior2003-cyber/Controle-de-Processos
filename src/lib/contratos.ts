@@ -123,12 +123,28 @@ export function devolverSaldo(
   };
 }
 
-/** Ocorrência/notificação registrada sobre um contrato. */
-export interface NotificacaoContrato {
-  id: number;
+export type TipoOcorrencia = 'OCORRENCIA' | 'ADITIVO' | 'ESCLARECIMENTO';
+
+export const TIPO_OCORRENCIA_LABELS: Record<TipoOcorrencia, string> = {
+  OCORRENCIA: 'Ocorrência',
+  ADITIVO: 'Solicitação de Aditivo',
+  ESCLARECIMENTO: 'Solicitação de Esclarecimento',
+};
+
+/**
+ * Ocorrência registrada sobre um contrato: tanto um apontamento simples do
+ * Gestor quanto uma solicitação de aditivo/esclarecimento do Fiscal — sem
+ * workflow de aprovação, é só registro histórico.
+ */
+export interface Ocorrencia {
+  id: string;
   contratoId: string;
-  texto: string;
+  descricao: string;
   data: string;
+  registradoPorId: string;
+  registradoPorNome: string;
+  tipo: TipoOcorrencia;
+  criado_em?: string;
 }
 
 export const formatarMoeda = (valor: number) =>

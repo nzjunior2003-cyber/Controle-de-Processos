@@ -37,7 +37,7 @@ import {
   requireFirebaseAuth,
 } from '../lib/firebase';
 import { mapSheetArrayToPca, mapSheetRowToPca, type LinhaPlanilha } from '../lib/csv';
-import { abaterSaldo, devolverSaldo, type ExecucaoContrato } from '../lib/contratos';
+import { abaterSaldo, devolverSaldo, type ExecucaoContrato, type Ocorrencia } from '../lib/contratos';
 import {
   Processo,
   Setor,
@@ -65,6 +65,7 @@ interface AppContextData {
   pareceres: Parecer[];
   contratos: Contrato[];
   execucoes: ExecucaoContrato[];
+  ocorrencias: Ocorrencia[];
   procedimentos: ProcedimentoLicitatorio[];
   sancionatorios: ProcessoSancionatorio[];
   portarias: PortariaFiscal[];
@@ -107,6 +108,7 @@ interface AppContextData {
   deleteContrato: (id: string) => Promise<void>;
   addExecucao: (dados: Omit<ExecucaoContrato, 'id'>) => Promise<void>;
   deleteExecucao: (id: string, contratoId: string) => Promise<void>;
+  addOcorrencia: (dados: Omit<Ocorrencia, 'id'>) => Promise<void>;
   addProcedimento: (dados: Omit<ProcedimentoLicitatorio, 'id'>) => Promise<void>;
   updateProcedimento: (id: string, dados: Partial<ProcedimentoLicitatorio>) => Promise<void>;
   addSancionatorio: (dados: Omit<ProcessoSancionatorio, 'id'>) => Promise<void>;
@@ -231,6 +233,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const pareceres = useColecao<Parecer>('pareceres', isAuthenticated);
   const contratos = useColecao<Contrato>('contratos', isAuthenticated);
   const execucoes = useColecao<ExecucaoContrato>('execucoes', isAuthenticated);
+  const ocorrencias = useColecao<Ocorrencia>('ocorrencias', isAuthenticated);
   const procedimentos = useColecao<ProcedimentoLicitatorio>('procedimentos', isAuthenticated);
   const sancionatorios = useColecao<ProcessoSancionatorio>('sancionatorios', isAuthenticated);
   const portarias = useColecao<PortariaFiscal>('portarias', isAuthenticated);
@@ -642,6 +645,37 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  /**
+   * Registra uma ocorrência (apontamento do Gestor, ou solicitação de
+   * aditivo/esclarecimento do Fiscal) sobre um contrato. Master/Contratos/
+   * Gestão podem registrar qualquer tipo; um Fiscal só pode registrar para
+   * um contrato em que é titular ou suplente, e apenas os tipos ADITIVO ou
+   * ESCLARECIMENTO (o apontamento simples 'OCORRENCIA' é reservado à
+   * gestão) — mesma fronteira aplicada nas firestore.rules.
+   */
+  const addOcorrencia = useCallback(
+    async (dados: Omit<Ocorrencia, 'id'>) => {
+      const perfil = usuarioAtual?.perfil;
+      const gestorOuContratos = perfil === 'master' || perfil === 'gestao' || perfil === 'contratos';
+
+      let podeRegistrar = gestorOuContratos;
+      if (!podeRegistrar && perfil === 'fiscal' && dados.tipo !== 'OCORRENCIA') {
+        const contrato = contratos.find((c) => c.id === dados.contratoId);
+        podeRegistrar =
+          !!contrato &&
+          (contrato.fiscalEmail === usuarioAtual?.email ||
+            contrato.fiscalSuplenteEmail === usuarioAtual?.email);
+      }
+
+      if (!podeRegistrar) {
+        throw new Error('Você não tem permissão para registrar esta ocorrência neste contrato.');
+      }
+
+      await criarEm('ocorrencias', dados);
+    },
+    [criarEm, contratos, usuarioAtual],
+  );
+
   const addProcedimento = useCallback(
     (dados: Omit<ProcedimentoLicitatorio, 'id'>) => criarEm('procedimentos', dados),
     [criarEm],
@@ -682,6 +716,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       pareceres,
       contratos,
       execucoes,
+      ocorrencias,
       procedimentos,
       sancionatorios,
       portarias,
@@ -706,6 +741,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       deleteContrato,
       addExecucao,
       deleteExecucao,
+      addOcorrencia,
       addProcedimento,
       updateProcedimento,
       addSancionatorio,
@@ -722,6 +758,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       pareceres,
       contratos,
       execucoes,
+      ocorrencias,
       procedimentos,
       sancionatorios,
       portarias,
@@ -745,6 +782,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       deleteContrato,
       addExecucao,
       deleteExecucao,
+      addOcorrencia,
       addProcedimento,
       updateProcedimento,
       addSancionatorio,

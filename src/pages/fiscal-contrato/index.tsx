@@ -10,15 +10,17 @@ import {
   calcularStatusContrato,
   filtrarContratosDoFiscal,
   type ContratoComStatus,
-  type NotificacaoContrato,
+  type TipoOcorrencia,
 } from '../../lib/contratos';
 
+const TIPOS_OCORRENCIA_FISCAL: TipoOcorrencia[] = ['ADITIVO', 'ESCLARECIMENTO'];
+
 export default function FiscalContrato() {
-  const { processos, pcas, usuarioAtual, contratos, execucoes, addExecucao } = useApp();
+  const { processos, pcas, usuarioAtual, contratos, execucoes, addExecucao, ocorrencias, addOcorrencia } =
+    useApp();
 
   const [busca, setBusca] = useState('');
   const [contratoSelecionado, setContratoSelecionado] = useState<ContratoComStatus | null>(null);
-  const [notificacoes] = useState<NotificacaoContrato[]>([]);
 
   useEffect(() => {
     const cancelar = initAuth();
@@ -95,7 +97,7 @@ export default function FiscalContrato() {
         <TabelaContratosVigencia
           dados={filtrados}
           execucoes={execucoes}
-          notificacoes={notificacoes}
+          ocorrencias={ocorrencias}
           podeGerenciar={isMasterOrFiscal}
           onGerenciar={setContratoSelecionado}
           getPcaTitleByProcesso={getPcaTitleByProcesso}
@@ -106,10 +108,21 @@ export default function FiscalContrato() {
         <ExecucaoModal
           contrato={contratoSelecionado}
           execucoes={execucoes.filter((e) => e.contratoId === contratoSelecionado.id)}
-          notificacoes={notificacoes}
+          ocorrencias={ocorrencias.filter((o) => o.contratoId === contratoSelecionado.id)}
           comQuantidade
-          usuarioNome={usuarioAtual?.nome}
+          comOcorrencias
+          tiposOcorrenciaPermitidos={TIPOS_OCORRENCIA_FISCAL}
           onAddExecucao={(execucao) => addExecucao(execucao)}
+          onAddOcorrencia={({ descricao, tipo }) =>
+            addOcorrencia({
+              contratoId: contratoSelecionado.id,
+              descricao,
+              tipo,
+              data: new Date().toISOString(),
+              registradoPorId: usuarioAtual?.id ?? '',
+              registradoPorNome: usuarioAtual?.nome ?? '',
+            })
+          }
           onFechar={() => setContratoSelecionado(null)}
         />
       )}

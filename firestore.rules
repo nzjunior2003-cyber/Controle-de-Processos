@@ -29,6 +29,17 @@ service cloud.firestore {
       return ativo() && perfilDoc().perfil == 'master';
     }
 
+    // Fiscal titular ou suplente do contrato informado (por e-mail).
+    function fiscalDoContrato(contratoId) {
+      return exists(/databases/$(database)/documents/contratos/$(contratoId))
+        && (
+          get(/databases/$(database)/documents/contratos/$(contratoId)).data.fiscalEmail
+            == request.auth.token.email
+          || get(/databases/$(database)/documents/contratos/$(contratoId)).data.fiscalSuplenteEmail
+            == request.auth.token.email
+        );
+    }
+
     match /usuarios/{usuarioId} {
       // Qualquer usuário autenticado lê a lista (nomes/fiscais aparecem nas telas);
       // o próprio usuário sempre consegue ler seu documento para saber se foi aprovado.
@@ -79,6 +90,18 @@ service cloud.firestore {
       allow read: if ativo();
       allow write: if ativo()
         && perfilDoc().perfil in ['master', 'contratos', 'gestao'];
+    }
+    match /ocorrencias/{documento} {
+      allow read: if ativo();
+      allow write: if ativo()
+        && perfilDoc().perfil in ['master', 'contratos', 'gestao'];
+      // O Fiscal titular/suplente do contrato pode registrar apenas
+      // solicitações de aditivo/esclarecimento (não o apontamento simples
+      // 'OCORRENCIA', reservado à gestão); sem edição/exclusão.
+      allow create: if ativo()
+        && perfilDoc().perfil == 'fiscal'
+        && request.resource.data.tipo in ['ADITIVO', 'ESCLARECIMENTO']
+        && fiscalDoContrato(request.resource.data.contratoId);
     }
     match /procedimentos/{documento} {
       allow read: if ativo();

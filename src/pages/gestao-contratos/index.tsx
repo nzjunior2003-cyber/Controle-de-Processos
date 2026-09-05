@@ -9,21 +9,25 @@ import TabelaContratosVigencia from '../../components/contratos/TabelaContratosV
 import ExecucaoModal from '../../components/contratos/ExecucaoModal';
 import ContratoFormModal from '../../components/contratos/ContratoFormModal';
 import type { Contrato } from '../../types';
-import {
-  buscarContratos,
-  calcularStatusContrato,
-  type ContratoComStatus,
-  type NotificacaoContrato,
-} from '../../lib/contratos';
+import { buscarContratos, calcularStatusContrato, type ContratoComStatus } from '../../lib/contratos';
 
 export default function GestaoContratos() {
-  const { processos, pcas, usuarioAtual, contratos, execucoes, addExecucao, addContrato, updateContrato } =
-    useApp();
+  const {
+    processos,
+    pcas,
+    usuarioAtual,
+    contratos,
+    execucoes,
+    addExecucao,
+    ocorrencias,
+    addOcorrencia,
+    addContrato,
+    updateContrato,
+  } = useApp();
 
   const [busca, setBusca] = useState('');
   const [abaAtiva, setAbaAtiva] = useState<'geral' | 'alertas'>('geral');
   const [contratoSelecionado, setContratoSelecionado] = useState<ContratoComStatus | null>(null);
-  const [notificacoes, setNotificacoes] = useState<NotificacaoContrato[]>([]);
   const [alertasModalOpen, setAlertasModalOpen] = useState(false);
   const [filtroKpi, setFiltroKpi] = useState<FiltroKpi>(null);
   const [contratoEmEdicao, setContratoEmEdicao] = useState<Contrato | null>(null);
@@ -150,7 +154,7 @@ export default function GestaoContratos() {
           <TabelaContratosVigencia
             dados={filtrados}
             execucoes={execucoes}
-            notificacoes={notificacoes}
+            ocorrencias={ocorrencias}
             podeGerenciar={isMasterOrGestao}
             onGerenciar={setContratoSelecionado}
             onEditar={
@@ -225,20 +229,18 @@ export default function GestaoContratos() {
         <ExecucaoModal
           contrato={contratoSelecionado}
           execucoes={execucoes.filter((e) => e.contratoId === contratoSelecionado.id)}
-          notificacoes={notificacoes}
-          comNotificacoes
-          usuarioNome={usuarioAtual?.nome}
+          ocorrencias={ocorrencias.filter((o) => o.contratoId === contratoSelecionado.id)}
+          comOcorrencias
           onAddExecucao={(execucao) => addExecucao(execucao)}
-          onAddNotificacao={(texto) =>
-            setNotificacoes((anteriores) => [
-              {
-                id: Date.now(),
-                contratoId: contratoSelecionado.id,
-                texto,
-                data: new Date().toISOString(),
-              },
-              ...anteriores,
-            ])
+          onAddOcorrencia={({ descricao, tipo }) =>
+            addOcorrencia({
+              contratoId: contratoSelecionado.id,
+              descricao,
+              tipo,
+              data: new Date().toISOString(),
+              registradoPorId: usuarioAtual?.id ?? '',
+              registradoPorNome: usuarioAtual?.nome ?? '',
+            })
           }
           onFechar={() => setContratoSelecionado(null)}
         />

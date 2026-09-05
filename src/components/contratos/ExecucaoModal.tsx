@@ -5,9 +5,11 @@ import { getAccessToken, googleSignIn } from '../../lib/googleAuth';
 import { getOrCreateFolder, uploadFileToDrive } from '../../lib/driveService';
 import {
   formatarMoeda,
+  TIPO_OCORRENCIA_LABELS,
   type ContratoComStatus,
   type ExecucaoContrato,
-  type NotificacaoContrato,
+  type Ocorrencia,
+  type TipoOcorrencia,
 } from '../../lib/contratos';
 
 const CLASSE_INPUT =
@@ -35,38 +37,45 @@ const EXECUCAO_VAZIA: NovaExecucao = {
   arquivo: null,
 };
 
+const TIPOS_OCORRENCIA_PADRAO: TipoOcorrencia[] = ['OCORRENCIA', 'ADITIVO', 'ESCLARECIMENTO'];
+
 interface Props {
   contrato: ContratoComStatus;
   execucoes: ExecucaoContrato[];
-  notificacoes: NotificacaoContrato[];
+  ocorrencias: Ocorrencia[];
   onAddExecucao: (execucao: Omit<ExecucaoContrato, 'id'>) => void | Promise<void>;
-  onAddNotificacao?: (texto: string) => void;
-  /** Exibe a aba de notificações (módulo de Gestão). */
-  comNotificacoes?: boolean;
+  onAddOcorrencia?: (dados: { descricao: string; tipo: TipoOcorrencia }) => void | Promise<void>;
+  /** Exibe a aba de ocorrências. */
+  comOcorrencias?: boolean;
+  /** Tipos de ocorrência que este usuário pode registrar (varia por perfil). */
+  tiposOcorrenciaPermitidos?: TipoOcorrencia[];
   /** Exibe os campos de abatimento por quantidade (módulo Fiscal). */
   comQuantidade?: boolean;
-  usuarioNome?: string;
   onFechar: () => void;
 }
 
 /**
- * Modal de execução financeira / notificações de um contrato.
+ * Modal de execução financeira / ocorrências de um contrato.
  * Compartilhado por Gestão de Contratos e Fiscal do Contrato.
  */
 export default function ExecucaoModal({
   contrato,
   execucoes,
-  notificacoes,
+  ocorrencias,
   onAddExecucao,
-  onAddNotificacao,
-  comNotificacoes = false,
+  onAddOcorrencia,
+  comOcorrencias = false,
+  tiposOcorrenciaPermitidos = TIPOS_OCORRENCIA_PADRAO,
   comQuantidade = false,
-  usuarioNome,
   onFechar,
 }: Props) {
-  const [aba, setAba] = useState<'execucao' | 'notificacoes'>('execucao');
+  const [aba, setAba] = useState<'execucao' | 'ocorrencias'>('execucao');
   const [novaExecucao, setNovaExecucao] = useState<NovaExecucao>(EXECUCAO_VAZIA);
-  const [novaNotificacao, setNovaNotificacao] = useState('');
+  const [novaDescricao, setNovaDescricao] = useState('');
+  const [novoTipo, setNovoTipo] = useState<TipoOcorrencia>(
+    tiposOcorrenciaPermitidos[0] ?? 'OCORRENCIA',
+  );
+  const [salvandoOcorrencia, setSalvandoOcorrencia] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
   const execucoesDoContrato = execucoes.filter((e) => e.contratoId === contrato.id);
@@ -170,7 +179,7 @@ export default function ExecucaoModal({
           </div>
         </div>
 
-        {comNotificacoes && (
+        {comOcorrencias && (
           <div className="flex border-b border-gray-200 mb-4">
             <button
               className={`py-2 px-4 font-medium text-sm border-b-2 ${aba === 'execucao' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
@@ -179,10 +188,10 @@ export default function ExecucaoModal({
               Execução Financeira
             </button>
             <button
-              className={`py-2 px-4 font-medium text-sm border-b-2 ${aba === 'notificacoes' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-              onClick={() => setAba('notificacoes')}
+              className={`py-2 px-4 font-medium text-sm border-b-2 ${aba === 'ocorrencias' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setAba('ocorrencias')}
             >
-              Notificações
+              Ocorrências
             </button>
           </div>
         )}
@@ -219,7 +228,7 @@ export default function ExecucaoModal({
             </div>
           </div>
 
-          {(!comNotificacoes || aba === 'execucao') && (
+          {(!comOcorrencias || aba === 'execucao') && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1">
                 <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
@@ -401,52 +410,81 @@ export default function ExecucaoModal({
             </div>
           )}
 
-          {comNotificacoes && aba === 'notificacoes' && (
+          {comOcorrencias && aba === 'ocorrencias' && (
             <div className="grid grid-cols-1 gap-6">
               <div>
                 <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
-                  Nova Notificação
+                  Nova Ocorrência
                 </h4>
-                <div className="flex gap-2 mb-6">
+                <div className="flex flex-col sm:flex-row gap-2 mb-6">
+                  {tiposOcorrenciaPermitidos.length > 1 && (
+                    <select
+                      value={novoTipo}
+                      onChange={(e) => setNovoTipo(e.target.value as TipoOcorrencia)}
+                      className="border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm sm:w-64"
+                    >
+                      {tiposOcorrenciaPermitidos.map((tipo) => (
+                        <option key={tipo} value={tipo}>
+                          {TIPO_OCORRENCIA_LABELS[tipo]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <input
                     type="text"
-                    value={novaNotificacao}
-                    onChange={(e) => setNovaNotificacao(e.target.value)}
-                    placeholder="Digite a ocorrência / notificação para este contrato..."
+                    value={novaDescricao}
+                    onChange={(e) => setNovaDescricao(e.target.value)}
+                    placeholder="Descreva a ocorrência / solicitação para este contrato..."
                     className="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
                   />
                   <button
                     type="button"
-                    onClick={() => {
-                      if (novaNotificacao.trim() && onAddNotificacao) {
-                        onAddNotificacao(novaNotificacao.trim());
-                        setNovaNotificacao('');
+                    disabled={salvandoOcorrencia || !novaDescricao.trim()}
+                    onClick={async () => {
+                      if (!novaDescricao.trim() || !onAddOcorrencia) return;
+                      setSalvandoOcorrencia(true);
+                      try {
+                        await onAddOcorrencia({ descricao: novaDescricao.trim(), tipo: novoTipo });
+                        setNovaDescricao('');
+                      } catch (erro) {
+                        console.error(erro);
+                        alert(
+                          erro instanceof Error
+                            ? erro.message
+                            : 'Erro ao registrar a ocorrência. Tente novamente.',
+                        );
+                      } finally {
+                        setSalvandoOcorrencia(false);
                       }
                     }}
-                    className="inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 focus:outline-none"
+                    className="inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none"
                   >
                     <PlusCircle className="-ml-1 mr-2 h-4 w-4" />
-                    Adicionar
+                    {salvandoOcorrencia ? 'Salvando...' : 'Adicionar'}
                   </button>
                 </div>
 
                 <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
-                  Histórico de Notificações
+                  Histórico de Ocorrências
                 </h4>
                 <div className="space-y-4">
-                  {notificacoes
-                    .filter((n) => n.contratoId === contrato.id)
-                    .map((notif) => (
-                      <div key={notif.id} className="bg-white border text-left border-gray-200 rounded-md p-4 shadow-sm">
-                        <p className="text-sm text-gray-800">{notif.texto}</p>
+                  {ocorrencias
+                    .filter((o) => o.contratoId === contrato.id)
+                    .map((ocorrencia) => (
+                      <div key={ocorrencia.id} className="bg-white border text-left border-gray-200 rounded-md p-4 shadow-sm">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200 mb-2">
+                          {TIPO_OCORRENCIA_LABELS[ocorrencia.tipo] ?? ocorrencia.tipo}
+                        </span>
+                        <p className="text-sm text-gray-800">{ocorrencia.descricao}</p>
                         <p className="text-xs text-gray-500 mt-2">
-                          {format(new Date(notif.data), 'dd/MM/yyyy HH:mm')} - Registrado por {usuarioNome}
+                          {format(new Date(ocorrencia.data), 'dd/MM/yyyy HH:mm')} - Registrado por{' '}
+                          {ocorrencia.registradoPorNome}
                         </p>
                       </div>
                     ))}
-                  {notificacoes.filter((n) => n.contratoId === contrato.id).length === 0 && (
+                  {ocorrencias.filter((o) => o.contratoId === contrato.id).length === 0 && (
                     <div className="text-sm text-gray-500 italic">
-                      Nenhuma notificação registrada para este contrato.
+                      Nenhuma ocorrência registrada para este contrato.
                     </div>
                   )}
                 </div>
