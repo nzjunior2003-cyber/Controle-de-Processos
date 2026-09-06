@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { mapSheetArrayToPca, mapSheetRowToPca, parseCurrencyBR } from './csv';
+import {
+  mapSheetArrayToPca,
+  mapSheetRowToPca,
+  mapSheetRowToProcesso,
+  parseCurrencyBR,
+  parseDataBR,
+} from './csv';
 
 describe('parseCurrencyBR', () => {
   it('converte valores no formato brasileiro completo', () => {
@@ -71,6 +77,75 @@ describe('mapSheetRowToPca', () => {
     expect(pca.codigo_pca).toBe('');
     expect(pca.valor_previsto).toBe(0);
     expect(pca.exercicio).toBe(2025);
+  });
+});
+
+describe('parseDataBR', () => {
+  it('converte datas no formato d/m/aaaa para ISO', () => {
+    expect(parseDataBR('27/08/2026')).toBe(new Date(2026, 7, 27).toISOString());
+    expect(parseDataBR('5/1/2025')).toBe(new Date(2025, 0, 5).toISOString());
+  });
+
+  it('devolve undefined para datas incompletas ou vazias', () => {
+    expect(parseDataBR('27/08')).toBeUndefined();
+    expect(parseDataBR('')).toBeUndefined();
+    expect(parseDataBR(undefined)).toBeUndefined();
+    expect(parseDataBR('data inválida')).toBeUndefined();
+  });
+});
+
+describe('mapSheetRowToProcesso', () => {
+  const linhaBase = {
+    'N° PAE': 'E-2026/2014417',
+    OBJETO: ' Prorrogação do contrato ',
+    'SETOR DEMANDANTE': 'CSMV/MOP',
+    FONTE: 'TESOURO',
+    'RITO PROCESSUAL': 'PRORROGAÇÃO',
+    'FASE DO PROCESSO': 'INTERNA',
+    'SUBFASE DO PROCESSO': 'CONTRATADO',
+    'SETOR ATUAL': 'CBM > CSMV/SUBCHEFIA > Complexo do Entroncamento',
+    ANDAMENTO: '6º Termo aditivo em vigência',
+    'DATA DE ENTRADA ': '01/01/2026',
+    'ÚLTIMA TRAMITAÇÃO': '27/08/2026',
+  };
+
+  it('mapeia as colunas e remove o prefixo "E-" do número do processo', () => {
+    const processo = mapSheetRowToProcesso(linhaBase);
+    expect(processo).toEqual({
+      numero_processo: '2026/2014417',
+      objeto: 'Prorrogação do contrato',
+      unidade_demandante: 'CSMV/MOP',
+      status: 'concluido',
+      fonte: 'TESOURO',
+      rito_processual: 'PRORROGAÇÃO',
+      fase_processo: 'INTERNA',
+      subfase_processo: 'CONTRATADO',
+      localizacao_atual: 'CBM > CSMV/SUBCHEFIA > Complexo do Entroncamento',
+      andamento: '6º Termo aditivo em vigência',
+      data_entrada: new Date(2026, 0, 1).toISOString(),
+      ultima_tramitacao: new Date(2026, 7, 27).toISOString(),
+    });
+  });
+
+  it('tolera espaço extra no nome da coluna (ex.: "DATA DE ENTRADA ")', () => {
+    const processo = mapSheetRowToProcesso(linhaBase);
+    expect(processo?.data_entrada).toBeDefined();
+  });
+
+  it('infere status a partir da subfase', () => {
+    expect(mapSheetRowToProcesso({ ...linhaBase, 'SUBFASE DO PROCESSO': 'CANCELADO' })?.status).toBe(
+      'arquivado',
+    );
+    expect(
+      mapSheetRowToProcesso({ ...linhaBase, 'SUBFASE DO PROCESSO': '9 FINALIZADO' })?.status,
+    ).toBe('concluido');
+    expect(
+      mapSheetRowToProcesso({ ...linhaBase, 'SUBFASE DO PROCESSO': '1 INSTRUÇÃO' })?.status,
+    ).toBe('em_andamento');
+  });
+
+  it('devolve null quando não há número de processo', () => {
+    expect(mapSheetRowToProcesso({ ...linhaBase, 'N° PAE': '' })).toBeNull();
   });
 });
 

@@ -147,6 +147,13 @@ export interface Processo {
   checklist_rito?: string[];
   fase_processo?: string;
   subfase_processo?: string;
+  /**
+   * Localização/unidade atual do processo, em texto livre (ex.: "CBM >
+   * CSMV/SUBCHEFIA > Complexo do Entroncamento"), vinda da planilha de
+   * controle já usada pela equipe — não corresponde ao fluxo interno fixo
+   * de `fase_atual_id`, é só para exibição.
+   */
+  localizacao_atual?: string;
   andamento?: string;
   data_entrada?: string;
   ultima_tramitacao?: string;

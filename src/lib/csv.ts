@@ -2,7 +2,7 @@
  * Parsing de planilhas do PCA (Google Sheets exportado como CSV).
  * Lógica pura, extraída do AppContext para poder ser testada isoladamente.
  */
-import type { PCA } from '../types';
+import type { PCA, StatusProcesso } from '../types';
 
 /**
  * Converte um valor monetário no formato brasileiro para número.
@@ -75,6 +75,83 @@ export function mapSheetRowToPca(
     item_pca: valor('ITEM'),
     grupo_pca: valor('GRUPO'),
     fonte_recurso: valor('FONTE DO RECURSO'),
+  };
+}
+
+/**
+ * Converte uma data no formato brasileiro (d/m/aaaa) para ISO 8601.
+ * Devolve undefined para datas ausentes/incompletas (ex.: sem ano), em vez
+ * de lançar ou gerar uma data inválida.
+ */
+export function parseDataBR(entrada: unknown): string | undefined {
+  const texto = (entrada ?? '').toString().trim();
+  const partes = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!partes) return undefined;
+
+  const [, dia, mes, ano] = partes;
+  const data = new Date(Number(ano), Number(mes) - 1, Number(dia));
+  return Number.isNaN(data.getTime()) ? undefined : data.toISOString();
+}
+
+/** Lê uma célula da linha por nome de coluna, tolerando espaços extras no cabeçalho. */
+function celula(linha: LinhaPlanilha, nomeColuna: string): string {
+  const normalizado = nomeColuna.trim().toLowerCase();
+  const chave = Object.keys(linha).find((k) => k.trim().toLowerCase() === normalizado);
+  return chave ? (linha[chave] ?? '').toString().trim() : '';
+}
+
+function inferirStatusProcesso(subfase: string): StatusProcesso {
+  const valor = subfase.toUpperCase();
+  if (valor.includes('CANCELADO')) return 'arquivado';
+  if (valor.includes('FINALIZADO') || valor.includes('CONTRATADO')) return 'concluido';
+  return 'em_andamento';
+}
+
+/**
+ * Campos de um Processo extraídos da planilha de controle (a mesma
+ * atualizada pelo RPA de acompanhamento no PAE). Não inclui os campos que o
+ * próprio sistema gerencia (id, criado_em, atualizado_em, demandante_id,
+ * pca_id, checklist_rito) — esses ficam por conta de quem grava.
+ */
+export interface ProcessoDaPlanilha {
+  numero_processo: string;
+  objeto: string;
+  unidade_demandante: string;
+  status: StatusProcesso;
+  fonte?: string;
+  rito_processual?: string;
+  fase_processo?: string;
+  subfase_processo?: string;
+  localizacao_atual?: string;
+  andamento?: string;
+  data_entrada?: string;
+  ultima_tramitacao?: string;
+}
+
+/**
+ * Mapeia uma linha (com cabeçalho) da planilha de controle de processos.
+ * Devolve null quando a linha não tem número de processo (não dá pra
+ * localizar/atualizar sem essa chave).
+ */
+export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha | null {
+  const numeroBruto = celula(linha, 'N° PAE');
+  if (!numeroBruto) return null;
+
+  const subfase = celula(linha, 'SUBFASE DO PROCESSO');
+
+  return {
+    numero_processo: numeroBruto.replace(/^E-/i, ''),
+    objeto: celula(linha, 'OBJETO'),
+    unidade_demandante: celula(linha, 'SETOR DEMANDANTE'),
+    status: inferirStatusProcesso(subfase),
+    fonte: celula(linha, 'FONTE') || undefined,
+    rito_processual: celula(linha, 'RITO PROCESSUAL') || undefined,
+    fase_processo: celula(linha, 'FASE DO PROCESSO') || undefined,
+    subfase_processo: subfase || undefined,
+    localizacao_atual: celula(linha, 'SETOR ATUAL') || undefined,
+    andamento: celula(linha, 'ANDAMENTO') || undefined,
+    data_entrada: parseDataBR(celula(linha, 'DATA DE ENTRADA')),
+    ultima_tramitacao: parseDataBR(celula(linha, 'ÚLTIMA TRAMITAÇÃO')),
   };
 }
 

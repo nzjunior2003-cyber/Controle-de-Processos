@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Search, Filter, AlertCircle, FilePlus, Clock, Database, List } from 'lucide-react';
+import { Search, Filter, AlertCircle, FilePlus, Clock, Database, List, RefreshCw } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import IntegracaoPCA from './IntegracaoPCA';
 
+const URL_PLANILHA_PROCESSOS =
+  'https://docs.google.com/spreadsheets/d/1deakLqP8-enEgY384EkFyYedgo5WYSONjvYIBJDwqXE/edit?usp=sharing';
+
 export default function Aquisicoes() {
-  const { processos, setores, usuarioAtual } = useApp();
+  const { processos, setores, usuarioAtual, syncProcessosDaPlanilha } = useApp();
   const [busca, setBusca] = useState('');
   const [activeTab, setActiveTab] = useState<'processos' | 'pca'>('processos');
+  const [sincronizando, setSincronizando] = useState(false);
 
   const [filtroTempo, setFiltroTempo] = useState<'todos' | 'verde' | 'amarelo' | 'vermelho'>('todos');
 
@@ -43,6 +47,25 @@ export default function Aquisicoes() {
 
   const isMasterOrApoio = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'apoio';
 
+  const handleSincronizar = async () => {
+    setSincronizando(true);
+    try {
+      const resultado = await syncProcessosDaPlanilha(URL_PLANILHA_PROCESSOS);
+      alert(
+        `Sincronização concluída: ${resultado.criados} processo(s) novo(s), ` +
+          `${resultado.atualizados} atualizado(s)` +
+          (resultado.ignorados > 0 ? `, ${resultado.ignorados} linha(s) ignorada(s) (sem número).` : '.'),
+      );
+    } catch (erro) {
+      alert(
+        'Erro ao sincronizar a planilha: ' +
+          (erro instanceof Error ? erro.message : String(erro)),
+      );
+    } finally {
+      setSincronizando(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
@@ -51,13 +74,25 @@ export default function Aquisicoes() {
           <p className="mt-1 text-sm text-gray-500">Gestão de aquisições e controle do PCA</p>
         </div>
         {isMasterOrApoio && (
-          <Link
-            to="/sistema/processos/novo"
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-          >
-            <FilePlus className="-ml-1 mr-2 h-5 w-5" />
-            Novo Processo
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSincronizar}
+              disabled={sincronizando}
+              title="Atualiza os processos com os dados mais recentes da planilha de controle"
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`-ml-1 mr-2 h-5 w-5 ${sincronizando ? 'animate-spin' : ''}`} />
+              {sincronizando ? 'Sincronizando...' : 'Sincronizar Planilha'}
+            </button>
+            <Link
+              to="/sistema/processos/novo"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            >
+              <FilePlus className="-ml-1 mr-2 h-5 w-5" />
+              Novo Processo
+            </Link>
+          </div>
         )}
       </div>
 
@@ -202,9 +237,12 @@ export default function Aquisicoes() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{proc.unidade_demandante}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {setores.find(s => s.id === proc.fase_atual_id)?.sigla}
+                        <td className="px-6 py-4 max-w-xs">
+                          <div
+                            className="text-sm text-gray-900 line-clamp-2"
+                            title={proc.localizacao_atual}
+                          >
+                            {proc.localizacao_atual || setores.find(s => s.id === proc.fase_atual_id)?.sigla}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap max-w-[200px] truncate" title={proc.andamento || proc.status.replace('_', ' ')}>

@@ -37,7 +37,13 @@ import {
   requireDb,
   requireFirebaseAuth,
 } from '../lib/firebase';
-import { mapSheetArrayToPca, mapSheetRowToPca, type LinhaPlanilha } from '../lib/csv';
+import {
+  mapSheetArrayToPca,
+  mapSheetRowToPca,
+  mapSheetRowToProcesso,
+  type LinhaPlanilha,
+  type ProcessoDaPlanilha,
+} from '../lib/csv';
 import {
   abaterSaldo,
   aplicarAditivoFinanceiro,
@@ -121,6 +127,9 @@ interface AppContextData {
     movimentacao: Omit<MovimentacaoProcesso, 'id' | 'data_movimentacao'>,
   ) => Promise<void>;
   syncPcasFromPublicUrl: (url: string) => Promise<void>;
+  syncProcessosDaPlanilha: (
+    url: string,
+  ) => Promise<{ criados: number; atualizados: number; ignorados: number }>;
   updateUsuario: (id: string, dados: Partial<Usuario>) => Promise<void>;
   addUsuario: (dados: Omit<Usuario, 'id'> & { senha?: string }) => Promise<void>;
   deleteUsuario: (id: string) => Promise<void>;
@@ -483,6 +492,99 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     },
     [gravarPcas],
+  );
+
+  /**
+   * Sincroniza os processos com a planilha de controle da equipe (a mesma
+   * atualizada pelo RPA de acompanhamento no PAE): casa cada linha pelo
+   * número do processo — atualiza o que já existe (status, localização
+   * atual, andamento, datas etc.) e cria o que ainda não estava cadastrado.
+   * Não mexe em campos que o próprio sistema passa a gerenciar depois de
+   * criado (fase_atual_id do fluxo interno, pca_id, checklist_rito).
+   */
+  const syncProcessosDaPlanilha = useCallback(
+    async (url: string) => {
+      const db = requireDb();
+      const correspondencia = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (!correspondencia) {
+        throw new Error('URL inválida. Não foi possível encontrar o ID da planilha.');
+      }
+
+      const fetchUrl = `https://docs.google.com/spreadsheets/d/${correspondencia[1]}/gviz/tq?tqx=out:csv`;
+      const resposta = await fetch(fetchUrl);
+      if (!resposta.ok) {
+        throw new Error(
+          "Não foi possível acessar a planilha. Verifique se ela está pública ('Qualquer pessoa com o link').",
+        );
+      }
+
+      const csv = await resposta.text();
+      const Papa = (await import('papaparse')).default;
+
+      const linhas = await new Promise<LinhaPlanilha[]>((resolve) => {
+        Papa.parse<LinhaPlanilha>(csv, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (resultado) => resolve(resultado.data),
+        });
+      });
+
+      const validas = linhas
+        .map((linha) => mapSheetRowToProcesso(linha))
+        .filter((p): p is ProcessoDaPlanilha => p !== null);
+
+      let criados = 0;
+      let atualizados = 0;
+      // Evita criar duplicados quando o mesmo número aparece mais de uma
+      // vez na planilha e ainda não existe no Firestore (o lote inteiro
+      // ainda não foi confirmado, então `processos` não reflete as
+      // criações anteriores deste mesmo lote).
+      const idsCriadosNestaSincronizacao = new Map<string, string>();
+
+      for (let inicio = 0; inicio < validas.length; inicio += 400) {
+        const lote = writeBatch(db);
+        const agora = new Date().toISOString();
+
+        validas.slice(inicio, inicio + 400).forEach((dados) => {
+          const { numero_processo, ...resto } = dados;
+          const campos = Object.fromEntries(
+            Object.entries(resto).filter(([, v]) => v !== undefined),
+          );
+
+          const idExistente =
+            processos.find((p) => p.numero_processo === numero_processo)?.id ??
+            idsCriadosNestaSincronizacao.get(numero_processo);
+
+          if (idExistente) {
+            lote.set(
+              doc(db, 'processos', idExistente),
+              { ...campos, numero_processo, atualizado_em: agora },
+              { merge: true },
+            );
+            atualizados++;
+          } else {
+            const novaRef = doc(collection(db, 'processos'));
+            idsCriadosNestaSincronizacao.set(numero_processo, novaRef.id);
+            lote.set(novaRef, {
+              ...campos,
+              numero_processo,
+              demandante_id: '',
+              fase_atual_id: '1',
+              possui_alerta: false,
+              data_abertura: dados.data_entrada || agora,
+              criado_em: agora,
+              atualizado_em: agora,
+            });
+            criados++;
+          }
+        });
+
+        await lote.commit();
+      }
+
+      return { criados, atualizados, ignorados: linhas.length - validas.length };
+    },
+    [processos],
   );
 
   // --- Movimentações / Processos ------------------------------------------
@@ -919,6 +1021,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       updateProcesso,
       addMovimentacao,
       syncPcasFromPublicUrl,
+      syncProcessosDaPlanilha,
       updateUsuario,
       addUsuario,
       deleteUsuario,
@@ -964,6 +1067,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       updateProcesso,
       addMovimentacao,
       syncPcasFromPublicUrl,
+      syncProcessosDaPlanilha,
       updateUsuario,
       addUsuario,
       deleteUsuario,
