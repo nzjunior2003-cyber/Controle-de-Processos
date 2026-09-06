@@ -199,6 +199,53 @@ export interface Ocorrencia {
   criado_em?: string;
 }
 
+export type TipoAditivo = 'FINANCEIRO' | 'PRAZO' | 'FINANCEIRO_E_PRAZO';
+
+export const TIPO_ADITIVO_LABELS: Record<TipoAditivo, string> = {
+  FINANCEIRO: 'Aditivo Financeiro',
+  PRAZO: 'Aditivo de Prazo',
+  FINANCEIRO_E_PRAZO: 'Aditivo Financeiro e de Prazo',
+};
+
+/**
+ * Aditivo (ou apostilamento) formalmente registrado sobre um contrato:
+ * altera de fato o valor e/ou a vigência do contrato, com número/processo
+ * e data do instrumento, para histórico e auditoria. Diferente da
+ * 'Solicitação de Aditivo' (um tipo de Ocorrencia, que é só um pedido
+ * informal) — este é o registro do aditivo já formalizado.
+ */
+export interface Aditivo {
+  id: string;
+  contratoId: string;
+  tipo: TipoAditivo;
+  numero: string;
+  data: string;
+  /** Presente quando tipo inclui FINANCEIRO: valor acrescido ao contrato. */
+  valorAcrescido?: number;
+  /** Presente quando tipo inclui PRAZO: nova data de fim de vigência. */
+  novaFimVigencia?: string;
+  observacao?: string;
+  registradoPorId: string;
+  registradoPorNome: string;
+  criado_em?: string;
+}
+
+/**
+ * Aplica um aditivo financeiro ao contrato: o valor acrescido soma ao
+ * valor global, ao saldo inicial de referência e ao saldo atual (o
+ * contrato passa a ter mais saldo disponível para novas execuções).
+ */
+export function aplicarAditivoFinanceiro(
+  contrato: Pick<Contrato, 'valorGlobal' | 'saldoInicialFinanceiro' | 'saldoAtualFinanceiro'>,
+  valorAcrescido: number,
+): Pick<Contrato, 'valorGlobal' | 'saldoInicialFinanceiro' | 'saldoAtualFinanceiro'> {
+  return {
+    valorGlobal: (contrato.valorGlobal || 0) + valorAcrescido,
+    saldoInicialFinanceiro: (contrato.saldoInicialFinanceiro || 0) + valorAcrescido,
+    saldoAtualFinanceiro: (contrato.saldoAtualFinanceiro || 0) + valorAcrescido,
+  };
+}
+
 export const formatarMoeda = (valor: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
     Number.isFinite(valor) ? valor : 0,

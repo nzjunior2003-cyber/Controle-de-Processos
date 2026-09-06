@@ -16,8 +16,18 @@ import {
 } from '../../lib/contratos';
 
 export default function GestaoContratos() {
-  const { processos, pcas, usuarioAtual, contratos, execucoes, addExecucao, ocorrencias, addOcorrencia } =
-    useApp();
+  const {
+    processos,
+    pcas,
+    usuarioAtual,
+    contratos,
+    execucoes,
+    addExecucao,
+    ocorrencias,
+    addOcorrencia,
+    aditivos,
+    addAditivo,
+  } = useApp();
   const navigate = useNavigate();
 
   const [busca, setBusca] = useState('');
@@ -60,6 +70,13 @@ export default function GestaoContratos() {
 
   const isMasterOrGestao =
     usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'gestao';
+
+  // Sempre a versão mais atual do contrato selecionado (não a foto tirada
+  // no clique) — essencial pra refletir na hora um aditivo/execução recém
+  // lançados sem precisar fechar e reabrir o modal.
+  const contratoModalAtivo = contratoSelecionado
+    ? (contratosComStatus.find((c) => c.id === contratoSelecionado.id) ?? contratoSelecionado)
+    : null;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -218,19 +235,29 @@ export default function GestaoContratos() {
         )}
       </div>
 
-      {contratoSelecionado && (
+      {contratoModalAtivo && (
         <ExecucaoModal
-          contrato={contratoSelecionado}
-          execucoes={execucoes.filter((e) => e.contratoId === contratoSelecionado.id)}
-          ocorrencias={ocorrencias.filter((o) => o.contratoId === contratoSelecionado.id)}
+          contrato={contratoModalAtivo}
+          execucoes={execucoes.filter((e) => e.contratoId === contratoModalAtivo.id)}
+          ocorrencias={ocorrencias.filter((o) => o.contratoId === contratoModalAtivo.id)}
+          aditivos={aditivos.filter((a) => a.contratoId === contratoModalAtivo.id)}
           comOcorrencias
+          comAditivos={isMasterOrGestao}
           onAddExecucao={(execucao) => addExecucao(execucao)}
           onAddOcorrencia={({ descricao, tipo }) =>
             addOcorrencia({
-              contratoId: contratoSelecionado.id,
+              contratoId: contratoModalAtivo.id,
               descricao,
               tipo,
               data: new Date().toISOString(),
+              registradoPorId: usuarioAtual?.id ?? '',
+              registradoPorNome: usuarioAtual?.nome ?? '',
+            })
+          }
+          onAddAditivo={(dados) =>
+            addAditivo({
+              ...dados,
+              contratoId: contratoModalAtivo.id,
               registradoPorId: usuarioAtual?.id ?? '',
               registradoPorNome: usuarioAtual?.nome ?? '',
             })

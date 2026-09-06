@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   abaterSaldo,
+  aplicarAditivoFinanceiro,
   buscarContratos,
   calcularStatusContrato,
   devolverSaldo,
@@ -230,6 +231,27 @@ describe('filtrarContratosPorGestor', () => {
 
   it('devolve todos os contratos sem usuário (nada para restringir)', () => {
     expect(filtrarContratosPorGestor(contratos, null)).toEqual(contratos);
+  });
+});
+
+describe('aplicarAditivoFinanceiro', () => {
+  it('soma o valor acrescido ao valor global, saldo inicial e saldo atual', () => {
+    const resultado = aplicarAditivoFinanceiro(
+      { valorGlobal: 1000, saldoInicialFinanceiro: 1000, saldoAtualFinanceiro: 400 },
+      500,
+    );
+    expect(resultado).toEqual({
+      valorGlobal: 1500,
+      saldoInicialFinanceiro: 1500,
+      saldoAtualFinanceiro: 900,
+    });
+  });
+
+  it('preserva o quanto já havia sido executado (diferença global - atual)', () => {
+    const antes = { valorGlobal: 1000, saldoInicialFinanceiro: 1000, saldoAtualFinanceiro: 300 };
+    const executado = antes.valorGlobal - antes.saldoAtualFinanceiro;
+    const depois = aplicarAditivoFinanceiro(antes, 200);
+    expect(depois.valorGlobal - depois.saldoAtualFinanceiro).toBe(executado);
   });
 });
 

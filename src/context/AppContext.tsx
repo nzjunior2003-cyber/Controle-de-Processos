@@ -40,9 +40,11 @@ import {
 import { mapSheetArrayToPca, mapSheetRowToPca, type LinhaPlanilha } from '../lib/csv';
 import {
   abaterSaldo,
+  aplicarAditivoFinanceiro,
   devolverSaldo,
   gestorRaizDe,
   validarLimiteFiscal,
+  type Aditivo,
   type ExecucaoContrato,
   type Ocorrencia,
 } from '../lib/contratos';
@@ -80,6 +82,7 @@ interface AppContextData {
   contratos: Contrato[];
   execucoes: ExecucaoContrato[];
   ocorrencias: Ocorrencia[];
+  aditivos: Aditivo[];
   procedimentos: ProcedimentoLicitatorio[];
   sancionatorios: ProcessoSancionatorio[];
   portarias: PortariaFiscal[];
@@ -127,6 +130,7 @@ interface AppContextData {
   addExecucao: (dados: Omit<ExecucaoContrato, 'id'>) => Promise<void>;
   deleteExecucao: (id: string, contratoId: string) => Promise<void>;
   addOcorrencia: (dados: Omit<Ocorrencia, 'id'>) => Promise<void>;
+  addAditivo: (dados: Omit<Aditivo, 'id'>) => Promise<void>;
   addProcedimento: (dados: Omit<ProcedimentoLicitatorio, 'id'>) => Promise<void>;
   updateProcedimento: (id: string, dados: Partial<ProcedimentoLicitatorio>) => Promise<void>;
   addSancionatorio: (dados: Omit<ProcessoSancionatorio, 'id'>) => Promise<void>;
@@ -252,6 +256,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const contratos = useColecao<Contrato>('contratos', isAuthenticated);
   const execucoes = useColecao<ExecucaoContrato>('execucoes', isAuthenticated);
   const ocorrencias = useColecao<Ocorrencia>('ocorrencias', isAuthenticated);
+  const aditivos = useColecao<Aditivo>('aditivos', isAuthenticated);
   const procedimentos = useColecao<ProcedimentoLicitatorio>('procedimentos', isAuthenticated);
   const sancionatorios = useColecao<ProcessoSancionatorio>('sancionatorios', isAuthenticated);
   const portarias = useColecao<PortariaFiscal>('portarias', isAuthenticated);
@@ -801,6 +806,53 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [criarEm, contratos, usuarioAtual, registrarAuditoria],
   );
 
+  /**
+   * Registra um aditivo (financeiro e/ou de prazo, também usado para
+   * apostilamentos que mudem valor/vigência) sobre um contrato,
+   * atualizando o próprio contrato numa única transação com o registro
+   * do aditivo — restrito a Master/Contratos/Gestão, mesma fronteira de
+   * quem pode editar o contrato.
+   */
+  const addAditivo = useCallback(
+    async (dados: Omit<Aditivo, 'id'>) => {
+      const perfil = usuarioAtual?.perfil;
+      const podeRegistrar = perfil === 'master' || perfil === 'gestao' || perfil === 'contratos';
+      if (!podeRegistrar) {
+        throw new Error('Você não tem permissão para registrar aditivos neste contrato.');
+      }
+
+      const db = requireDb();
+      const contratoRef = doc(db, 'contratos', dados.contratoId);
+      const aditivoRef = doc(collection(db, 'aditivos'));
+      const agora = new Date().toISOString();
+
+      const { contratoAntes, atualizacaoContrato } = await runTransaction(db, async (transacao) => {
+        const contratoSnap = await transacao.get(contratoRef);
+        if (!contratoSnap.exists()) {
+          throw new Error('Contrato não encontrado.');
+        }
+        const contrato = contratoSnap.data() as Contrato;
+
+        const atualizacao: Record<string, unknown> = {};
+        if (dados.tipo !== 'PRAZO' && typeof dados.valorAcrescido === 'number') {
+          Object.assign(atualizacao, aplicarAditivoFinanceiro(contrato, dados.valorAcrescido));
+        }
+        if (dados.tipo !== 'FINANCEIRO' && dados.novaFimVigencia) {
+          atualizacao.fimVigencia = dados.novaFimVigencia;
+        }
+
+        transacao.set(aditivoRef, { ...dados, criado_em: agora });
+        transacao.update(contratoRef, { ...atualizacao, atualizado_em: agora });
+
+        return { contratoAntes: contrato, atualizacaoContrato: atualizacao };
+      });
+
+      await registrarAuditoria('aditivos', aditivoRef.id, 'CREATE', dados);
+      await registrarAuditoria('contratos', dados.contratoId, 'UPDATE', atualizacaoContrato, contratoAntes);
+    },
+    [usuarioAtual, registrarAuditoria],
+  );
+
   const addProcedimento = useCallback(
     async (dados: Omit<ProcedimentoLicitatorio, 'id'>) => {
       await criarEm('procedimentos', dados);
@@ -848,6 +900,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       contratos,
       execucoes,
       ocorrencias,
+      aditivos,
       procedimentos,
       sancionatorios,
       portarias,
@@ -875,6 +928,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addExecucao,
       deleteExecucao,
       addOcorrencia,
+      addAditivo,
       addProcedimento,
       updateProcedimento,
       addSancionatorio,
@@ -892,6 +946,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       contratos,
       execucoes,
       ocorrencias,
+      aditivos,
       procedimentos,
       sancionatorios,
       portarias,
@@ -918,6 +973,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addExecucao,
       deleteExecucao,
       addOcorrencia,
+      addAditivo,
       addProcedimento,
       updateProcedimento,
       addSancionatorio,

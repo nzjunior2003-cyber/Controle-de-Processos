@@ -54,6 +54,13 @@ export default function FiscalContrato() {
   const isMasterOrFiscal =
     usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'fiscal';
 
+  // Sempre a versão mais atual do contrato selecionado (não a foto tirada
+  // no clique) — essencial pra refletir na hora uma execução recém lançada
+  // sem precisar fechar e reabrir o modal.
+  const contratoModalAtivo = contratoSelecionado
+    ? (contratosComStatus.find((c) => c.id === contratoSelecionado.id) ?? contratoSelecionado)
+    : null;
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
@@ -101,17 +108,17 @@ export default function FiscalContrato() {
         />
       </div>
 
-      {contratoSelecionado && (
+      {contratoModalAtivo && (
         <ExecucaoModal
-          contrato={contratoSelecionado}
-          execucoes={execucoes.filter((e) => e.contratoId === contratoSelecionado.id)}
-          ocorrencias={ocorrencias.filter((o) => o.contratoId === contratoSelecionado.id)}
+          contrato={contratoModalAtivo}
+          execucoes={execucoes.filter((e) => e.contratoId === contratoModalAtivo.id)}
+          ocorrencias={ocorrencias.filter((o) => o.contratoId === contratoModalAtivo.id)}
           comQuantidade
           comOcorrencias
           onAddExecucao={(execucao) => addExecucao(execucao)}
           onAddOcorrencia={({ descricao, tipo }) =>
             addOcorrencia({
-              contratoId: contratoSelecionado.id,
+              contratoId: contratoModalAtivo.id,
               descricao,
               tipo,
               data: new Date().toISOString(),

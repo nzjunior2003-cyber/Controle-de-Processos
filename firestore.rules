@@ -101,6 +101,11 @@ service cloud.firestore {
         && perfilDoc().perfil == 'fiscal'
         && fiscalDoContrato(request.resource.data.contratoId);
     }
+    match /aditivos/{documento} {
+      allow read: if ativo();
+      allow write: if ativo()
+        && perfilDoc().perfil in ['master', 'contratos', 'gestao'];
+    }
     match /procedimentos/{documento} {
       allow read: if ativo();
       allow write: if ativo() && perfilDoc().perfil in ['master', 'contratos'];

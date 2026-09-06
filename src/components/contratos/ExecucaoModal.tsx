@@ -5,10 +5,13 @@ import { getAccessToken, googleSignIn } from '../../lib/googleAuth';
 import { getOrCreateFolder, uploadFileToDrive } from '../../lib/driveService';
 import {
   formatarMoeda,
+  TIPO_ADITIVO_LABELS,
   TIPO_OCORRENCIA_LABELS,
+  type Aditivo,
   type ContratoComStatus,
   type ExecucaoContrato,
   type Ocorrencia,
+  type TipoAditivo,
   type TipoOcorrencia,
 } from '../../lib/contratos';
 
@@ -39,14 +42,43 @@ const EXECUCAO_VAZIA: NovaExecucao = {
 
 const TIPOS_OCORRENCIA_PADRAO: TipoOcorrencia[] = ['OCORRENCIA', 'ADITIVO', 'ESCLARECIMENTO'];
 
+interface NovoAditivoForm {
+  tipo: TipoAditivo;
+  numero: string;
+  data: string;
+  valorAcrescido: string;
+  novaFimVigencia: string;
+  observacao: string;
+}
+
+const ADITIVO_VAZIO: NovoAditivoForm = {
+  tipo: 'FINANCEIRO',
+  numero: '',
+  data: '',
+  valorAcrescido: '',
+  novaFimVigencia: '',
+  observacao: '',
+};
+
 interface Props {
   contrato: ContratoComStatus;
   execucoes: ExecucaoContrato[];
   ocorrencias: Ocorrencia[];
+  aditivos?: Aditivo[];
   onAddExecucao: (execucao: Omit<ExecucaoContrato, 'id'>) => void | Promise<void>;
   onAddOcorrencia?: (dados: { descricao: string; tipo: TipoOcorrencia }) => void | Promise<void>;
+  onAddAditivo?: (dados: {
+    tipo: TipoAditivo;
+    numero: string;
+    data: string;
+    valorAcrescido?: number;
+    novaFimVigencia?: string;
+    observacao?: string;
+  }) => void | Promise<void>;
   /** Exibe a aba de ocorrências. */
   comOcorrencias?: boolean;
+  /** Exibe a aba de aditivos (apenas Gestão/Master/Contratos). */
+  comAditivos?: boolean;
   /** Tipos de ocorrência que este usuário pode registrar (varia por perfil). */
   tiposOcorrenciaPermitidos?: TipoOcorrencia[];
   /** Exibe os campos de abatimento por quantidade (módulo Fiscal). */
@@ -62,20 +94,26 @@ export default function ExecucaoModal({
   contrato,
   execucoes,
   ocorrencias,
+  aditivos = [],
   onAddExecucao,
   onAddOcorrencia,
+  onAddAditivo,
   comOcorrencias = false,
+  comAditivos = false,
   tiposOcorrenciaPermitidos = TIPOS_OCORRENCIA_PADRAO,
   comQuantidade = false,
   onFechar,
 }: Props) {
-  const [aba, setAba] = useState<'execucao' | 'ocorrencias'>('execucao');
+  const [aba, setAba] = useState<'execucao' | 'ocorrencias' | 'aditivos'>('execucao');
   const [novaExecucao, setNovaExecucao] = useState<NovaExecucao>(EXECUCAO_VAZIA);
   const [novaDescricao, setNovaDescricao] = useState('');
   const [novoTipo, setNovoTipo] = useState<TipoOcorrencia>(
     tiposOcorrenciaPermitidos[0] ?? 'OCORRENCIA',
   );
   const [salvandoOcorrencia, setSalvandoOcorrencia] = useState(false);
+  const [novoAditivo, setNovoAditivo] = useState<NovoAditivoForm>(ADITIVO_VAZIO);
+  const [salvandoAditivo, setSalvandoAditivo] = useState(false);
+  const [erroAditivo, setErroAditivo] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
   const execucoesDoContrato = execucoes.filter((e) => e.contratoId === contrato.id);
@@ -146,6 +184,39 @@ export default function ExecucaoModal({
     }
   };
 
+  const aditivoCamposInvalidos =
+    !novoAditivo.numero ||
+    !novoAditivo.data ||
+    (novoAditivo.tipo !== 'PRAZO' && !novoAditivo.valorAcrescido) ||
+    (novoAditivo.tipo !== 'FINANCEIRO' && !novoAditivo.novaFimVigencia);
+
+  const handleAddAditivo = async () => {
+    if (aditivoCamposInvalidos || !onAddAditivo) return;
+    setSalvandoAditivo(true);
+    setErroAditivo(null);
+    try {
+      await onAddAditivo({
+        tipo: novoAditivo.tipo,
+        numero: novoAditivo.numero,
+        data: novoAditivo.data,
+        ...(novoAditivo.tipo !== 'PRAZO'
+          ? { valorAcrescido: Number(novoAditivo.valorAcrescido) || 0 }
+          : {}),
+        ...(novoAditivo.tipo !== 'FINANCEIRO'
+          ? { novaFimVigencia: novoAditivo.novaFimVigencia }
+          : {}),
+        observacao: novoAditivo.observacao || '',
+      });
+      setNovoAditivo(ADITIVO_VAZIO);
+    } catch (erro) {
+      setErroAditivo(
+        erro instanceof Error ? erro.message : 'Erro ao registrar o aditivo. Tente novamente.',
+      );
+    } finally {
+      setSalvandoAditivo(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-gray-500 bg-opacity-75 overflow-hidden"
@@ -179,7 +250,7 @@ export default function ExecucaoModal({
           </div>
         </div>
 
-        {comOcorrencias && (
+        {(comOcorrencias || comAditivos) && (
           <div className="flex border-b border-gray-200 mb-4">
             <button
               className={`py-2 px-4 font-medium text-sm border-b-2 ${aba === 'execucao' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
@@ -187,12 +258,22 @@ export default function ExecucaoModal({
             >
               Execução Financeira
             </button>
-            <button
-              className={`py-2 px-4 font-medium text-sm border-b-2 ${aba === 'ocorrencias' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-              onClick={() => setAba('ocorrencias')}
-            >
-              Ocorrências
-            </button>
+            {comOcorrencias && (
+              <button
+                className={`py-2 px-4 font-medium text-sm border-b-2 ${aba === 'ocorrencias' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                onClick={() => setAba('ocorrencias')}
+              >
+                Ocorrências
+              </button>
+            )}
+            {comAditivos && (
+              <button
+                className={`py-2 px-4 font-medium text-sm border-b-2 ${aba === 'aditivos' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                onClick={() => setAba('aditivos')}
+              >
+                Aditivos
+              </button>
+            )}
           </div>
         )}
 
@@ -228,7 +309,7 @@ export default function ExecucaoModal({
             </div>
           </div>
 
-          {(!comOcorrencias || aba === 'execucao') && (
+          {(!(comOcorrencias || comAditivos) || aba === 'execucao') && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1">
                 <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
@@ -485,6 +566,169 @@ export default function ExecucaoModal({
                   {ocorrencias.filter((o) => o.contratoId === contrato.id).length === 0 && (
                     <div className="text-sm text-gray-500 italic">
                       Nenhuma ocorrência registrada para este contrato.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {comAditivos && aba === 'aditivos' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1">
+                <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
+                  Novo Aditivo
+                </h4>
+                {erroAditivo && (
+                  <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-md p-3 mb-4">
+                    {erroAditivo}
+                  </div>
+                )}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Tipo de Aditivo</label>
+                    <select
+                      value={novoAditivo.tipo}
+                      onChange={(e) =>
+                        setNovoAditivo({ ...novoAditivo, tipo: e.target.value as TipoAditivo })
+                      }
+                      className={CLASSE_INPUT}
+                    >
+                      {(Object.keys(TIPO_ADITIVO_LABELS) as TipoAditivo[]).map((tipo) => (
+                        <option key={tipo} value={tipo}>
+                          {TIPO_ADITIVO_LABELS[tipo]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Nº do Aditivo / Processo
+                    </label>
+                    <input
+                      type="text"
+                      value={novoAditivo.numero}
+                      onChange={(e) => setNovoAditivo({ ...novoAditivo, numero: e.target.value })}
+                      className={CLASSE_INPUT}
+                      placeholder="Ex: 1º Termo Aditivo, Processo 2026/000123"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Data do Instrumento
+                    </label>
+                    <input
+                      type="date"
+                      value={novoAditivo.data}
+                      onChange={(e) => setNovoAditivo({ ...novoAditivo, data: e.target.value })}
+                      className={CLASSE_INPUT}
+                    />
+                  </div>
+                  {novoAditivo.tipo !== 'PRAZO' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Valor Acrescido (R$)
+                      </label>
+                      <input
+                        type="number"
+                        value={novoAditivo.valorAcrescido}
+                        onChange={(e) =>
+                          setNovoAditivo({ ...novoAditivo, valorAcrescido: e.target.value })
+                        }
+                        className={CLASSE_INPUT}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Somado ao valor global e ao saldo disponível do contrato.
+                      </p>
+                    </div>
+                  )}
+                  {novoAditivo.tipo !== 'FINANCEIRO' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Nova Data de Fim de Vigência
+                      </label>
+                      <input
+                        type="date"
+                        value={novoAditivo.novaFimVigencia}
+                        onChange={(e) =>
+                          setNovoAditivo({ ...novoAditivo, novaFimVigencia: e.target.value })
+                        }
+                        className={CLASSE_INPUT}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Observação</label>
+                    <textarea
+                      rows={2}
+                      value={novoAditivo.observacao}
+                      onChange={(e) =>
+                        setNovoAditivo({ ...novoAditivo, observacao: e.target.value })
+                      }
+                      className={CLASSE_INPUT}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddAditivo}
+                    disabled={salvandoAditivo || aditivoCamposInvalidos}
+                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none"
+                  >
+                    <PlusCircle className="-ml-1 mr-2 h-4 w-4" />
+                    {salvandoAditivo ? 'Salvando...' : 'Registrar Aditivo'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2">
+                <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
+                  Histórico de Aditivos
+                </h4>
+                <div className="relative pl-4 border-l-2 border-gray-200 space-y-6">
+                  {aditivos
+                    .filter((a) => a.contratoId === contrato.id)
+                    .slice()
+                    .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+                    .map((aditivo) => (
+                      <div key={aditivo.id} className="relative">
+                        <div className="absolute -left-6 mt-1 w-4 h-4 bg-blue-600 rounded-full border-2 border-white"></div>
+                        <div className="bg-white border text-left border-gray-200 rounded-md p-4 shadow-sm hover:border-gray-300">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200">
+                                {TIPO_ADITIVO_LABELS[aditivo.tipo] ?? aditivo.tipo}
+                              </span>
+                              <p className="text-sm font-medium text-gray-900 mt-1">
+                                {aditivo.numero}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {format(new Date(aditivo.data), 'dd/MM/yyyy')} - Registrado por{' '}
+                                {aditivo.registradoPorNome}
+                              </p>
+                            </div>
+                            {typeof aditivo.valorAcrescido === 'number' && (
+                              <p className="text-lg font-bold text-emerald-600 text-right">
+                                + {formatarMoeda(aditivo.valorAcrescido)}
+                              </p>
+                            )}
+                          </div>
+                          {aditivo.novaFimVigencia && (
+                            <p className="text-xs text-gray-700">
+                              Nova vigência até{' '}
+                              <span className="font-medium">
+                                {format(new Date(aditivo.novaFimVigencia), 'dd/MM/yyyy')}
+                              </span>
+                            </p>
+                          )}
+                          {aditivo.observacao && (
+                            <p className="text-xs text-gray-500 mt-1">{aditivo.observacao}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  {aditivos.filter((a) => a.contratoId === contrato.id).length === 0 && (
+                    <div className="text-sm text-gray-500 italic pb-4">
+                      Nenhum aditivo registrado para este contrato.
                     </div>
                   )}
                 </div>
