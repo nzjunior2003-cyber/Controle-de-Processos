@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bell, LogOut, Menu } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import ThemeToggle from '../ThemeToggle';
 
 interface HeaderProps {
   sidebarOpen: boolean;
@@ -36,11 +37,12 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
         </div>
         
         <div className="flex items-center pr-4 sm:pr-6">
-          <button className="p-1 rounded-full text-red-200 hover:text-white hover:bg-red-700 focus:outline-none transition-colors border border-transparent mr-4">
+          <ThemeToggle />
+          <button className="p-1 rounded-full text-red-200 hover:text-white hover:bg-red-700 focus:outline-none transition-colors border border-transparent mx-4">
             <span className="sr-only">Notificações</span>
             <Bell className="h-5 w-5" aria-hidden="true" />
           </button>
-          
+
           <div className="flex items-center border-l border-red-700 pl-4 space-x-3">
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium text-white">{usuarioAtual?.nome}</p>
