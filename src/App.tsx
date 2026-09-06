@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import DetalheProcesso from './pages/DetalheProcesso';
 import ContratosArps from './pages/contratos-arps';
 import GestaoContratos from './pages/gestao-contratos';
+import ContratoForm from './pages/gestao-contratos/ContratoForm';
 import Usuarios from './pages/Usuarios';
 import ProtectedRoute from './components/ProtectedRoute';
 import FiscalContrato from './pages/fiscal-contrato';
@@ -28,6 +29,8 @@ export default function App() {
                <Route path="apoio" element={<Aquisicoes />} />
                <Route path="contratos-arps" element={<ContratosArps />} />
                <Route path="gestao-contratos" element={<GestaoContratos />} />
+               <Route path="gestao-contratos/novo" element={<ContratoForm />} />
+               <Route path="gestao-contratos/:id/editar" element={<ContratoForm />} />
                <Route path="fiscal-contrato" element={<FiscalContrato />} />
                <Route path="aquisicoes" element={<Aquisicoes />} />
                <Route path="processos/novo" element={<NovoProcesso />} />

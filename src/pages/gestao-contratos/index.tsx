@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AlertCircle, BellRing, Clock, FileText, Filter, Mail, PlusCircle, Search, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
@@ -7,8 +8,6 @@ import { AlertasModal } from '../../components/AlertasModal';
 import KpisContratos, { type FiltroKpi } from '../../components/contratos/KpisContratos';
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
 import ExecucaoModal from '../../components/contratos/ExecucaoModal';
-import ContratoFormModal from '../../components/contratos/ContratoFormModal';
-import type { Contrato } from '../../types';
 import {
   buscarContratos,
   calcularStatusContrato,
@@ -17,26 +16,15 @@ import {
 } from '../../lib/contratos';
 
 export default function GestaoContratos() {
-  const {
-    processos,
-    pcas,
-    usuarioAtual,
-    contratos,
-    execucoes,
-    addExecucao,
-    ocorrencias,
-    addOcorrencia,
-    addContrato,
-    updateContrato,
-  } = useApp();
+  const { processos, pcas, usuarioAtual, contratos, execucoes, addExecucao, ocorrencias, addOcorrencia } =
+    useApp();
+  const navigate = useNavigate();
 
   const [busca, setBusca] = useState('');
   const [abaAtiva, setAbaAtiva] = useState<'geral' | 'alertas'>('geral');
   const [contratoSelecionado, setContratoSelecionado] = useState<ContratoComStatus | null>(null);
   const [alertasModalOpen, setAlertasModalOpen] = useState(false);
   const [filtroKpi, setFiltroKpi] = useState<FiltroKpi>(null);
-  const [contratoEmEdicao, setContratoEmEdicao] = useState<Contrato | null>(null);
-  const [formularioAberto, setFormularioAberto] = useState(false);
 
   useEffect(() => {
     const cancelar = initAuth();
@@ -85,10 +73,7 @@ export default function GestaoContratos() {
         <div className="flex items-center gap-2">
           {isMasterOrGestao && (
             <button
-              onClick={() => {
-                setContratoEmEdicao(null);
-                setFormularioAberto(true);
-              }}
+              onClick={() => navigate('/sistema/gestao-contratos/novo')}
               className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800"
             >
               <PlusCircle className="-ml-1 mr-2 h-5 w-5" />
@@ -170,10 +155,7 @@ export default function GestaoContratos() {
             onGerenciar={setContratoSelecionado}
             onEditar={
               isMasterOrGestao
-                ? (contrato) => {
-                    setContratoEmEdicao(contrato);
-                    setFormularioAberto(true);
-                  }
+                ? (contrato) => navigate(`/sistema/gestao-contratos/${contrato.id}/editar`)
                 : undefined
             }
             getPcaTitleByProcesso={getPcaTitleByProcesso}
@@ -254,25 +236,6 @@ export default function GestaoContratos() {
             })
           }
           onFechar={() => setContratoSelecionado(null)}
-        />
-      )}
-
-      {formularioAberto && (
-        <ContratoFormModal
-          contrato={contratoEmEdicao}
-          onSalvar={async (dados) => {
-            if (contratoEmEdicao) {
-              await updateContrato(contratoEmEdicao.id, dados);
-            } else {
-              await addContrato(dados);
-            }
-            setFormularioAberto(false);
-            setContratoEmEdicao(null);
-          }}
-          onFechar={() => {
-            setFormularioAberto(false);
-            setContratoEmEdicao(null);
-          }}
         />
       )}
     </div>

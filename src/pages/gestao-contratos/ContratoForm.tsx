@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Save, X } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Save } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 import type { Contrato } from '../../types';
 
 const CLASSE_INPUT =
@@ -98,24 +100,23 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
   };
 }
 
-interface Props {
-  /** Presente em modo de edição; ausente em modo de cadastro (novo contrato). */
-  contrato?: Contrato | null;
-  onSalvar: (dados: Omit<Contrato, 'id'>) => Promise<void>;
-  onFechar: () => void;
-}
-
 /**
- * Cadastro/edição de Contrato. Em modo de cadastro, o Gestor informa o saldo
- * inicial (financeiro e, opcionalmente, quantitativo) que servirá de base
- * para o abatimento das execuções (NFs) lançadas depois.
+ * Cadastro/edição de Contrato, como página normal (antes era um modal).
+ * Em modo de cadastro, o Gestor informa o saldo inicial (financeiro e,
+ * opcionalmente, quantitativo) que servirá de base para o abatimento das
+ * execuções (NFs) lançadas depois.
  */
-export default function ContratoFormModal({ contrato, onSalvar, onFechar }: Props) {
+export default function ContratoForm() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { contratos, addContrato, updateContrato } = useApp();
+
+  const contrato = id ? contratos.find((c) => c.id === id) ?? null : null;
+  const emEdicao = !!id;
+
   const [form, setForm] = useState<FormState>(() => contratoParaFormulario(contrato));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-
-  const emEdicao = !!contrato;
 
   const camposInvalidos =
     !form.pae ||
@@ -131,7 +132,8 @@ export default function ContratoFormModal({ contrato, onSalvar, onFechar }: Prop
     setForm((anterior) => ({ ...anterior, [campo]: valor }));
   };
 
-  const handleSalvar = async () => {
+  const handleSalvar = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (camposInvalidos) return;
     setSalvando(true);
     setErro(null);
@@ -177,7 +179,13 @@ export default function ContratoFormModal({ contrato, onSalvar, onFechar }: Prop
         linkContrato: form.linkContrato || null,
       };
 
-      await onSalvar(dados);
+      if (emEdicao && id) {
+        await updateContrato(id, dados);
+      } else {
+        await addContrato(dados);
+      }
+
+      navigate('/sistema/gestao-contratos');
     } catch (erroCapturado) {
       setErro(
         erroCapturado instanceof Error
@@ -190,29 +198,28 @@ export default function ContratoFormModal({ contrato, onSalvar, onFechar }: Prop
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-gray-500 bg-opacity-75 overflow-hidden"
-      onClick={onFechar}
-    >
-      <div
-        className="relative bg-white rounded-lg shadow-xl w-full max-w-4xl h-full max-h-[95vh] p-4 sm:p-6 text-left transform transition-all flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center mb-4 flex-shrink-0">
-          <h3 className="text-lg font-bold text-gray-900 border-l-4 border-red-600 pl-3">
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center space-x-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 -ml-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100"
+        >
+          <ArrowLeft className="h-6 w-6" />
+        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
             {emEdicao ? `Editar Contrato nº ${contrato?.numero}` : 'Novo Contrato'}
-          </h3>
-          <button
-            type="button"
-            className="text-gray-400 hover:text-gray-500 focus:outline-none"
-            onClick={onFechar}
-          >
-            <span className="sr-only">Fechar</span>
-            <X className="h-6 w-6" aria-hidden="true" />
-          </button>
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {emEdicao
+              ? 'Atualize os dados cadastrais do contrato.'
+              : 'Cadastre um novo contrato, informando o saldo inicial que servirá de base para as execuções (NFs).'}
+          </p>
         </div>
+      </div>
 
-        <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+      <div className="bg-white shadow-sm rounded-lg border border-gray-200">
+        <form onSubmit={handleSalvar} className="p-6 space-y-6">
           {erro && (
             <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-md p-3">
               {erro}
@@ -498,26 +505,25 @@ export default function ContratoFormModal({ contrato, onSalvar, onFechar }: Prop
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="mt-4 flex-shrink-0 flex justify-end gap-3 border-t border-gray-200 pt-4">
-          <button
-            type="button"
-            onClick={onFechar}
-            className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={handleSalvar}
-            disabled={salvando || camposInvalidos}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none"
-          >
-            <Save className="-ml-1 mr-2 h-4 w-4" />
-            {salvando ? 'Salvando...' : 'Salvar Contrato'}
-          </button>
-        </div>
+          <div className="pt-4 border-t border-gray-200 flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={salvando || camposInvalidos}
+              className="inline-flex items-center justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            >
+              <Save className="-ml-1 mr-2 h-5 w-5" />
+              {salvando ? 'Salvando...' : 'Salvar Contrato'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
