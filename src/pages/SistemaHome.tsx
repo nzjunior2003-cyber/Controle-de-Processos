@@ -9,7 +9,7 @@ export default function SistemaHome() {
   const isMaster = perfil === 'master';
 
   return (
-    <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
+    <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Módulos do Sistema</h1>
         <p className="mt-1 text-sm text-gray-500">

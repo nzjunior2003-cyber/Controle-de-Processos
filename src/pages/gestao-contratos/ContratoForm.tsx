@@ -198,7 +198,7 @@ export default function ContratoForm() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
         <button
           onClick={() => navigate(-1)}
@@ -230,7 +230,7 @@ export default function ContratoForm() {
             <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
               Identificação
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className={CLASSE_LABEL}>Nº do Processo (PAE)</label>
                 <input
@@ -249,7 +249,7 @@ export default function ContratoForm() {
                   className={CLASSE_INPUT}
                 />
               </div>
-              <div className="md:col-span-2 lg:col-span-3">
+              <div className="md:col-span-2">
                 <label className={CLASSE_LABEL}>Objeto</label>
                 <textarea
                   rows={2}
@@ -319,7 +319,7 @@ export default function ContratoForm() {
             <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
               Vigência e Valores
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className={CLASSE_LABEL}>Início da Vigência</label>
                 <input
@@ -362,7 +362,7 @@ export default function ContratoForm() {
                   }
                 />
               </div>
-              <div className="md:col-span-2 lg:col-span-3 flex items-center gap-2">
+              <div className="md:col-span-2 flex items-center gap-2">
                 <input
                   id="controlaQuantidade"
                   type="checkbox"
@@ -394,7 +394,7 @@ export default function ContratoForm() {
             <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
               Fiscalização
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className={CLASSE_LABEL}>Fiscal Titular</label>
                 <input
@@ -465,7 +465,7 @@ export default function ContratoForm() {
             <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
               Dados Orçamentários
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className={CLASSE_LABEL}>Fonte de Recurso</label>
                 <input
