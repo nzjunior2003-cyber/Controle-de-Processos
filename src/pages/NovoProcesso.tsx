@@ -1,24 +1,33 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, Save } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { PcaAutocomplete } from '../components/PcaAutocomplete';
 import { CHECKLISTS_RITOS } from '../types';
 
+const paraDataInput = (isoOuVazio?: string) => (isoOuVazio ? isoOuVazio.split('T')[0] : '');
+
 export default function NovoProcesso() {
-  const { addProcesso, pcas, usuarioAtual, setores } = useApp();
+  const { id } = useParams<{ id: string }>();
+  const { addProcesso, updateProcesso, processos, pcas, usuarioAtual, setores } = useApp();
   const navigate = useNavigate();
 
-  const [numeroProcesso, setNumeroProcesso] = useState('');
-  const [objeto, setObjeto] = useState('');
-  const [descricao, setDescricao] = useState('');
-  const [unidadeDemandante, setUnidadeDemandante] = useState('');
-  const [pcaId, setPcaId] = useState('');
-  const [pcaSearchText, setPcaSearchText] = useState('');
+  const emEdicao = !!id;
+  const processo = id ? processos.find((p) => p.id === id) : undefined;
+  const pcaVinculado = processo?.pca_id ? pcas.find((p) => p.id === processo.pca_id) : undefined;
 
-  const [ritoProcessual, setRitoProcessual] = useState('');
-  const [checklistLocal, setChecklistLocal] = useState<string[]>([]);
+  const [numeroProcesso, setNumeroProcesso] = useState(processo?.numero_processo ?? '');
+  const [objeto, setObjeto] = useState(processo?.objeto ?? '');
+  const [descricao, setDescricao] = useState(processo?.descricao ?? '');
+  const [unidadeDemandante, setUnidadeDemandante] = useState(processo?.unidade_demandante ?? '');
+  const [pcaId, setPcaId] = useState(processo?.pca_id ?? '');
+  const [pcaSearchText, setPcaSearchText] = useState(
+    pcaVinculado ? `${pcaVinculado.codigo_pca} - ${pcaVinculado.objeto_pca}` : '',
+  );
+
+  const [ritoProcessual, setRitoProcessual] = useState(processo?.rito_processual ?? '');
+  const [checklistLocal, setChecklistLocal] = useState<string[]>(processo?.checklist_rito ?? []);
 
   const handleRitoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const valor = e.target.value;
@@ -27,39 +36,57 @@ export default function NovoProcesso() {
   };
 
   const handleToggleChecklist = (item: string) => {
-    setChecklistLocal(prev => 
+    setChecklistLocal(prev =>
       prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
     );
   };
-  
-  const [faseAtualId, setFaseAtualId] = useState('1');
-  const [andamento, setAndamento] = useState('');
-  
-  const today = new Date().toISOString().split('T')[0];
-  const [dataEntrada, setDataEntrada] = useState(today);
-  const [ultimaTramitacao, setUltimaTramitacao] = useState(today);
+
+  const [faseAtualId, setFaseAtualId] = useState(processo?.fase_atual_id ?? '1');
+  const [andamento, setAndamento] = useState(processo?.andamento ?? '');
+
+  const hoje = new Date().toISOString().split('T')[0];
+  const [dataEntrada, setDataEntrada] = useState(paraDataInput(processo?.data_entrada) || hoje);
+  const [ultimaTramitacao, setUltimaTramitacao] = useState(
+    paraDataInput(processo?.ultima_tramitacao) || hoje,
+  );
 
   const handleSalvar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!numeroProcesso || !objeto || !unidadeDemandante) return;
 
     try {
-      await addProcesso({
-        numero_processo: numeroProcesso,
-        objeto,
-        descricao,
-        unidade_demandante: unidadeDemandante,
-        demandante_id: usuarioAtual?.id || '',
-        pca_id: pcaId || undefined,
-        rito_processual: ritoProcessual,
-        checklist_rito: checklistLocal,
-        fase_atual_id: faseAtualId,
-        andamento,
-        data_entrada: new Date(dataEntrada).toISOString(),
-        ultima_tramitacao: new Date(ultimaTramitacao).toISOString(),
-      });
-
-      navigate('/sistema/aquisicoes');
+      if (emEdicao && id) {
+        await updateProcesso(id, {
+          numero_processo: numeroProcesso,
+          objeto,
+          descricao,
+          unidade_demandante: unidadeDemandante,
+          pca_id: pcaId || undefined,
+          rito_processual: ritoProcessual,
+          checklist_rito: checklistLocal,
+          fase_atual_id: faseAtualId,
+          andamento,
+          data_entrada: new Date(dataEntrada).toISOString(),
+          ultima_tramitacao: new Date(ultimaTramitacao).toISOString(),
+        });
+        navigate(`/sistema/processos/${id}`);
+      } else {
+        await addProcesso({
+          numero_processo: numeroProcesso,
+          objeto,
+          descricao,
+          unidade_demandante: unidadeDemandante,
+          demandante_id: usuarioAtual?.id || '',
+          pca_id: pcaId || undefined,
+          rito_processual: ritoProcessual,
+          checklist_rito: checklistLocal,
+          fase_atual_id: faseAtualId,
+          andamento,
+          data_entrada: new Date(dataEntrada).toISOString(),
+          ultima_tramitacao: new Date(ultimaTramitacao).toISOString(),
+        });
+        navigate('/sistema/aquisicoes');
+      }
     } catch (erro) {
       alert(
         'Não foi possível salvar o processo: ' +
@@ -67,6 +94,10 @@ export default function NovoProcesso() {
       );
     }
   };
+
+  if (emEdicao && !processo) {
+    return <div className="p-6">Processo não encontrado.</div>;
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -78,8 +109,14 @@ export default function NovoProcesso() {
           <ArrowLeft className="h-6 w-6" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Novo Processo</h1>
-          <p className="mt-1 text-sm text-gray-500">Cadastre um novo processo administrativo de aquisição ou contração.</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {emEdicao ? `Editar Processo ${processo?.numero_processo}` : 'Novo Processo'}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {emEdicao
+              ? 'Atualize os dados cadastrais do processo.'
+              : 'Cadastre um novo processo administrativo de aquisição ou contração.'}
+          </p>
         </div>
       </div>
 
@@ -129,7 +166,7 @@ export default function NovoProcesso() {
                 <option value="DTIC">DTIC</option>
               </select>
             </div>
-            
+
             <div className="md:col-span-2">
               <label htmlFor="pca" className="block text-sm font-medium text-gray-700 mb-1">
                 Vincular PCA (Plano de Contratações Anual)
@@ -152,7 +189,7 @@ export default function NovoProcesso() {
                   <option key={rito} value={rito}>{rito}</option>
                 ))}
               </select>
-              
+
               {ritoProcessual && CHECKLISTS_RITOS[ritoProcessual] && (
                 <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
                   <h4 className="text-sm font-medium text-gray-900 mb-2">Checklist Inicial:</h4>
@@ -252,7 +289,7 @@ export default function NovoProcesso() {
               className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
             >
               <Save className="-ml-1 mr-2 h-5 w-5" />
-              Salvar Processo
+              {emEdicao ? 'Salvar Alterações' : 'Salvar Processo'}
             </button>
           </div>
         </form>

@@ -1,15 +1,33 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Search, Filter, AlertCircle, FilePlus, Clock, Database, List, RefreshCw } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { differenceInDays } from 'date-fns';
 import IntegracaoPCA from './IntegracaoPCA';
+import type { StatusProcesso } from '../types';
+
+const STATUS_LABELS: Record<StatusProcesso, string> = {
+  em_andamento: 'Em Andamento',
+  aprovado: 'Aprovado',
+  pendente: 'Pendente',
+  concluido: 'Concluído',
+  arquivado: 'Arquivado',
+};
+
+const STATUS_CORES: Record<StatusProcesso, string> = {
+  em_andamento: 'bg-blue-50 text-blue-700 outline-blue-200',
+  aprovado: 'bg-emerald-50 text-emerald-700 outline-emerald-200',
+  pendente: 'bg-amber-50 text-amber-700 outline-amber-200',
+  concluido: 'bg-green-50 text-green-700 outline-green-200',
+  arquivado: 'bg-gray-100 text-gray-600 outline-gray-300',
+};
 
 const URL_PLANILHA_PROCESSOS =
   'https://docs.google.com/spreadsheets/d/1deakLqP8-enEgY384EkFyYedgo5WYSONjvYIBJDwqXE/edit?usp=sharing';
 
 export default function Aquisicoes() {
   const { processos, setores, usuarioAtual, syncProcessosDaPlanilha } = useApp();
+  const navigate = useNavigate();
   const [busca, setBusca] = useState('');
   const [activeTab, setActiveTab] = useState<'processos' | 'pca'>('processos');
   const [sincronizando, setSincronizando] = useState(false);
@@ -185,83 +203,90 @@ export default function Aquisicoes() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="w-full table-fixed divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nº Processo
+                    <th scope="col" className="w-[13%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Nº PAE
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[30%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Objeto
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Demandante
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Setor Atual
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Andamento
+                    <th scope="col" className="w-[14%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Rito
                     </th>
-                    <th scope="col" className="relative px-6 py-3">
-                      <span className="sr-only">Ações</span>
+                    <th scope="col" className="w-[9%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Dias no Setor
+                    </th>
+                    <th scope="col" className="w-[10%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filtrados.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-10 text-center text-gray-500">
+                      <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
                         Nenhum processo encontrado.
                       </td>
                     </tr>
                   ) : (
-                    filtrados.map((proc) => (
-                      <tr key={proc.id} className="hover:bg-gray-50 group">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            {proc.possui_alerta && (
-                              <AlertCircle className="h-5 w-5 text-amber-500 mr-2 flex-shrink-0" />
-                            )}
-                            <span className="text-sm font-medium text-gray-900">
-                              {proc.numero_processo}
+                    filtrados.map((proc) => {
+                      const diasNoSetor = proc.ultima_tramitacao
+                        ? Math.max(0, differenceInDays(hoje, new Date(proc.ultima_tramitacao)))
+                        : null;
+                      return (
+                        <tr
+                          key={proc.id}
+                          onClick={() => navigate(`/sistema/processos/${proc.id}`)}
+                          className="hover:bg-gray-50 cursor-pointer"
+                        >
+                          <td className="px-4 py-4">
+                            <div className="flex items-center">
+                              {proc.possui_alerta && (
+                                <AlertCircle className="h-4 w-4 text-amber-500 mr-1.5 flex-shrink-0" />
+                              )}
+                              <span className="text-sm font-medium text-gray-900 truncate" title={proc.numero_processo}>
+                                {proc.numero_processo}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="text-sm text-gray-900 line-clamp-2" title={proc.objeto}>
+                              {proc.objeto}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div
+                              className="text-sm text-gray-900 line-clamp-2"
+                              title={proc.localizacao_atual}
+                            >
+                              {proc.localizacao_atual || setores.find(s => s.id === proc.fase_atual_id)?.sigla}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="text-sm text-gray-700 truncate" title={proc.rito_processual}>
+                              {proc.rito_processual || '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className="text-sm text-gray-900">
+                              {diasNoSetor === null ? '-' : `${diasNoSetor}d`}
                             </span>
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            {format(new Date(proc.data_abertura), 'dd/MM/yyyy')}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900 line-clamp-2 max-w-xs">{proc.objeto}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{proc.unidade_demandante}</div>
-                        </td>
-                        <td className="px-6 py-4 max-w-xs">
-                          <div
-                            className="text-sm text-gray-900 line-clamp-2"
-                            title={proc.localizacao_atual}
-                          >
-                            {proc.localizacao_atual || setores.find(s => s.id === proc.fase_atual_id)?.sigla}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap max-w-[200px] truncate" title={proc.andamento || proc.status.replace('_', ' ')}>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium outline outline-1 outline-offset-1 bg-blue-50 text-blue-700 outline-blue-200">
-                            {proc.andamento || proc.status.replace('_', ' ')}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          {isMasterOrApoio && (
-                            <Link to={`/sistema/processos/editar/${proc.id}`} className="text-gray-600 hover:text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity mr-4">
-                              Editar
-                            </Link>
-                          )}
-                          <Link to={`/sistema/processos/${proc.id}`} className="text-red-600 hover:text-red-900 opacity-0 group-hover:opacity-100 transition-opacity">
-                            Visualizar
-                          </Link>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="px-4 py-4">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium outline outline-1 outline-offset-1 ${STATUS_CORES[proc.status]}`}
+                            >
+                              {STATUS_LABELS[proc.status]}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

@@ -36,6 +36,7 @@ export default function App() {
                 <Route path="fiscal-contrato" element={<FiscalContrato />} />
                 <Route path="aquisicoes" element={<Aquisicoes />} />
                 <Route path="processos/novo" element={<NovoProcesso />} />
+                <Route path="processos/:id/editar" element={<NovoProcesso />} />
                 <Route path="processos/:id" element={<DetalheProcesso />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="usuarios" element={<Usuarios />} />
