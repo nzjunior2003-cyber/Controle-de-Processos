@@ -72,6 +72,9 @@ service cloud.firestore {
     match /movimentacoes/{documento} {
       allow read, write: if ativo();
     }
+    match /estadas_processo/{documento} {
+      allow read, write: if ativo();
+    }
     match /pcas/{documento} {
       allow read, write: if ativo();
     }

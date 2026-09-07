@@ -44,6 +44,7 @@ import {
   type LinhaPlanilha,
   type ProcessoDaPlanilha,
 } from '../lib/csv';
+import { localizacaoEfetiva, type EstadaProcesso } from '../lib/fluxoProcesso';
 import {
   abaterSaldo,
   aplicarAditivoFinanceiro,
@@ -83,6 +84,7 @@ interface AppContextData {
   processos: Processo[];
   pcas: PCA[];
   movimentacoes: MovimentacaoProcesso[];
+  estadasProcesso: EstadaProcesso[];
   alertas: Alerta[];
   pareceres: Parecer[];
   contratos: Contrato[];
@@ -258,6 +260,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // --- Coleções -----------------------------------------------------------
   const usuarios = useColecao<Usuario>('usuarios', isAuthenticated);
   const processos = useColecao<Processo>('processos', isAuthenticated);
+  const estadasProcesso = useColecao<EstadaProcesso>('estadas_processo', isAuthenticated);
   const movimentacoes = useColecao<MovimentacaoProcesso>('movimentacoes', isAuthenticated);
   const pcas = useColecao<PCA>('pcas', isAuthenticated);
   const alertas = useColecao<Alerta>('alertas', isAuthenticated);
@@ -502,6 +505,37 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
    * Não mexe em campos que o próprio sistema passa a gerenciar depois de
    * criado (fase_atual_id do fluxo interno, pca_id, checklist_rito).
    */
+  /**
+   * Garante que a "estada" atual do processo (coleção `estadas_processo`)
+   * bate com a localização informada: se a localização mudou desde a
+   * última estada aberta, fecha a antiga e abre uma nova. Alimenta o
+   * histórico de fluxo/Gantt de cada processo (por localização real, não
+   * pelo fluxo fixo de 7 setores).
+   */
+  const sincronizarEstada = useCallback(
+    async (processoId: string, novaLocalizacao: string, dataMudanca: string) => {
+      if (!novaLocalizacao) return;
+      const db = requireDb();
+      const aberta = estadasProcesso.find(
+        (e) => e.processo_id === processoId && e.data_fim === null,
+      );
+
+      if (aberta && aberta.localizacao === novaLocalizacao) return;
+
+      if (aberta) {
+        await updateDoc(doc(db, 'estadas_processo', aberta.id), { data_fim: dataMudanca });
+      }
+      await addDoc(collection(db, 'estadas_processo'), {
+        processo_id: processoId,
+        localizacao: novaLocalizacao,
+        data_inicio: dataMudanca,
+        data_fim: null,
+        criado_em: new Date().toISOString(),
+      });
+    },
+    [estadasProcesso],
+  );
+
   const syncProcessosDaPlanilha = useCallback(
     async (url: string) => {
       const db = requireDb();
@@ -540,6 +574,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       // ainda não foi confirmado, então `processos` não reflete as
       // criações anteriores deste mesmo lote).
       const idsCriadosNestaSincronizacao = new Map<string, string>();
+      const mudancasDeLocalizacao: Array<{
+        processoId: string;
+        localizacao: string;
+        dataMudanca: string;
+      }> = [];
 
       for (let inicio = 0; inicio < validas.length; inicio += 400) {
         const lote = writeBatch(db);
@@ -562,6 +601,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               { merge: true },
             );
             atualizados++;
+            if (dados.localizacao_atual) {
+              mudancasDeLocalizacao.push({
+                processoId: idExistente,
+                localizacao: dados.localizacao_atual,
+                dataMudanca: dados.ultima_tramitacao || agora,
+              });
+            }
           } else {
             const novaRef = doc(collection(db, 'processos'));
             idsCriadosNestaSincronizacao.set(numero_processo, novaRef.id);
@@ -576,15 +622,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               atualizado_em: agora,
             });
             criados++;
+            if (dados.localizacao_atual) {
+              // Primeira estada: melhor estimativa possível é "desde a
+              // data de entrada" — o histórico anterior a esta
+              // funcionalidade não existe.
+              mudancasDeLocalizacao.push({
+                processoId: novaRef.id,
+                localizacao: dados.localizacao_atual,
+                dataMudanca: dados.data_entrada || dados.ultima_tramitacao || agora,
+              });
+            }
           }
         });
 
         await lote.commit();
       }
 
+      // Sequencial (não em paralelo): sincronizarEstada lê o estado atual
+      // de `estadasProcesso` para decidir se abre uma estada nova, e esse
+      // estado só é confiável se as chamadas não pisarem uma na outra.
+      for (const mudanca of mudancasDeLocalizacao) {
+        await sincronizarEstada(mudanca.processoId, mudanca.localizacao, mudanca.dataMudanca);
+      }
+
       return { criados, atualizados, ignorados: linhas.length - validas.length };
     },
-    [processos],
+    [processos, sincronizarEstada],
   );
 
   // --- Movimentações / Processos ------------------------------------------
@@ -629,17 +692,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         status_movimentacao: 'concluido',
         observacao: 'Abertura do processo',
       });
+
+      await sincronizarEstada(
+        referencia.id,
+        localizacaoEfetiva(novoProcesso, (setorId) => SETORES.find((s) => s.id === setorId)?.sigla),
+        novoProcesso.data_entrada,
+      );
     },
-    [addMovimentacao, usuarioAtual],
+    [addMovimentacao, usuarioAtual, sincronizarEstada],
   );
 
-  const updateProcesso = useCallback(async (id: string, dados: Partial<Processo>) => {
-    const db = requireDb();
-    await updateDoc(doc(db, 'processos', id), {
-      ...dados,
-      atualizado_em: new Date().toISOString(),
-    });
-  }, []);
+  const updateProcesso = useCallback(
+    async (id: string, dados: Partial<Processo>) => {
+      const db = requireDb();
+      const anterior = processos.find((p) => p.id === id);
+
+      await updateDoc(doc(db, 'processos', id), {
+        ...dados,
+        atualizado_em: new Date().toISOString(),
+      });
+
+      if (anterior && (dados.localizacao_atual !== undefined || dados.fase_atual_id !== undefined)) {
+        const siglaDoSetor = (setorId: string) => SETORES.find((s) => s.id === setorId)?.sigla;
+        const novaLocalizacao = localizacaoEfetiva({ ...anterior, ...dados }, siglaDoSetor);
+        await sincronizarEstada(id, novaLocalizacao, new Date().toISOString());
+      }
+    },
+    [processos, sincronizarEstada],
+  );
 
   const updateProcessoStatus = useCallback(
     async (id: string, status: Processo['status'], fase_id?: string) => {
@@ -997,6 +1077,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       processos,
       pcas,
       movimentacoes,
+      estadasProcesso,
       alertas,
       pareceres,
       contratos,
@@ -1044,6 +1125,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       processos,
       pcas,
       movimentacoes,
+      estadasProcesso,
       alertas,
       pareceres,
       contratos,

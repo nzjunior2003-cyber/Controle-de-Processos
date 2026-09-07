@@ -1,14 +1,20 @@
 import React from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { ArrowLeft, CheckCircle, Clock, FileText, Pencil, ShieldCheck } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { ArrowLeft, Clock, MapPin, Pencil, ShieldCheck } from 'lucide-react';
+import { format } from 'date-fns';
 import { CHECKLISTS_RITOS } from '../types';
+import { calcularTempoTotal, localizacaoEfetiva, montarLinhaDoTempo } from '../lib/fluxoProcesso';
+
+const CORES_GANTT = [
+  'bg-blue-400', 'bg-indigo-400', 'bg-purple-400', 'bg-emerald-400',
+  'bg-amber-400', 'bg-rose-400', 'bg-cyan-400', 'bg-lime-400', 'bg-fuchsia-400',
+];
 
 export default function DetalheProcesso() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { processos, setores, movimentacoes, pcas, usuarioAtual, updateProcesso } = useApp();
+  const { processos, setores, estadasProcesso, pcas, usuarioAtual, updateProcesso } = useApp();
 
   const processo = processos.find(p => p.id === id);
   if (!processo) {
@@ -16,8 +22,13 @@ export default function DetalheProcesso() {
   }
 
   const pcaVinculado = pcas.find(p => p.id === processo.pca_id);
-  const historico = movimentacoes.filter(m => m.processo_id === processo.id).sort((a, b) => new Date(a.data_movimentacao).getTime() - new Date(b.data_movimentacao).getTime());
-  const setorAtual = setores.find(s => s.id === processo.fase_atual_id);
+  const localizacaoAtual = localizacaoEfetiva(processo, (setorId) => setores.find(s => s.id === setorId)?.sigla);
+
+  const linhaDoTempo = montarLinhaDoTempo(
+    estadasProcesso.filter(e => e.processo_id === processo.id),
+  );
+  const tempoTotalDias = calcularTempoTotal(estadasProcesso.filter(e => e.processo_id === processo.id));
+  const diasNaLocalizacaoAtual = linhaDoTempo[linhaDoTempo.length - 1]?.dias;
 
   const checklistDisponivel = processo.rito_processual ? CHECKLISTS_RITOS[processo.rito_processual] : undefined;
 
@@ -97,8 +108,11 @@ export default function DetalheProcesso() {
                   <dd className="mt-1 text-sm text-gray-900">{processo.unidade_demandante}</dd>
                 </div>
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">Fase Atual / Setor</dt>
-                  <dd className="mt-1 text-sm text-gray-900 font-medium">{setorAtual?.nome} ({setorAtual?.sigla})</dd>
+                  <dt className="text-sm font-medium text-gray-500">Localização Atual</dt>
+                  <dd className="mt-1 text-sm text-gray-900 font-medium flex items-center">
+                    <MapPin className="w-4 h-4 mr-1 text-gray-400 flex-shrink-0" />
+                    {localizacaoAtual}
+                  </dd>
                 </div>
                 {processo.rito_processual && (
                   <div>
@@ -128,14 +142,16 @@ export default function DetalheProcesso() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Data de Cadastro</dt>
                     <dd className="mt-1 text-sm text-gray-900">{format(new Date(processo.data_entrada), 'dd/MM/yyyy')}</dd>
-                    <dd className="mt-0.5 text-xs text-gray-500">Tempo Total: <span className="font-semibold text-gray-900">{Math.max(0, differenceInDays(new Date(), new Date(processo.data_entrada)))} dias</span></dd>
+                    <dd className="mt-0.5 text-xs text-gray-500">Tempo Total: <span className="font-semibold text-gray-900">{tempoTotalDias} dias</span></dd>
                   </div>
                 )}
                 {processo.ultima_tramitacao && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Última Tramitação</dt>
                     <dd className="mt-1 text-sm text-gray-900">{format(new Date(processo.ultima_tramitacao), 'dd/MM/yyyy')}</dd>
-                    <dd className="mt-0.5 text-xs text-gray-500">Dias no setor atual: <span className="font-semibold text-gray-900">{Math.max(0, differenceInDays(new Date(), new Date(processo.ultima_tramitacao)))} dias</span></dd>
+                    {diasNaLocalizacaoAtual !== undefined && (
+                      <dd className="mt-0.5 text-xs text-gray-500">Dias na localização atual: <span className="font-semibold text-gray-900">{diasNaLocalizacaoAtual} dias</span></dd>
+                    )}
                   </div>
                 )}
               </dl>
@@ -185,199 +201,96 @@ export default function DetalheProcesso() {
 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Gráfico de Tarefas (Gantt)</h2>
-            <div className="space-y-4">
-              <div className="w-full h-8 flex rounded-md overflow-hidden ring-1 ring-gray-200">
-                {(() => {
-                  let dataInicio = new Date(processo.data_entrada || processo.data_abertura);
-                  const timelineData = historico.map((mov) => {
-                    const s = setores.find(st => st.id === mov.setor_id);
-                    const dataFim = new Date(mov.data_movimentacao);
-                    const dias = Math.max(0, differenceInDays(dataFim, dataInicio));
-                    const periodo = {
-                      id: mov.id,
-                      setor: s?.sigla || 'Setor Anterior',
-                      setorNome: s?.nome || 'Setor Anterior',
-                      dias: dias,
-                      inicio: new Date(dataInicio),
-                      fim: dataFim
-                    };
-                    dataInicio = dataFim;
-                    return periodo;
-                  });
+            {linhaDoTempo.length === 0 ? (
+              <p className="text-sm text-gray-500 italic">Sem histórico de localização registrado ainda.</p>
+            ) : (
+              <div className="space-y-4">
+                <div className="w-full h-8 flex rounded-md overflow-hidden ring-1 ring-gray-200">
+                  {(() => {
+                    const totalDias = linhaDoTempo.reduce((acc, e) => acc + e.dias, 0) || 1;
+                    return linhaDoTempo
+                      .filter((e) => e.dias > 0)
+                      .map((estada, idx) => (
+                        <div
+                          key={estada.id}
+                          className={`${CORES_GANTT[idx % CORES_GANTT.length]} h-full group relative transition-all hover:brightness-110 flex items-center justify-center cursor-help`}
+                          style={{ width: `${Math.max((estada.dias / totalDias) * 100, 5)}%` }}
+                          title={`${estada.localizacao}: ${estada.dias} dias`}
+                        >
+                          <span className="text-[10px] font-bold text-white truncate px-1 drop-shadow-md">
+                            {estada.localizacao}
+                          </span>
+                        </div>
+                      ));
+                  })()}
+                </div>
 
-                  if (processo.status !== 'concluido' && processo.status !== 'arquivado') {
-                    const s = setores.find(st => st.id === processo.fase_atual_id);
-                    timelineData.push({
-                      id: 'atual',
-                      setor: s?.sigla || 'Atual',
-                      setorNome: s?.nome || 'Atual',
-                      dias: Math.max(0, differenceInDays(new Date(), dataInicio)),
-                      inicio: new Date(dataInicio),
-                      fim: new Date()
-                    });
-                  }
-
-                  const totalDias = timelineData.reduce((acc, curr) => acc + curr.dias, 0) || 1;
-                  const colors = ['bg-blue-400', 'bg-indigo-400', 'bg-purple-400', 'bg-emerald-400', 'bg-amber-400', 'bg-rose-400', 'bg-cyan-400', 'bg-lime-400', 'bg-fuchsia-400'];
-
-                  return (
-                    <>
-                      {timelineData.map((item, idx) => {
-                        const widthPercent = (item.dias / totalDias) * 100;
-                        const bgColor = colors[idx % colors.length];
-                        return (
-                          <div 
-                            key={item.id} 
-                            className={`${bgColor} h-full group relative transition-all hover:brightness-110 flex items-center justify-center cursor-help`}
-                            style={{ width: `${Math.max(widthPercent, 5)}%`, opacity: item.dias === 0 ? 0 : 1, display: item.dias === 0 ? 'none' : 'flex' }}
-                            title={`${item.setorNome}: ${item.dias} dias`}
-                          >
-                            <span className="text-[10px] font-bold text-white truncate px-1 drop-shadow-md">
-                              {item.setor} 
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </>
-                  );
-                })()}
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
-                {(() => {
-                  let dataInicio = new Date(processo.data_entrada || processo.data_abertura);
-                  const timelineData = historico.map((mov) => {
-                    const s = setores.find(st => st.id === mov.setor_id);
-                    const dataFim = new Date(mov.data_movimentacao);
-                    const dias = Math.max(0, differenceInDays(dataFim, dataInicio));
-                    const periodo = {
-                      id: mov.id,
-                      setor: s?.sigla || 'Setor Anterior',
-                      setorNome: s?.nome || 'Setor Anterior',
-                      dias: dias
-                    };
-                    dataInicio = dataFim;
-                    return periodo;
-                  });
-
-                  if (processo.status !== 'concluido' && processo.status !== 'arquivado') {
-                    const s = setores.find(st => st.id === processo.fase_atual_id);
-                    timelineData.push({
-                      id: 'atual',
-                      setor: s?.sigla || 'Atual',
-                      setorNome: s?.nome || 'Atual',
-                      dias: Math.max(0, differenceInDays(new Date(), dataInicio))
-                    });
-                  }
-
-                  const colors = ['bg-blue-400', 'bg-indigo-400', 'bg-purple-400', 'bg-emerald-400', 'bg-amber-400', 'bg-rose-400', 'bg-cyan-400', 'bg-lime-400', 'bg-fuchsia-400'];
-
-                  return timelineData.filter(i => i.dias > 0).map((item, idx) => {
-                    const bgColor = colors[idx % colors.length];
-                    return (
-                      <div key={item.id} className="flex items-center text-xs">
-                        <span className={`w-3 h-3 rounded-sm ${bgColor} mr-1.5 flex-shrink-0 shadow-sm`}></span>
-                        <span className="truncate text-gray-700" title={item.setorNome}>
-                          <span className="font-medium">{item.setor}</span> 
-                          <span className="text-gray-500 ml-1">({item.dias}d)</span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+                  {linhaDoTempo
+                    .filter((e) => e.dias > 0)
+                    .map((estada, idx) => (
+                      <div key={estada.id} className="flex items-center text-xs">
+                        <span className={`w-3 h-3 rounded-sm ${CORES_GANTT[idx % CORES_GANTT.length]} mr-1.5 flex-shrink-0 shadow-sm`}></span>
+                        <span className="truncate text-gray-700" title={estada.localizacao}>
+                          <span className="font-medium">{estada.localizacao}</span>
+                          <span className="text-gray-500 ml-1">({estada.dias}d)</span>
                         </span>
                       </div>
-                    );
-                  });
-                })()}
+                    ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
         </div>
 
-        {/* Right Column: Timeline & Flow */}
+        {/* Right Column: Real location history */}
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-6">Fluxo do Processo</h2>
-            <div className="flow-root">
-              <ul className="-mb-8">
-                {setores.sort((a,b) => a.ordem_fluxo - b.ordem_fluxo).map((s, sIdx) => {
-                  const isCurrent = processo.fase_atual_id === s.id && processo.status !== 'concluido';
-                  const isPast = processo.status === 'concluido' || (setores.find(st => st.id === processo.fase_atual_id)?.ordem_fluxo || 0) > s.ordem_fluxo;
-                  
-                  return (
-                    <li key={s.id}>
-                      <div className="relative pb-8">
-                        {sIdx !== setores.length - 1 ? (
-                          <span className={`${isPast ? 'bg-red-600' : 'bg-gray-200'} absolute top-4 left-4 -ml-px h-full w-0.5`} aria-hidden="true" />
-                        ) : null}
-                        <div className="relative flex space-x-3">
-                          <div>
-                            <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
-                              isCurrent ? 'bg-red-600' : isPast ? 'bg-red-600' : 'bg-gray-200'
-                            }`}>
-                              {isCurrent ? (
-                                <span className="h-2.5 w-2.5 rounded-full bg-white" />
-                              ) : isPast ? (
-                                <CheckCircle className="h-5 w-5 text-white" aria-hidden="true" />
-                              ) : (
-                                <span className="h-2.5 w-2.5 rounded-full bg-transparent" />
-                              )}
-                            </span>
-                          </div>
-                          <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
+            <h2 className="text-lg font-medium text-gray-900 mb-6">Histórico de Localizações</h2>
+            {linhaDoTempo.length === 0 ? (
+              <p className="text-sm text-gray-500 italic">Sem histórico de localização registrado ainda.</p>
+            ) : (
+              <div className="flow-root">
+                <ul className="-mb-8">
+                  {linhaDoTempo
+                    .slice()
+                    .reverse()
+                    .map((estada, eventIdx, lista) => (
+                      <li key={estada.id}>
+                        <div className="relative pb-8">
+                          {eventIdx !== lista.length - 1 ? (
+                            <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true" />
+                          ) : null}
+                          <div className="relative flex space-x-3">
                             <div>
-                              <p className={`text-sm ${isCurrent ? 'font-bold text-gray-900' : 'font-medium text-gray-500'}`}>
-                                {s.sigla}
-                              </p>
-                              <p className="text-xs text-gray-500 line-clamp-1">{s.nome}</p>
+                              <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
+                                estada.data_fim === null ? 'bg-red-600' : 'bg-gray-100'
+                              }`}>
+                                <MapPin className={`h-4 w-4 ${estada.data_fim === null ? 'text-white' : 'text-gray-500'}`} aria-hidden="true" />
+                              </span>
+                            </div>
+                            <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
+                              <div>
+                                <p className={`text-sm ${estada.data_fim === null ? 'font-semibold text-gray-900' : 'text-gray-500'}`}>
+                                  {estada.localizacao}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {estada.dias} dia{estada.dias === 1 ? '' : 's'}
+                                  {estada.data_fim === null ? ' (atual)' : ''}
+                                </p>
+                              </div>
+                              <div className="text-right text-xs whitespace-nowrap text-gray-500">
+                                <time dateTime={estada.data_inicio}>{format(new Date(estada.data_inicio), 'dd/MM/yyyy')}</time>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-6">Histórico de Movimentações</h2>
-            <div className="flow-root">
-              <ul className="-mb-8">
-                {historico.map((mov, eventIdx) => {
-                  const s = setores.find(st => st.id === mov.setor_id);
-                  return (
-                    <li key={mov.id}>
-                      <div className="relative pb-8">
-                        {eventIdx !== historico.length - 1 ? (
-                          <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true" />
-                        ) : null}
-                        <div className="relative flex space-x-3">
-                          <div>
-                            <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
-                              mov.status_movimentacao === 'devolvido' ? 'bg-amber-400' : 'bg-gray-100'
-                            }`}>
-                              <FileText className={`h-4 w-4 ${mov.status_movimentacao === 'devolvido' ? 'text-white' : 'text-gray-500'}`} aria-hidden="true" />
-                            </span>
-                          </div>
-                          <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-                            <div>
-                              <p className="text-sm text-gray-500">
-                                Movimentado em <span className="font-medium text-gray-900">{s?.sigla}</span>
-                              </p>
-                              {mov.observacao && (
-                                <p className="mt-1 text-sm bg-gray-50 p-2 rounded-md text-gray-700 italic border border-gray-100">"{mov.observacao}"</p>
-                              )}
-                            </div>
-                            <div className="text-right text-xs whitespace-nowrap text-gray-500">
-                              <time dateTime={mov.data_movimentacao}>{format(new Date(mov.data_movimentacao), "dd/MM 'às' HH:mm")}</time>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       </div>

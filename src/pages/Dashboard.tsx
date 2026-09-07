@@ -2,19 +2,43 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { PieChart, Pie, Cell, Legend } from 'recharts';
+import {
+  agruparEstadasPorProcesso,
+  calcularMediaDiasPorLocalizacao,
+  calcularMediaDiasPorRito,
+  localizacaoEfetiva,
+} from '../lib/fluxoProcesso';
+
+const TOOLTIP_STYLE = {
+  borderRadius: '0.5rem',
+  border: 'none',
+  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+};
 
 export default function Dashboard() {
-  const { processos, setores } = useApp();
+  const { processos, setores, estadasProcesso } = useApp();
 
   const total = processos.length;
   const concluidos = processos.filter(p => p.status === 'concluido').length;
   const emAndamento = processos.filter(p => p.status === 'em_andamento').length;
   const comAlerta = processos.filter(p => p.possui_alerta).length;
 
-  const dataFases = setores.map(s => ({
-    name: s.sigla,
-    Processos: processos.filter(p => p.fase_atual_id === s.id && p.status !== 'concluido').length
-  }));
+  const siglaDoSetor = (id: string) => setores.find(s => s.id === id)?.sigla;
+
+  // Top 8 localizações reais com mais processos em aberto agora — sem
+  // isso, contar por fase_atual_id (fluxo fixo de 7 setores) mostraria
+  // quase tudo empilhado em "Demandante" pros processos vindos da planilha.
+  const contagemPorLocalizacao = new Map<string, number>();
+  processos
+    .filter(p => p.status !== 'concluido' && p.status !== 'arquivado')
+    .forEach(p => {
+      const loc = localizacaoEfetiva(p, siglaDoSetor);
+      contagemPorLocalizacao.set(loc, (contagemPorLocalizacao.get(loc) ?? 0) + 1);
+    });
+  const dataFases = Array.from(contagemPorLocalizacao.entries())
+    .map(([name, Processos]) => ({ name, Processos }))
+    .sort((a, b) => b.Processos - a.Processos)
+    .slice(0, 8);
 
   const dataStatus = [
     { name: 'Em Andamento', value: emAndamento },
@@ -23,6 +47,10 @@ export default function Dashboard() {
   ];
 
   const COLORS = ['#0284c7', '#059669', '#d97706'];
+
+  const estadasPorProcesso = agruparEstadasPorProcesso(estadasProcesso);
+  const mediaPorLocalizacao = calcularMediaDiasPorLocalizacao(estadasProcesso).slice(0, 8);
+  const mediaPorRito = calcularMediaDiasPorRito(processos, estadasPorProcesso);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -54,14 +82,14 @@ export default function Dashboard() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h2 className="text-lg font-medium text-gray-900 mb-6">Processos por Setor (Gargalo Atual)</h2>
+          <h2 className="text-lg font-medium text-gray-900 mb-6">Processos por Localização (Gargalo Atual)</h2>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dataFases} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: '#f3f4f6'}} contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} angle={-30} textAnchor="end" height={70} tick={{ fontSize: 11 }} />
+                <YAxis axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip cursor={{fill: '#f3f4f6'}} contentStyle={TOOLTIP_STYLE} />
                 <Bar dataKey="Processos" fill="#b91c1c" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -86,11 +114,70 @@ export default function Dashboard() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
                 <Legend verticalAlign="bottom" height={36} />
               </PieChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      </div>
+
+      {/* Tempo médio: onde os processos demoram mais, e estimativa por tipo de contratação */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <h2 className="text-lg font-medium text-gray-900 mb-1">Setores com Maior Tempo Médio</h2>
+          <p className="text-xs text-gray-500 mb-6">Média de dias que os processos passam em cada localização (histórico completo).</p>
+          {mediaPorLocalizacao.length === 0 ? (
+            <p className="text-sm text-gray-500 italic">Ainda não há histórico suficiente. Sincronize a planilha ou aguarde os processos tramitarem.</p>
+          ) : (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={mediaPorLocalizacao.map(i => ({ name: i.localizacao, Dias: Math.round(i.mediaDias), amostras: i.ocorrencias }))}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" axisLine={false} tickLine={false} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} width={150} tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    cursor={{ fill: '#f3f4f6' }}
+                    contentStyle={TOOLTIP_STYLE}
+                    formatter={(value: number, _n, item) => [`${value} dias (${item.payload.amostras} amostra(s))`, 'Média']}
+                  />
+                  <Bar dataKey="Dias" fill="#d97706" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <h2 className="text-lg font-medium text-gray-900 mb-1">Estimativa de Tempo por Tipo de Contratação</h2>
+          <p className="text-xs text-gray-500 mb-6">Tempo médio total, do início ao fim, considerando só processos concluídos/arquivados.</p>
+          {mediaPorRito.length === 0 ? (
+            <p className="text-sm text-gray-500 italic">Ainda não há processos concluídos com histórico suficiente pra estimar.</p>
+          ) : (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={mediaPorRito.map(i => ({ name: i.rito, Dias: Math.round(i.mediaDias), amostras: i.ocorrencias }))}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" axisLine={false} tickLine={false} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} width={150} tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    cursor={{ fill: '#f3f4f6' }}
+                    contentStyle={TOOLTIP_STYLE}
+                    formatter={(value: number, _n, item) => [`${value} dias (${item.payload.amostras} amostra(s))`, 'Média']}
+                  />
+                  <Bar dataKey="Dias" fill="#0284c7" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       </div>
     </div>
