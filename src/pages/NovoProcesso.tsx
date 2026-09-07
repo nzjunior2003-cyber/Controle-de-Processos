@@ -5,9 +5,10 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { PcaAutocomplete } from '../components/PcaAutocomplete';
 import { CHECKLISTS_RITOS } from '../types';
-import { ID_PLANILHA_PROCESSOS, mapProcessoParaLinhaPlanilha } from '../lib/csv';
+import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../lib/googleAuth';
-import { appendRowToSheet } from '../lib/sheetsService';
+import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
+import { OPCOES_FONTE_PROCESSO, OPCOES_NATUREZA_DESPESA } from '../lib/planilhaProcessos';
 
 const paraDataInput = (isoOuVazio?: string) => (isoOuVazio ? isoOuVazio.split('T')[0] : '');
 
@@ -36,6 +37,11 @@ export default function NovoProcesso() {
 
   const [ritoProcessual, setRitoProcessual] = useState(processo?.rito_processual ?? '');
   const [checklistLocal, setChecklistLocal] = useState<string[]>(processo?.checklist_rito ?? []);
+  const [naturezaDespesa, setNaturezaDespesa] = useState(processo?.natureza_despesa ?? '');
+  const [fonte, setFonte] = useState(processo?.fonte ?? '');
+  const [valorEstimado, setValorEstimado] = useState(
+    processo?.valor_estimado != null ? String(processo.valor_estimado) : '',
+  );
   const [salvando, setSalvando] = useState(false);
 
   const handleRitoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -61,21 +67,22 @@ export default function NovoProcesso() {
 
     setSalvando(true);
     try {
-      if (emEdicao && id) {
-        await updateProcesso(id, {
-          numero_processo: numeroProcesso,
-          objeto,
-          descricao,
-          unidade_demandante: unidadeDemandante,
-          pca_id: pcaId || '',
-          rito_processual: ritoProcessual,
-          checklist_rito: checklistLocal,
-          andamento,
-          data_entrada: new Date(dataEntrada).toISOString(),
-        });
-        navigate(`/sistema/processos/${id}`);
-        return;
-      }
+      const valorEstimadoNumero = valorEstimado ? Number(valorEstimado.replace(',', '.')) : undefined;
+
+      const dadosComuns = {
+        numero_processo: numeroProcesso,
+        objeto,
+        descricao,
+        unidade_demandante: unidadeDemandante,
+        pca_id: pcaId || '',
+        rito_processual: ritoProcessual,
+        checklist_rito: checklistLocal,
+        andamento,
+        data_entrada: new Date(dataEntrada).toISOString(),
+        natureza_despesa: naturezaDespesa,
+        fonte,
+        valor_estimado: valorEstimadoNumero ?? 0,
+      };
 
       // Pede a autorização do Google ANTES de gravar no Firestore: feita
       // depois, o popup de login perde a associação com o clique do
@@ -92,53 +99,58 @@ export default function NovoProcesso() {
         erroGoogle = erro;
       }
 
-      await addProcesso({
-        numero_processo: numeroProcesso,
-        objeto,
-        descricao,
-        unidade_demandante: unidadeDemandante,
-        demandante_id: usuarioAtual?.id || '',
-        pca_id: pcaId || '',
-        rito_processual: ritoProcessual,
-        checklist_rito: checklistLocal,
-        fase_atual_id: '1',
-        andamento,
-        data_entrada: new Date(dataEntrada).toISOString(),
-      });
+      let processoId: string;
+      if (emEdicao && id) {
+        await updateProcesso(id, dadosComuns);
+        processoId = id;
+      } else {
+        processoId = await addProcesso({
+          ...dadosComuns,
+          demandante_id: usuarioAtual?.id || '',
+          fase_atual_id: '1',
+        });
+      }
 
       if (!googleToken) {
         alert(
-          'O processo foi criado no sistema, mas não foi possível conectar ao Google para ' +
+          'O processo foi salvo no sistema, mas não foi possível conectar ao Google para ' +
             'replicar na planilha automaticamente' +
             (erroGoogle instanceof Error ? `: ${erroGoogle.message}` : '.') +
-            ' Adicione a linha manualmente ou tente sincronizar depois.',
+            ' Adicione/atualize a linha manualmente ou tente sincronizar depois.',
         );
       } else {
         try {
-          await appendRowToSheet(
+          const linha = await sincronizarProcessoNaPlanilha(
             googleToken,
             ID_PLANILHA_PROCESSOS,
-            mapProcessoParaLinhaPlanilha({
+            {
               numero_processo: numeroProcesso,
               objeto,
               descricao,
               unidade_demandante: unidadeDemandante,
+              natureza_despesa: naturezaDespesa,
+              fonte,
+              valor_estimado: valorEstimadoNumero,
               rito_processual: ritoProcessual,
               andamento,
               data_entrada: new Date(dataEntrada).toISOString(),
               pca_id: pcaId,
-            }),
+            },
+            processo?.planilha_linha,
           );
+          if (linha !== processo?.planilha_linha) {
+            await updateProcesso(processoId, { planilha_linha: linha });
+          }
         } catch (erroPlanilha) {
           console.error('Erro ao gravar o processo na planilha:', erroPlanilha);
           alert(
-            'O processo foi criado no sistema, mas não foi possível gravá-lo na planilha automaticamente: ' +
+            'O processo foi salvo no sistema, mas não foi possível gravá-lo na planilha automaticamente: ' +
               (erroPlanilha instanceof Error ? erroPlanilha.message : String(erroPlanilha)),
           );
         }
       }
 
-      navigate('/sistema/aquisicoes');
+      navigate(emEdicao ? `/sistema/processos/${processoId}` : '/sistema/aquisicoes');
     } catch (erro) {
       alert(
         'Não foi possível salvar o processo: ' +
@@ -269,6 +281,50 @@ export default function NovoProcesso() {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div>
+              <label htmlFor="naturezaDespesa" className="block text-sm font-medium text-gray-700">Natureza de Despesa</label>
+              <select
+                id="naturezaDespesa"
+                value={naturezaDespesa}
+                onChange={(e) => setNaturezaDespesa(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
+              >
+                <option value="">Selecione...</option>
+                {OPCOES_NATUREZA_DESPESA.map((opcao) => (
+                  <option key={opcao} value={opcao}>{opcao}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="fonte" className="block text-sm font-medium text-gray-700">Fonte</label>
+              <select
+                id="fonte"
+                value={fonte}
+                onChange={(e) => setFonte(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
+              >
+                <option value="">Selecione...</option>
+                {OPCOES_FONTE_PROCESSO.map((opcao) => (
+                  <option key={opcao} value={opcao}>{opcao}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="valorEstimado" className="block text-sm font-medium text-gray-700">Valor Estimado (R$)</label>
+              <input
+                type="number"
+                id="valorEstimado"
+                step="0.01"
+                min="0"
+                value={valorEstimado}
+                onChange={(e) => setValorEstimado(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                placeholder="0,00"
+              />
             </div>
 
             <div>

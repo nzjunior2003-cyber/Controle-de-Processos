@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  mapProcessoParaLinhaPlanilha,
   mapSheetArrayToPca,
   mapSheetRowToPca,
   mapSheetRowToProcesso,
@@ -150,70 +149,27 @@ describe('mapSheetRowToProcesso', () => {
   });
 });
 
-describe('mapProcessoParaLinhaPlanilha', () => {
-  it('monta a linha na ordem das colunas, preenchendo só o que o cadastro coleta', () => {
-    const linha = mapProcessoParaLinhaPlanilha({
-      numero_processo: '2026/2014417',
-      objeto: 'Prorrogação do contrato',
-      descricao: 'Justificativa qualquer',
-      unidade_demandante: 'CSMV/MOP',
-      rito_processual: 'PRORROGAÇÃO',
-      andamento: 'Aguardando assinatura',
-      data_entrada: new Date(2026, 0, 15).toISOString(),
-      pca_id: 'pca-1',
+describe('mapSheetRowToProcesso: natureza de despesa e valor estimado', () => {
+  it('lê natureza de despesa e valor estimado quando presentes', () => {
+    const processo = mapSheetRowToProcesso({
+      'N° PAE': 'E-2026/1',
+      OBJETO: 'Objeto',
+      'SETOR DEMANDANTE': 'DTIC',
+      'NATUREZA DE DESPESA': 'SERVIÇO',
+      'V. ESTIMADO': 'R$ 1.500,50',
     });
-
-    expect(linha).toEqual([
-      '',
-      'E-2026/2014417',
-      'Prorrogação do contrato',
-      '',
-      '',
-      '',
-      'Justificativa qualquer',
-      'CSMV/MOP',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      'PRORROGAÇÃO',
-      '',
-      '',
-      '',
-      'Aguardando assinatura',
-      '',
-      '',
-      '15/01/2026',
-      '',
-      '2026',
-      'SIM',
-      '',
-    ]);
+    expect(processo?.natureza_despesa).toBe('SERVIÇO');
+    expect(processo?.valor_estimado).toBe(1500.5);
   });
 
-  it('não duplica o prefixo "E-" se o número já vier com ele', () => {
-    const linha = mapProcessoParaLinhaPlanilha({
-      numero_processo: 'E-2026/1',
-      objeto: 'Objeto',
-      unidade_demandante: 'DTIC',
+  it('devolve undefined quando ausentes', () => {
+    const processo = mapSheetRowToProcesso({
+      'N° PAE': 'E-2026/1',
+      OBJETO: 'Objeto',
+      'SETOR DEMANDANTE': 'DTIC',
     });
-    expect(linha[1]).toBe('E-2026/1');
-  });
-
-  it('deixa em branco os campos opcionais ausentes', () => {
-    const linha = mapProcessoParaLinhaPlanilha({
-      numero_processo: '2026/1',
-      objeto: 'Objeto',
-      unidade_demandante: 'DTIC',
-    });
-    expect(linha[6]).toBe(''); // OBSERVAÇÃO
-    expect(linha[14]).toBe(''); // RITO PROCESSUAL
-    expect(linha[18]).toBe(''); // ANDAMENTO
-    expect(linha[20]).toBe(''); // DATA DE ENTRADA
-    expect(linha[23]).toBe(''); // ANO DE ENTRADA
-    expect(linha[24]).toBe(''); // PREVISÃO NO PCA
+    expect(processo?.natureza_despesa).toBeUndefined();
+    expect(processo?.valor_estimado).toBeUndefined();
   });
 });
 

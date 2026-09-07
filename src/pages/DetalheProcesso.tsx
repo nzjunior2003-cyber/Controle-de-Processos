@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { ArrowLeft, Clock, MapPin, Pencil, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { CHECKLISTS_RITOS } from '../types';
 import { calcularTempoTotal, localizacaoEfetiva, montarLinhaDoTempo } from '../lib/fluxoProcesso';
@@ -14,12 +14,25 @@ const CORES_GANTT = [
 export default function DetalheProcesso() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { processos, setores, estadasProcesso, pcas, usuarioAtual, updateProcesso } = useApp();
+  const { processos, setores, estadasProcesso, pcas, usuarioAtual, updateProcesso, deleteProcesso } = useApp();
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
 
   const processo = processos.find(p => p.id === id);
   if (!processo) {
     return <div className="p-6">Processo não encontrado.</div>;
   }
+
+  const handleExcluir = async () => {
+    setExcluindo(true);
+    try {
+      await deleteProcesso(processo.id);
+      navigate('/sistema/aquisicoes');
+    } catch (erro) {
+      alert(erro instanceof Error ? erro.message : 'Não foi possível excluir o processo.');
+      setExcluindo(false);
+    }
+  };
 
   const pcaVinculado = pcas.find(p => p.id === processo.pca_id);
   const localizacaoAtual = localizacaoEfetiva(processo, (setorId) => setores.find(s => s.id === setorId)?.sigla);
@@ -77,13 +90,23 @@ export default function DetalheProcesso() {
             {processo.status.replace('_', ' ').toUpperCase()}
           </span>
           {isMasterOrApoio && (
-            <Link
-              to={`/sistema/processos/${processo.id}/editar`}
-              className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-            >
-              <Pencil className="-ml-1 mr-1.5 h-4 w-4" />
-              Editar
-            </Link>
+            <>
+              <Link
+                to={`/sistema/processos/${processo.id}/editar`}
+                className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                <Pencil className="-ml-1 mr-1.5 h-4 w-4" />
+                Editar
+              </Link>
+              <button
+                type="button"
+                onClick={() => setConfirmandoExclusao(true)}
+                className="inline-flex items-center px-3 py-1.5 border border-red-200 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50"
+              >
+                <Trash2 className="-ml-1 mr-1.5 h-4 w-4" />
+                Excluir
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -294,6 +317,35 @@ export default function DetalheProcesso() {
           </div>
         </div>
       </div>
+
+      {confirmandoExclusao && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 relative">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirmar Exclusão</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Tem certeza que deseja excluir o processo {processo.numero_processo}? Esta ação não
+              pode ser desfeita no sistema (a linha na planilha de controle não é removida
+              automaticamente).
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setConfirmandoExclusao(false)}
+                disabled={excluindo}
+                className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleExcluir}
+                disabled={excluindo}
+                className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+              >
+                {excluindo ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

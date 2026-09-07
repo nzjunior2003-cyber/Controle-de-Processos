@@ -29,24 +29,60 @@ export default function Aquisicoes() {
   const [busca, setBusca] = useState('');
   const [activeTab, setActiveTab] = useState<'processos' | 'pca'>('processos');
   const [sincronizando, setSincronizando] = useState(false);
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
   const [filtroTempo, setFiltroTempo] = useState<'todos' | 'verde' | 'amarelo' | 'vermelho'>('todos');
+  const [filtroRito, setFiltroRito] = useState('');
+  const [filtroNatureza, setFiltroNatureza] = useState('');
+  const [filtroSetorAtual, setFiltroSetorAtual] = useState('');
+  const [filtroFonte, setFiltroFonte] = useState('');
+  const [filtroPrevisaoPca, setFiltroPrevisaoPca] = useState<'todos' | 'sim' | 'nao'>('todos');
+  const [filtroDemandante, setFiltroDemandante] = useState('');
 
   const hoje = new Date();
 
+  const opcoesUnicas = (valores: (string | undefined)[]) =>
+    Array.from(new Set(valores.filter((v): v is string => !!v))).sort((a, b) => a.localeCompare(b));
+
+  const opcoesRito = opcoesUnicas(processos.map((p) => p.rito_processual));
+  const opcoesNatureza = opcoesUnicas(processos.map((p) => p.natureza_despesa));
+  const opcoesSetorAtual = opcoesUnicas(
+    processos.map((p) => p.localizacao_atual || setores.find((s) => s.id === p.fase_atual_id)?.sigla),
+  );
+  const opcoesFonte = opcoesUnicas(processos.map((p) => p.fonte));
+  const opcoesDemandante = opcoesUnicas(processos.map((p) => p.unidade_demandante));
+
+  const filtrosAtivos = [
+    filtroRito, filtroNatureza, filtroSetorAtual, filtroFonte, filtroDemandante,
+  ].filter(Boolean).length + (filtroPrevisaoPca !== 'todos' ? 1 : 0);
+
   const filtrados = processos.filter(p => {
-    const matchBusca = p.numero_processo.toLowerCase().includes(busca.toLowerCase()) || 
-      p.objeto.toLowerCase().includes(busca.toLowerCase());
-      
+    const setorAtualEfetivo = p.localizacao_atual || setores.find(s => s.id === p.fase_atual_id)?.sigla || '';
+    const buscaNormalizada = busca.toLowerCase();
+    const matchBusca =
+      !buscaNormalizada ||
+      [
+        p.numero_processo, p.objeto, p.rito_processual, p.natureza_despesa,
+        setorAtualEfetivo, p.fonte, p.unidade_demandante,
+      ].some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
+
     if (!matchBusca) return false;
-    
+
+    if (filtroRito && p.rito_processual !== filtroRito) return false;
+    if (filtroNatureza && p.natureza_despesa !== filtroNatureza) return false;
+    if (filtroSetorAtual && setorAtualEfetivo !== filtroSetorAtual) return false;
+    if (filtroFonte && p.fonte !== filtroFonte) return false;
+    if (filtroDemandante && p.unidade_demandante !== filtroDemandante) return false;
+    if (filtroPrevisaoPca === 'sim' && !p.pca_id) return false;
+    if (filtroPrevisaoPca === 'nao' && p.pca_id) return false;
+
     if (filtroTempo === 'todos') return true;
-    
+
     const dias = p.ultima_tramitacao ? Math.max(0, differenceInDays(hoje, new Date(p.ultima_tramitacao))) : 0;
     if (filtroTempo === 'verde' && dias < 10) return true;
     if (filtroTempo === 'amarelo' && dias >= 10 && dias <= 20) return true;
     if (filtroTempo === 'vermelho' && dias > 20) return true;
-    
+
     return false;
   });
   
@@ -141,8 +177,17 @@ export default function Aquisicoes() {
 
       {activeTab === 'processos' ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-             <div 
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+             <div className="bg-white p-5 rounded-lg border shadow-sm border-l-4 border-l-gray-400 border-gray-200">
+               <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total de Processos</p>
+                    <h3 className="text-2xl font-bold text-gray-900 mt-1">{processos.length}</h3>
+                  </div>
+                  <List className="w-5 h-5 text-gray-400" />
+               </div>
+             </div>
+             <div
                onClick={() => setFiltroTempo(filtroTempo === 'verde' ? 'todos' : 'verde')}
                className={`bg-white p-5 rounded-lg border shadow-sm border-l-4 border-l-emerald-500 cursor-pointer transition-colors ${filtroTempo === 'verde' ? 'ring-2 ring-emerald-500 bg-emerald-50 border-emerald-200' : 'border-gray-200 hover:bg-gray-50'}`}
              >
@@ -191,14 +236,86 @@ export default function Aquisicoes() {
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
                   className="block w-full rounded-md border-gray-300 pl-10 focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 border"
-                  placeholder="Buscar número ou objeto"
+                  placeholder="Buscar por número, objeto, rito, natureza, setor atual, fonte ou demandante"
                 />
               </div>
-              <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setMostrarFiltros((v) => !v)}
+                className={`inline-flex items-center px-3 py-2 border shadow-sm text-sm font-medium rounded-md whitespace-nowrap ${
+                  mostrarFiltros ? 'border-red-300 bg-red-50 text-red-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
                 <Filter className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
-                Filtros
+                Filtros{filtrosAtivos > 0 ? ` (${filtrosAtivos})` : ''}
               </button>
             </div>
+
+            {mostrarFiltros && (
+              <div className="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Rito</label>
+                  <select value={filtroRito} onChange={(e) => setFiltroRito(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
+                    <option value="">Todos</option>
+                    {opcoesRito.map((op) => <option key={op} value={op}>{op}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Natureza de Despesa</label>
+                  <select value={filtroNatureza} onChange={(e) => setFiltroNatureza(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
+                    <option value="">Todas</option>
+                    {opcoesNatureza.map((op) => <option key={op} value={op}>{op}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Setor Atual</label>
+                  <select value={filtroSetorAtual} onChange={(e) => setFiltroSetorAtual(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
+                    <option value="">Todos</option>
+                    {opcoesSetorAtual.map((op) => <option key={op} value={op}>{op}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Fonte</label>
+                  <select value={filtroFonte} onChange={(e) => setFiltroFonte(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
+                    <option value="">Todas</option>
+                    {opcoesFonte.map((op) => <option key={op} value={op}>{op}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Previsão no PCA</label>
+                  <select value={filtroPrevisaoPca} onChange={(e) => setFiltroPrevisaoPca(e.target.value as 'todos' | 'sim' | 'nao')} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
+                    <option value="todos">Todos</option>
+                    <option value="sim">Sim</option>
+                    <option value="nao">Não</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Demandante</label>
+                  <select value={filtroDemandante} onChange={(e) => setFiltroDemandante(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
+                    <option value="">Todos</option>
+                    {opcoesDemandante.map((op) => <option key={op} value={op}>{op}</option>)}
+                  </select>
+                </div>
+                {filtrosAtivos > 0 && (
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFiltroRito('');
+                        setFiltroNatureza('');
+                        setFiltroSetorAtual('');
+                        setFiltroFonte('');
+                        setFiltroPrevisaoPca('todos');
+                        setFiltroDemandante('');
+                      }}
+                      className="text-sm text-red-600 hover:text-red-800 font-medium"
+                    >
+                      Limpar filtros
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="overflow-x-auto">
               <table className="w-full table-fixed divide-y divide-gray-200">

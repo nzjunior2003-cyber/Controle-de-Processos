@@ -118,7 +118,8 @@ interface AppContextData {
       Processo,
       'id' | 'criado_em' | 'atualizado_em' | 'status' | 'possui_alerta' | 'data_abertura'
     >,
-  ) => Promise<void>;
+  ) => Promise<string>;
+  deleteProcesso: (id: string) => Promise<void>;
   updateProcessoStatus: (
     id: string,
     status: Processo['status'],
@@ -650,6 +651,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [processos, sincronizarEstada],
   );
 
+  /**
+   * Grava um log de auditoria (coleção `logs_auditoria`) para uma alteração
+   * de dados. Nunca lança: uma falha ao registrar o log não pode impedir a
+   * operação principal que a chamou.
+   */
+  const registrarAuditoria = useCallback(
+    async (
+      colecao: string,
+      documentoId: string,
+      acao: AcaoAuditoria,
+      dados: object,
+      anterior?: object,
+    ) => {
+      try {
+        const db = getDb();
+        if (!db || !usuarioAtual) return;
+        await addDoc(collection(db, 'logs_auditoria'), {
+          colecao,
+          documentoId,
+          acao,
+          usuarioId: usuarioAtual.id,
+          usuarioNome: usuarioAtual.nome,
+          dataHora: serverTimestamp(),
+          resumo: resumirAuditoria(acao, dados, anterior),
+        });
+      } catch (erro) {
+        console.error('Erro ao registrar log de auditoria:', erro);
+      }
+    },
+    [usuarioAtual],
+  );
+
   // --- Movimentações / Processos ------------------------------------------
   const addMovimentacao = useCallback(
     async (dados: Omit<MovimentacaoProcesso, 'id' | 'data_movimentacao'>) => {
@@ -698,8 +731,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         localizacaoEfetiva(novoProcesso, (setorId) => SETORES.find((s) => s.id === setorId)?.sigla),
         novoProcesso.data_entrada,
       );
+
+      await registrarAuditoria('processos', referencia.id, 'CREATE', novoProcesso);
+
+      return referencia.id;
     },
-    [addMovimentacao, usuarioAtual, sincronizarEstada],
+    [addMovimentacao, usuarioAtual, sincronizarEstada, registrarAuditoria],
+  );
+
+  /**
+   * Remove um processo (ex.: cadastro feito por engano). Não apaga o
+   * histórico de movimentações/estadas associado — fica órfão, mas
+   * inofensivo (nada mais referencia um processo que não existe mais).
+   */
+  const deleteProcesso = useCallback(
+    async (id: string) => {
+      const db = requireDb();
+      const anterior = processos.find((p) => p.id === id);
+      await deleteDoc(doc(db, 'processos', id));
+      await registrarAuditoria('processos', id, 'DELETE', {}, anterior);
+    },
+    [processos, registrarAuditoria],
   );
 
   const updateProcesso = useCallback(
@@ -717,8 +769,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const novaLocalizacao = localizacaoEfetiva({ ...anterior, ...dados }, siglaDoSetor);
         await sincronizarEstada(id, novaLocalizacao, new Date().toISOString());
       }
+
+      await registrarAuditoria('processos', id, 'UPDATE', dados, anterior);
     },
-    [processos, sincronizarEstada],
+    [processos, sincronizarEstada, registrarAuditoria],
   );
 
   const updateProcessoStatus = useCallback(
@@ -733,38 +787,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       });
     },
     [],
-  );
-
-  /**
-   * Grava um log de auditoria (coleção `logs_auditoria`) para uma alteração
-   * de dados. Nunca lança: uma falha ao registrar o log não pode impedir a
-   * operação principal que a chamou.
-   */
-  const registrarAuditoria = useCallback(
-    async (
-      colecao: string,
-      documentoId: string,
-      acao: AcaoAuditoria,
-      dados: object,
-      anterior?: object,
-    ) => {
-      try {
-        const db = getDb();
-        if (!db || !usuarioAtual) return;
-        await addDoc(collection(db, 'logs_auditoria'), {
-          colecao,
-          documentoId,
-          acao,
-          usuarioId: usuarioAtual.id,
-          usuarioNome: usuarioAtual.nome,
-          dataHora: serverTimestamp(),
-          resumo: resumirAuditoria(acao, dados, anterior),
-        });
-      } catch (erro) {
-        console.error('Erro ao registrar log de auditoria:', erro);
-      }
-    },
-    [usuarioAtual],
   );
 
   // --- Usuários -----------------------------------------------------------
@@ -1098,6 +1120,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       solicitarAcesso,
       enviarResetSenha,
       addProcesso,
+      deleteProcesso,
       updateProcessoStatus,
       updateProcesso,
       addMovimentacao,
@@ -1145,6 +1168,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       solicitarAcesso,
       enviarResetSenha,
       addProcesso,
+      deleteProcesso,
       updateProcessoStatus,
       updateProcesso,
       addMovimentacao,

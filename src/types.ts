@@ -143,6 +143,8 @@ export interface Processo {
   data_abertura: string;
   data_conclusao?: string;
   fonte?: string;
+  natureza_despesa?: string;
+  valor_estimado?: number;
   rito_processual?: string;
   checklist_rito?: string[];
   fase_processo?: string;
@@ -157,6 +159,8 @@ export interface Processo {
   andamento?: string;
   data_entrada?: string;
   ultima_tramitacao?: string;
+  /** Linha (1-based) desse processo na planilha de controle, para atualizações futuras acharem a linha certa sem precisar buscar de novo. */
+  planilha_linha?: number;
   criado_em: string;
   atualizado_em: string;
 }

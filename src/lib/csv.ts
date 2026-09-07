@@ -119,6 +119,8 @@ export interface ProcessoDaPlanilha {
   unidade_demandante: string;
   status: StatusProcesso;
   fonte?: string;
+  natureza_despesa?: string;
+  valor_estimado?: number;
   rito_processual?: string;
   fase_processo?: string;
   subfase_processo?: string;
@@ -145,6 +147,8 @@ export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha 
     unidade_demandante: celula(linha, 'SETOR DEMANDANTE'),
     status: inferirStatusProcesso(subfase),
     fonte: celula(linha, 'FONTE') || undefined,
+    natureza_despesa: celula(linha, 'NATUREZA DE DESPESA') || undefined,
+    valor_estimado: celula(linha, 'V. ESTIMADO') ? parseCurrencyBR(celula(linha, 'V. ESTIMADO')) : undefined,
     rito_processual: celula(linha, 'RITO PROCESSUAL') || undefined,
     fase_processo: celula(linha, 'FASE DO PROCESSO') || undefined,
     subfase_processo: subfase || undefined,
@@ -158,61 +162,6 @@ export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha 
 /** Id da planilha de controle de processos (compartilhada por leitura e escrita). */
 export const ID_PLANILHA_PROCESSOS = '1deakLqP8-enEgY384EkFyYedgo5WYSONjvYIBJDwqXE';
 export const URL_PLANILHA_PROCESSOS = `https://docs.google.com/spreadsheets/d/${ID_PLANILHA_PROCESSOS}/edit?usp=sharing`;
-
-function paraDataBR(iso?: string): string {
-  const data = iso ? new Date(iso) : undefined;
-  if (!data || Number.isNaN(data.getTime())) return '';
-  const dia = String(data.getDate()).padStart(2, '0');
-  const mes = String(data.getMonth() + 1).padStart(2, '0');
-  return `${dia}/${mes}/${data.getFullYear()}`;
-}
-
-/**
- * Monta a linha (na ordem das colunas da planilha de controle de
- * processos) para inserir um processo novo criado no sistema. Só
- * preenche o que o cadastro já coleta — setor atual, última tramitação,
- * valores e status de aprovação continuam vindos do RPA/planilha, não
- * do sistema.
- */
-export function mapProcessoParaLinhaPlanilha(dados: {
-  numero_processo: string;
-  objeto: string;
-  descricao?: string;
-  unidade_demandante: string;
-  rito_processual?: string;
-  andamento?: string;
-  data_entrada?: string;
-  pca_id?: string;
-}): string[] {
-  return [
-    '', // (coluna de numeração sequencial da planilha, preenchida manualmente)
-    /^E-/i.test(dados.numero_processo) ? dados.numero_processo : `E-${dados.numero_processo}`,
-    dados.objeto,
-    '', // STATUS SEPLAD
-    '', // STATUS GTAF / CASA CIVIL
-    '', // TAXA DE PROG.
-    dados.descricao || '', // OBSERVAÇÃO
-    dados.unidade_demandante,
-    '', // NATUREZA DE DESPESA
-    '', // FONTE
-    '', // V. PCA
-    '', // V. ESTIMADO
-    '', // V. HOMOLOGADO
-    '', // V. EXECUTADO
-    dados.rito_processual || '',
-    '', // FASE DO PROCESSO
-    '', // SUBFASE DO PROCESSO
-    '', // SETOR ATUAL (preenchido pela sincronização com o PAE)
-    dados.andamento || '',
-    '', // ÚLTIMA TRAMITAÇÃO (preenchido pela sincronização com o PAE)
-    '', // DIAS NO ÚLTIMO ANDAMENTO
-    paraDataBR(dados.data_entrada),
-    '', // TEMPO_TOTAL_DIAS
-    dados.data_entrada ? paraDataBR(dados.data_entrada).slice(-4) : '', // ANO DE ENTRADA
-    dados.pca_id ? 'SIM' : '',
-    '',
-  ];
-}
 
 /**
  * Mapeia uma linha posicional (planilha sem cabeçalho reconhecido) para um PCA.
