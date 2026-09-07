@@ -1,17 +1,25 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, Save } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { PcaAutocomplete } from '../components/PcaAutocomplete';
 import { CHECKLISTS_RITOS } from '../types';
+import { ID_PLANILHA_PROCESSOS, mapProcessoParaLinhaPlanilha } from '../lib/csv';
+import { getAccessToken, googleSignIn, initAuth } from '../lib/googleAuth';
+import { appendRowToSheet } from '../lib/sheetsService';
 
 const paraDataInput = (isoOuVazio?: string) => (isoOuVazio ? isoOuVazio.split('T')[0] : '');
 
 export default function NovoProcesso() {
   const { id } = useParams<{ id: string }>();
-  const { addProcesso, updateProcesso, processos, pcas, usuarioAtual, setores } = useApp();
+  const { addProcesso, updateProcesso, processos, pcas, usuarioAtual } = useApp();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const cancelar = initAuth();
+    return () => cancelar();
+  }, []);
 
   const emEdicao = !!id;
   const processo = id ? processos.find((p) => p.id === id) : undefined;
@@ -28,6 +36,7 @@ export default function NovoProcesso() {
 
   const [ritoProcessual, setRitoProcessual] = useState(processo?.rito_processual ?? '');
   const [checklistLocal, setChecklistLocal] = useState<string[]>(processo?.checklist_rito ?? []);
+  const [salvando, setSalvando] = useState(false);
 
   const handleRitoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const valor = e.target.value;
@@ -41,19 +50,57 @@ export default function NovoProcesso() {
     );
   };
 
-  const [faseAtualId, setFaseAtualId] = useState(processo?.fase_atual_id ?? '1');
   const [andamento, setAndamento] = useState(processo?.andamento ?? '');
 
   const hoje = new Date().toISOString().split('T')[0];
   const [dataEntrada, setDataEntrada] = useState(paraDataInput(processo?.data_entrada) || hoje);
-  const [ultimaTramitacao, setUltimaTramitacao] = useState(
-    paraDataInput(processo?.ultima_tramitacao) || hoje,
-  );
+
+  /**
+   * Grava o processo recém-criado também na planilha de controle (na
+   * última linha), pra ninguém precisar mexer nela manualmente. Só na
+   * criação — edições feitas no sistema não são replicadas pra planilha,
+   * já que setor atual/última tramitação vêm dela, não o contrário.
+   */
+  const alimentarPlanilha = async () => {
+    try {
+      let token = await getAccessToken();
+      if (!token) {
+        const resultado = await googleSignIn();
+        token = resultado?.accessToken ?? null;
+      }
+      if (!token) {
+        console.warn('Sem acesso ao Google: o processo não foi replicado na planilha.');
+        return;
+      }
+
+      await appendRowToSheet(
+        token,
+        ID_PLANILHA_PROCESSOS,
+        mapProcessoParaLinhaPlanilha({
+          numero_processo: numeroProcesso,
+          objeto,
+          descricao,
+          unidade_demandante: unidadeDemandante,
+          rito_processual: ritoProcessual,
+          andamento,
+          data_entrada: new Date(dataEntrada).toISOString(),
+          pca_id: pcaId,
+        }),
+      );
+    } catch (erro) {
+      console.error('Erro ao gravar o processo na planilha:', erro);
+      alert(
+        'O processo foi criado no sistema, mas não foi possível gravá-lo na planilha automaticamente: ' +
+          (erro instanceof Error ? erro.message : String(erro)),
+      );
+    }
+  };
 
   const handleSalvar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!numeroProcesso || !objeto || !unidadeDemandante) return;
 
+    setSalvando(true);
     try {
       if (emEdicao && id) {
         await updateProcesso(id, {
@@ -64,10 +111,8 @@ export default function NovoProcesso() {
           pca_id: pcaId || undefined,
           rito_processual: ritoProcessual,
           checklist_rito: checklistLocal,
-          fase_atual_id: faseAtualId,
           andamento,
           data_entrada: new Date(dataEntrada).toISOString(),
-          ultima_tramitacao: new Date(ultimaTramitacao).toISOString(),
         });
         navigate(`/sistema/processos/${id}`);
       } else {
@@ -80,11 +125,11 @@ export default function NovoProcesso() {
           pca_id: pcaId || undefined,
           rito_processual: ritoProcessual,
           checklist_rito: checklistLocal,
-          fase_atual_id: faseAtualId,
+          fase_atual_id: '1',
           andamento,
           data_entrada: new Date(dataEntrada).toISOString(),
-          ultima_tramitacao: new Date(ultimaTramitacao).toISOString(),
         });
+        await alimentarPlanilha();
         navigate('/sistema/aquisicoes');
       }
     } catch (erro) {
@@ -92,6 +137,8 @@ export default function NovoProcesso() {
         'Não foi possível salvar o processo: ' +
           (erro instanceof Error ? erro.message : String(erro)),
       );
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -218,15 +265,6 @@ export default function NovoProcesso() {
             </div>
 
             <div>
-              <label htmlFor="faseAtualId" className="block text-sm font-medium text-gray-700">Setor Atual <span className="text-red-500">*</span></label>
-              <select id="faseAtualId" value={faseAtualId} onChange={e => setFaseAtualId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
-                {setores.map(s => (
-                  <option key={s.id} value={s.id}>{s.nome} ({s.sigla})</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
               <label htmlFor="andamento" className="block text-sm font-medium text-gray-700">Andamento</label>
               <input type="text" id="andamento" value={andamento} onChange={e => setAndamento(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border" placeholder="Aguardando assinatura, Em análise..." />
             </div>
@@ -239,13 +277,12 @@ export default function NovoProcesso() {
               </p>
             </div>
 
-            <div>
-              <label htmlFor="ultimaTramitacao" className="block text-sm font-medium text-gray-700">Última Tramitação</label>
-              <input type="date" id="ultimaTramitacao" value={ultimaTramitacao} onChange={e => setUltimaTramitacao(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border" />
-              <p className="mt-1 text-xs text-gray-500">
-                Dias no setor atual: <span className="font-semibold text-gray-900">{ultimaTramitacao ? Math.max(0, differenceInDays(new Date(), new Date(`${ultimaTramitacao}T00:00:00`))) : 0} dias</span>
-              </p>
-            </div>
+            {emEdicao && (
+              <div className="md:col-span-2 rounded-md bg-blue-50 border border-blue-100 p-3 text-xs text-blue-800">
+                Setor atual e última tramitação são atualizados automaticamente pela sincronização com a
+                planilha de controle (PAE) e não são editáveis aqui.
+              </div>
+            )}
 
             <div className="md:col-span-2">
               <label htmlFor="objeto" className="block text-sm font-medium text-gray-700">
@@ -286,10 +323,11 @@ export default function NovoProcesso() {
             </button>
             <button
               type="submit"
-              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              disabled={salvando}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
             >
               <Save className="-ml-1 mr-2 h-5 w-5" />
-              {emEdicao ? 'Salvar Alterações' : 'Salvar Processo'}
+              {salvando ? 'Salvando...' : emEdicao ? 'Salvar Alterações' : 'Salvar Processo'}
             </button>
           </div>
         </form>

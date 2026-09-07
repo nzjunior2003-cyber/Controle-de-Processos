@@ -5,6 +5,7 @@ import { Search, Filter, AlertCircle, FilePlus, Clock, Database, List, RefreshCw
 import { differenceInDays } from 'date-fns';
 import IntegracaoPCA from './IntegracaoPCA';
 import type { StatusProcesso } from '../types';
+import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
 
 const STATUS_LABELS: Record<StatusProcesso, string> = {
   em_andamento: 'Em Andamento',
@@ -21,9 +22,6 @@ const STATUS_CORES: Record<StatusProcesso, string> = {
   concluido: 'bg-green-50 text-green-700 outline-green-200',
   arquivado: 'bg-gray-100 text-gray-600 outline-gray-300',
 };
-
-const URL_PLANILHA_PROCESSOS =
-  'https://docs.google.com/spreadsheets/d/1deakLqP8-enEgY384EkFyYedgo5WYSONjvYIBJDwqXE/edit?usp=sharing';
 
 export default function Aquisicoes() {
   const { processos, setores, usuarioAtual, syncProcessosDaPlanilha } = useApp();

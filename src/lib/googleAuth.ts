@@ -1,7 +1,8 @@
 /**
- * Google Sign-In usado APENAS para obter um access token do Google Drive
- * (anexar arquivos a contratos/execuções). É independente da autenticação
- * por e-mail/senha do sistema: roda numa instância secundária do Firebase
+ * Google Sign-In usado para obter um access token do Google (anexar
+ * arquivos a contratos/execuções via Drive, e gravar novos processos na
+ * planilha de controle via Sheets). É independente da autenticação por
+ * e-mail/senha do sistema: roda numa instância secundária do Firebase
  * ("drive"), de forma que abrir o popup do Google não derruba a sessão do
  * usuário logado no sistema.
  */
@@ -17,6 +18,7 @@ const DRIVE_APP = 'drive';
 
 const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/drive.file');
+provider.addScope('https://www.googleapis.com/auth/spreadsheets');
 
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
