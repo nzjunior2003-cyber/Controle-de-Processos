@@ -55,47 +55,6 @@ export default function NovoProcesso() {
   const hoje = new Date().toISOString().split('T')[0];
   const [dataEntrada, setDataEntrada] = useState(paraDataInput(processo?.data_entrada) || hoje);
 
-  /**
-   * Grava o processo recém-criado também na planilha de controle (na
-   * última linha), pra ninguém precisar mexer nela manualmente. Só na
-   * criação — edições feitas no sistema não são replicadas pra planilha,
-   * já que setor atual/última tramitação vêm dela, não o contrário.
-   */
-  const alimentarPlanilha = async () => {
-    try {
-      let token = await getAccessToken();
-      if (!token) {
-        const resultado = await googleSignIn();
-        token = resultado?.accessToken ?? null;
-      }
-      if (!token) {
-        console.warn('Sem acesso ao Google: o processo não foi replicado na planilha.');
-        return;
-      }
-
-      await appendRowToSheet(
-        token,
-        ID_PLANILHA_PROCESSOS,
-        mapProcessoParaLinhaPlanilha({
-          numero_processo: numeroProcesso,
-          objeto,
-          descricao,
-          unidade_demandante: unidadeDemandante,
-          rito_processual: ritoProcessual,
-          andamento,
-          data_entrada: new Date(dataEntrada).toISOString(),
-          pca_id: pcaId,
-        }),
-      );
-    } catch (erro) {
-      console.error('Erro ao gravar o processo na planilha:', erro);
-      alert(
-        'O processo foi criado no sistema, mas não foi possível gravá-lo na planilha automaticamente: ' +
-          (erro instanceof Error ? erro.message : String(erro)),
-      );
-    }
-  };
-
   const handleSalvar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!numeroProcesso || !objeto || !unidadeDemandante) return;
@@ -115,23 +74,71 @@ export default function NovoProcesso() {
           data_entrada: new Date(dataEntrada).toISOString(),
         });
         navigate(`/sistema/processos/${id}`);
-      } else {
-        await addProcesso({
-          numero_processo: numeroProcesso,
-          objeto,
-          descricao,
-          unidade_demandante: unidadeDemandante,
-          demandante_id: usuarioAtual?.id || '',
-          pca_id: pcaId || '',
-          rito_processual: ritoProcessual,
-          checklist_rito: checklistLocal,
-          fase_atual_id: '1',
-          andamento,
-          data_entrada: new Date(dataEntrada).toISOString(),
-        });
-        await alimentarPlanilha();
-        navigate('/sistema/aquisicoes');
+        return;
       }
+
+      // Pede a autorização do Google ANTES de gravar no Firestore: feita
+      // depois, o popup de login perde a associação com o clique do
+      // usuário e a maioria dos navegadores bloqueia silenciosamente.
+      let googleToken: string | null = null;
+      let erroGoogle: unknown = null;
+      try {
+        googleToken = await getAccessToken();
+        if (!googleToken) {
+          const resultado = await googleSignIn();
+          googleToken = resultado?.accessToken ?? null;
+        }
+      } catch (erro) {
+        erroGoogle = erro;
+      }
+
+      await addProcesso({
+        numero_processo: numeroProcesso,
+        objeto,
+        descricao,
+        unidade_demandante: unidadeDemandante,
+        demandante_id: usuarioAtual?.id || '',
+        pca_id: pcaId || '',
+        rito_processual: ritoProcessual,
+        checklist_rito: checklistLocal,
+        fase_atual_id: '1',
+        andamento,
+        data_entrada: new Date(dataEntrada).toISOString(),
+      });
+
+      if (!googleToken) {
+        alert(
+          'O processo foi criado no sistema, mas não foi possível conectar ao Google para ' +
+            'replicar na planilha automaticamente' +
+            (erroGoogle instanceof Error ? `: ${erroGoogle.message}` : '.') +
+            ' Adicione a linha manualmente ou tente sincronizar depois.',
+        );
+      } else {
+        try {
+          await appendRowToSheet(
+            googleToken,
+            ID_PLANILHA_PROCESSOS,
+            mapProcessoParaLinhaPlanilha({
+              numero_processo: numeroProcesso,
+              objeto,
+              descricao,
+              unidade_demandante: unidadeDemandante,
+              rito_processual: ritoProcessual,
+              andamento,
+              data_entrada: new Date(dataEntrada).toISOString(),
+              pca_id: pcaId,
+            }),
+          );
+        } catch (erroPlanilha) {
+          console.error('Erro ao gravar o processo na planilha:', erroPlanilha);
+          alert(
+            'O processo foi criado no sistema, mas não foi possível gravá-lo na planilha automaticamente: ' +
+              (erroPlanilha instanceof Error ? erroPlanilha.message : String(erroPlanilha)),
+          );
+        }
+      }
+
+      navigate('/sistema/aquisicoes');
     } catch (erro) {
       alert(
         'Não foi possível salvar o processo: ' +
