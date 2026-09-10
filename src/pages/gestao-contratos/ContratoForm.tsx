@@ -185,7 +185,7 @@ export default function ContratoForm() {
         portaria: form.portaria || '',
         fonteRecurso: form.fonteRecurso || '',
         prd: form.prd || '',
-        valorPRD: form.valorPRD ? Number(form.valorPRD.replace(',', '.')) : undefined,
+        ...(form.valorPRD ? { valorPRD: Number(form.valorPRD.replace(',', '.')) } : {}),
         empenho: form.empenho || '',
         dotacao: form.dotacao || '',
         linkContrato: form.linkContrato || null,
