@@ -143,7 +143,7 @@ async function updateContratoSheetRow(
   linha: number,
   valores: string[],
 ): Promise<void> {
-  await chamarSheetsApi(accessToken, spreadsheetId, 'PUT', rangeNaAbaContratos(`A${linha}:AA${linha}`), {
+  await chamarSheetsApi(accessToken, spreadsheetId, 'PUT', rangeNaAbaContratos(`A${linha}:AE${linha}`), {
     values: [valores],
   });
 }
@@ -165,7 +165,7 @@ async function localizarLinhaContrato(
     getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos('F:F')).then((l) =>
       l.map((v) => v[0] ?? ''),
     ),
-    getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos('A:Z')),
+    getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos('A:AE')),
   ]);
 
   const totalLinhas = Math.max(colunaNumero.length, linhasCompletas.length);
@@ -220,7 +220,7 @@ export async function sincronizarContratoNaPlanilha(
 
   const linhaExistente = ehNova
     ? undefined
-    : (await getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos(`A${linha}:AA${linha}`)))[0];
+    : (await getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos(`A${linha}:AE${linha}`)))[0];
 
   const valoresColunas = montarValoresColunasContrato(dados);
 

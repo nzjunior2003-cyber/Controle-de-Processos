@@ -1,19 +1,20 @@
 /**
- * Mapeamento das colunas da nova planilha "GESTÃO DE CONTRATOS - 2026
+ * Mapeamento das colunas da planilha "GESTÃO DE CONTRATOS - 2026
  * DESPESAS MENSAIS" (aba `ABA_GESTAO_CONTRATOS`) usada para sincronizar em
  * mão dupla com o sistema: ao criar/editar um contrato no app, grava/
  * atualiza a linha correspondente na aba; ao clicar em "Sincronizar
  * Planilha", importa da aba os contratos que ainda não existem no app e
  * atualiza os que já existem. Colunas que o app não gerencia (Data de
- * Emissão, Alerta, Recebimentos por ano, Valor Aditivado, Valor do
+ * Emissão, Alerta, Ano Exercício, Valor Global/Recebido/Saldo "da
+ * Vigência", Recebimentos por ano, Valor Aditivado, Valor do
  * Empenho/Reforçado/Recebido/Liquidado — controle financeiro manual da
  * planilha) nunca são tocadas por essa sincronização.
  *
- * A planilha tem, abaixo da tabela principal (linhas com "Nº" numérico na
- * coluna A), uma segunda tabela solta com estrutura diferente (controle
- * avulso de alguns contratos de serviço) — `limiteLinhasValidas` acha o
- * fim da tabela principal (primeira linha com a coluna "Nº" em branco)
- * pra essa segunda tabela nunca ser lida/sobrescrita por engano.
+ * A planilha é, na prática, várias sub-tabelas coladas manualmente ao
+ * longo do ano (cada uma com seu próprio título repetido e às vezes uma
+ * segunda tabela solta com colunas deslocadas) — `linhaTemOrdemValida`
+ * reconhece uma linha de contrato de verdade (a única constante entre
+ * as sub-tabelas é ter um número inteiro na coluna "Nº"/Ordem).
  */
 import type { Contrato } from '../types';
 import { parseCurrencyBR, parseDataBR } from './csv';
@@ -31,18 +32,18 @@ export const COLUNA_CONTRATO = {
   INICIO_VIGENCIA: 6,
   ALERTA: 7,
   FIM_VIGENCIA: 8,
-  CONTRATADA: 9,
-  OBJETO: 10,
-  VALOR_GLOBAL: 11,
-  SALDO: 22,
-  FISCAL_TITULAR: 23,
-  FISCAL_SUPLENTE: 24,
-  DEMANDANTE: 25,
-  PCA: 26,
+  CONTRATADA: 13,
+  OBJETO: 14,
+  VALOR_GLOBAL: 15,
+  SALDO: 26,
+  FISCAL_TITULAR: 27,
+  FISCAL_SUPLENTE: 28,
+  DEMANDANTE: 29,
+  PCA: 30,
 } as const;
 
-/** A..AA (0..26) — cobre até a coluna PCA, a última que o app usa. */
-export const TOTAL_COLUNAS_PLANILHA_CONTRATOS = 27;
+/** A..AE (0..30) — cobre até a coluna PCA, a última que o app usa. */
+export const TOTAL_COLUNAS_PLANILHA_CONTRATOS = 31;
 
 const REGEX_CNPJ = /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/;
 

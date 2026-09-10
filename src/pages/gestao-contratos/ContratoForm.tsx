@@ -131,7 +131,6 @@ export default function ContratoForm() {
   const [erro, setErro] = useState<string | null>(null);
 
   const camposInvalidos =
-    !form.pae ||
     !form.numero ||
     !form.objeto ||
     !form.empresa ||
