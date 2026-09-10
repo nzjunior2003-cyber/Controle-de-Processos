@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { AlertCircle, BellRing, Clock, FileText, Filter, Mail, PlusCircle, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
-import { URL_PLANILHA_CONTRATOS } from '../../lib/csv';
-import { initAuth } from '../../lib/googleAuth';
+import type { Contrato } from '../../types';
+import { ID_PLANILHA_CONTRATOS, URL_PLANILHA_CONTRATOS } from '../../lib/csv';
+import { getAccessToken, initAuth } from '../../lib/googleAuth';
+import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
+import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
 import { AlertasModal } from '../../components/AlertasModal';
 import KpisContratos, { type FiltroKpi } from '../../components/contratos/KpisContratos';
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
@@ -15,6 +18,30 @@ import {
   filtrarContratosPorGestor,
   type ContratoComStatus,
 } from '../../lib/contratos';
+
+/**
+ * Depois de uma execução (NF) ou aditivo lançado no app mudar o saldo/
+ * valor global do contrato, empurra esses campos de volta pra planilha —
+ * só se já houver uma sessão Google autenticada (não força um popup de
+ * login no meio do lançamento); falha aqui não deve travar o fluxo.
+ */
+async function pushSaldoNaPlanilha(
+  contrato: ContratoComStatus,
+  atualizacao: Partial<Pick<Contrato, 'valorGlobal' | 'saldoAtualFinanceiro'>>,
+): Promise<void> {
+  try {
+    const googleToken = await getAccessToken();
+    if (!googleToken) return;
+    await sincronizarContratoNaPlanilha(
+      googleToken,
+      ID_PLANILHA_CONTRATOS,
+      contratoParaDadosPlanilha({ ...contrato, ...atualizacao }),
+      contrato.planilha_linha,
+    );
+  } catch (erro) {
+    console.error('Erro ao sincronizar saldo do contrato com a planilha:', erro);
+  }
+}
 
 export default function GestaoContratos() {
   const {
@@ -274,7 +301,10 @@ export default function GestaoContratos() {
           aditivos={aditivos.filter((a) => a.contratoId === contratoModalAtivo.id)}
           comOcorrencias
           comAditivos={isMasterOrGestao}
-          onAddExecucao={(execucao) => addExecucao(execucao)}
+          onAddExecucao={async (execucao) => {
+            const novoSaldo = await addExecucao(execucao);
+            await pushSaldoNaPlanilha(contratoModalAtivo, novoSaldo);
+          }}
           onAddOcorrencia={({ descricao, tipo }) =>
             addOcorrencia({
               contratoId: contratoModalAtivo.id,
@@ -285,14 +315,17 @@ export default function GestaoContratos() {
               registradoPorNome: usuarioAtual?.nome ?? '',
             })
           }
-          onAddAditivo={(dados) =>
-            addAditivo({
+          onAddAditivo={async (dados) => {
+            const atualizacao = await addAditivo({
               ...dados,
               contratoId: contratoModalAtivo.id,
               registradoPorId: usuarioAtual?.id ?? '',
               registradoPorNome: usuarioAtual?.nome ?? '',
-            })
-          }
+            });
+            if (Object.keys(atualizacao).length > 0) {
+              await pushSaldoNaPlanilha(contratoModalAtivo, atualizacao);
+            }
+          }}
           onFechar={() => setContratoSelecionado(null)}
         />
       )}

@@ -1,34 +1,50 @@
 /**
- * Mapeamento das colunas da planilha "Gestão de Contratos" usadas para
- * sincronizar em mão dupla com o sistema: ao criar/editar um contrato no
- * app, grava/atualiza a linha correspondente na aba
- * `ABA_GESTAO_CONTRATOS`; colunas que o app não gerencia (Tipo, Unidade
- * Gestora, Dados do Fiscal, pasta/rótulo do contrato etc. — algumas com
- * cabeçalho desalinhado dos dados reais nessa planilha legada) nunca são
- * tocadas por essa sincronização — continuam só do preenchimento manual.
- * A leitura (planilha -> app) usa os mesmos índices de coluna, por posição
- * em vez de nome de cabeçalho, pelo mesmo motivo do desalinhamento.
+ * Mapeamento das colunas da nova planilha "GESTÃO DE CONTRATOS - 2026
+ * DESPESAS MENSAIS" (aba `ABA_GESTAO_CONTRATOS`) usada para sincronizar em
+ * mão dupla com o sistema: ao criar/editar um contrato no app, grava/
+ * atualiza a linha correspondente na aba; ao clicar em "Sincronizar
+ * Planilha", importa da aba os contratos que ainda não existem no app e
+ * atualiza os que já existem. Colunas que o app não gerencia (Data de
+ * Emissão, Alerta, Recebimentos por ano, Valor Aditivado, Valor do
+ * Empenho/Reforçado/Recebido/Liquidado — controle financeiro manual da
+ * planilha) nunca são tocadas por essa sincronização.
+ *
+ * A planilha tem, abaixo da tabela principal (linhas com "Nº" numérico na
+ * coluna A), uma segunda tabela solta com estrutura diferente (controle
+ * avulso de alguns contratos de serviço) — `limiteLinhasValidas` acha o
+ * fim da tabela principal (primeira linha com a coluna "Nº" em branco)
+ * pra essa segunda tabela nunca ser lida/sobrescrita por engano.
  */
+import type { Contrato } from '../types';
 import { parseCurrencyBR, parseDataBR } from './csv';
 
-export const ABA_GESTAO_CONTRATOS = 'GESTÃO DE CONTRATOS - 2026 - GERAL';
+export const ABA_GESTAO_CONTRATOS = 'GERAL';
 
-/** Índices (0-based) das colunas da planilha que o app pode gravar/atualizar. */
+/** Índices (0-based) das colunas da planilha que o app pode ler/gravar. */
 export const COLUNA_CONTRATO = {
   ORDEM: 0,
-  EMPRESA: 2,
-  N_CONTRATO: 3,
-  PRD: 4,
-  VALOR_PRD: 5,
-  N_EMPENHO: 6,
-  STATUS: 7,
-  OBJETO: 8,
-  INICIO_VIGENCIA: 9,
-  TERMINO_VIGENCIA: 10,
-  CNPJ: 17,
+  EMPENHO: 1,
+  PRD: 2,
+  DATA_EMISSAO: 3,
+  PAE: 4,
+  N_CONTRATO: 5,
+  INICIO_VIGENCIA: 6,
+  ALERTA: 7,
+  FIM_VIGENCIA: 8,
+  CONTRATADA: 9,
+  OBJETO: 10,
+  VALOR_GLOBAL: 11,
+  SALDO: 22,
+  FISCAL_TITULAR: 23,
+  FISCAL_SUPLENTE: 24,
+  DEMANDANTE: 25,
+  PCA: 26,
 } as const;
 
+/** A..AA (0..26) — cobre até a coluna PCA, a última que o app usa. */
 export const TOTAL_COLUNAS_PLANILHA_CONTRATOS = 27;
+
+const REGEX_CNPJ = /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/;
 
 function paraDataBR(iso?: string): string {
   const data = iso ? new Date(iso) : undefined;
@@ -39,22 +55,29 @@ function paraDataBR(iso?: string): string {
 }
 
 function formatarValorParaPlanilha(valor?: number): string {
-  if (typeof valor !== 'number' || !Number.isFinite(valor) || valor === 0) return '';
+  if (typeof valor !== 'number' || !Number.isFinite(valor)) return '';
   return `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-/** Mesmos rótulos de status usados na planilha para a coluna H, a partir do status calculado em `contratos.ts`. */
-export function statusParaTextoPlanilha(
-  status: 'VIGENTE' | 'FALTA MENOS DE 90 DIAS' | 'FALTA MENOS DE 30 DIAS' | 'VENCIDO',
-): string {
-  switch (status) {
-    case 'FALTA MENOS DE 90 DIAS':
-      return 'FALTA MENOS DE 90 DIAS PARA O FIM';
-    case 'FALTA MENOS DE 30 DIAS':
-      return 'FALTA MENOS DE 30 DIAS PARA O FIM';
-    default:
-      return status;
-  }
+/**
+ * A célula "Contratada" traz o nome da empresa e, às vezes, o CNPJ numa
+ * linha separada dentro da mesma célula. Separa os dois; se não achar um
+ * CNPJ reconhecível, devolve o texto inteiro como nome da empresa.
+ */
+function separarEmpresaECnpj(texto: string): { empresa: string; cnpj?: string } {
+  const linhas = texto
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const linhaCnpj = linhas.find((l) => REGEX_CNPJ.test(l));
+  const cnpj = linhaCnpj?.match(REGEX_CNPJ)?.[0];
+  const empresa = linhas.filter((l) => l !== linhaCnpj).join(' ').trim();
+  return { empresa: empresa || texto.trim(), cnpj };
+}
+
+/** Inverso de `separarEmpresaECnpj`, pra gravar de volta no mesmo formato da célula. */
+function composeContratada(empresa: string, cnpj?: string): string {
+  return cnpj ? `${empresa}\n${cnpj}` : empresa;
 }
 
 export interface DadosContratoParaPlanilha {
@@ -62,34 +85,86 @@ export interface DadosContratoParaPlanilha {
   empresa: string;
   objeto: string;
   cnpj?: string;
+  pae?: string;
   prd?: string;
-  valorPRD?: number;
   empenho?: string;
+  valorGlobal?: number;
+  saldoAtualFinanceiro?: number;
   inicioVigencia?: string;
   fimVigencia?: string;
-  status: 'VIGENTE' | 'FALTA MENOS DE 90 DIAS' | 'FALTA MENOS DE 30 DIAS' | 'VENCIDO';
+  fiscalTitular?: string;
+  fiscalSuplente?: string;
+  /** Só é gravada na planilha quando informada — não existe campo próprio no cadastro do app hoje. */
+  unidadeDemandante?: string;
+  /** Idem: só é gravada quando informada, pra não apagar o preenchimento manual na planilha. */
+  pcaCodigo?: string;
+}
+
+/** Monta um `DadosContratoParaPlanilha` a partir de um Contrato do app. */
+export function contratoParaDadosPlanilha(
+  contrato: Pick<
+    Contrato,
+    | 'numero'
+    | 'empresa'
+    | 'objeto'
+    | 'cnpj'
+    | 'pae'
+    | 'prd'
+    | 'empenho'
+    | 'valorGlobal'
+    | 'saldoAtualFinanceiro'
+    | 'inicioVigencia'
+    | 'fimVigencia'
+    | 'fiscalTitular'
+    | 'fiscalSuplente'
+  >,
+): DadosContratoParaPlanilha {
+  return {
+    numero: contrato.numero,
+    empresa: contrato.empresa,
+    objeto: contrato.objeto,
+    cnpj: contrato.cnpj,
+    pae: contrato.pae,
+    prd: contrato.prd,
+    empenho: contrato.empenho,
+    valorGlobal: contrato.valorGlobal,
+    saldoAtualFinanceiro: contrato.saldoAtualFinanceiro,
+    inicioVigencia: contrato.inicioVigencia,
+    fimVigencia: contrato.fimVigencia,
+    fiscalTitular: contrato.fiscalTitular,
+    fiscalSuplente: contrato.fiscalSuplente,
+  };
 }
 
 /**
  * Monta só os valores das colunas que o app gerencia, num mapa
  * índice-da-coluna -> valor — pra mesclar numa linha existente sem mexer
- * no resto (Tipo, Unidade Gestora, Dados do Fiscal etc.).
+ * no resto (Data de Emissão, Alerta, Recebimentos por ano etc.).
+ * Demandante e PCA só entram no mapa quando informados, porque o
+ * cadastro do app ainda não tem esses campos — sem essa checagem, gravar
+ * um contrato existente apagaria o que já estava preenchido manualmente
+ * na planilha.
  */
 export function montarValoresColunasContrato(
   dados: DadosContratoParaPlanilha,
 ): Record<number, string> {
-  return {
-    [COLUNA_CONTRATO.EMPRESA]: dados.empresa,
+  const valores: Record<number, string> = {
+    [COLUNA_CONTRATO.CONTRATADA]: composeContratada(dados.empresa, dados.cnpj),
     [COLUNA_CONTRATO.N_CONTRATO]: dados.numero,
+    [COLUNA_CONTRATO.PAE]: dados.pae || '',
     [COLUNA_CONTRATO.PRD]: dados.prd || '',
-    [COLUNA_CONTRATO.VALOR_PRD]: formatarValorParaPlanilha(dados.valorPRD),
-    [COLUNA_CONTRATO.N_EMPENHO]: dados.empenho || '',
-    [COLUNA_CONTRATO.STATUS]: statusParaTextoPlanilha(dados.status),
+    [COLUNA_CONTRATO.EMPENHO]: dados.empenho || '',
     [COLUNA_CONTRATO.OBJETO]: dados.objeto,
+    [COLUNA_CONTRATO.VALOR_GLOBAL]: formatarValorParaPlanilha(dados.valorGlobal),
+    [COLUNA_CONTRATO.SALDO]: formatarValorParaPlanilha(dados.saldoAtualFinanceiro),
     [COLUNA_CONTRATO.INICIO_VIGENCIA]: paraDataBR(dados.inicioVigencia),
-    [COLUNA_CONTRATO.TERMINO_VIGENCIA]: paraDataBR(dados.fimVigencia),
-    [COLUNA_CONTRATO.CNPJ]: dados.cnpj || '',
+    [COLUNA_CONTRATO.FIM_VIGENCIA]: paraDataBR(dados.fimVigencia),
+    [COLUNA_CONTRATO.FISCAL_TITULAR]: dados.fiscalTitular || '',
+    [COLUNA_CONTRATO.FISCAL_SUPLENTE]: dados.fiscalSuplente || '',
   };
+  if (dados.unidadeDemandante) valores[COLUNA_CONTRATO.DEMANDANTE] = dados.unidadeDemandante;
+  if (dados.pcaCodigo) valores[COLUNA_CONTRATO.PCA] = dados.pcaCodigo;
+  return valores;
 }
 
 /**
@@ -118,48 +193,85 @@ export function proximoNumeroSequencialContrato(valorLinhaAnterior: string | und
   return Number.isFinite(numero) && numero > 0 ? String(numero + 1) : '1';
 }
 
+/**
+ * A aba "GERAL" é, na prática, várias sub-tabelas coladas manualmente uma
+ * embaixo da outra ao longo do ano (uma por leva de contratos), cada uma
+ * com sua própria linha de título repetida e às vezes uma linha em
+ * branco de separação — mas só as linhas de contrato de verdade têm um
+ * número inteiro preenchido na coluna "Nº" (Ordem); título, separador e
+ * a segunda tabela solta de controle avulso (mais abaixo, com colunas
+ * deslocadas) sempre têm essa coluna em branco. Por isso, "a linha é de
+ * um contrato" se resume a essa única checagem — sem precisar achar
+ * onde a tabela "termina".
+ */
+export function linhaTemOrdemValida(valorOrdem: string | undefined): boolean {
+  return /^\d+$/.test((valorOrdem ?? '').trim());
+}
+
 /** Dados de um Contrato extraídos de uma linha (posicional) da planilha. */
 export interface ContratoDaPlanilha {
   numero: string;
   empresa: string;
   objeto: string;
   cnpj?: string;
+  pae?: string;
   prd?: string;
-  valorPRD?: number;
   empenho?: string;
+  valorGlobal?: number;
+  saldoAtualFinanceiro?: number;
   inicioVigencia?: string;
   fimVigencia?: string;
+  fiscalTitular?: string;
+  fiscalSuplente?: string;
+  unidadeDemandante?: string;
+  pcaCodigo?: string;
 }
 
 /**
  * Mapeia uma linha posicional (array de colunas, sem cabeçalho) da aba
- * "Gestão de Contratos" para os campos que o app consegue preencher.
- * Devolve null quando a linha não tem N° do Contrato (não dá pra
- * localizar/atualizar sem essa chave).
+ * "GERAL" para os campos que o app consegue preencher. Devolve null
+ * quando a linha não tem N° do Contrato (não dá pra localizar/atualizar
+ * sem essa chave — é também o sinal de que a linha é de fato um contrato,
+ * não uma linha em branco ou de outra seção da planilha).
  */
 export function mapLinhaContratoDaPlanilha(colunas: string[]): ContratoDaPlanilha | null {
   const numero = (colunas[COLUNA_CONTRATO.N_CONTRATO] ?? '').trim();
   if (!numero) return null;
 
-  const valorPRDTexto = (colunas[COLUNA_CONTRATO.VALOR_PRD] ?? '').trim();
+  const { empresa, cnpj } = separarEmpresaECnpj((colunas[COLUNA_CONTRATO.CONTRATADA] ?? '').trim());
+  const valorGlobalTexto = (colunas[COLUNA_CONTRATO.VALOR_GLOBAL] ?? '').trim();
+  const saldoTexto = (colunas[COLUNA_CONTRATO.SALDO] ?? '').trim();
 
   return {
     numero,
-    empresa: (colunas[COLUNA_CONTRATO.EMPRESA] ?? '').trim(),
+    empresa,
+    cnpj,
     objeto: (colunas[COLUNA_CONTRATO.OBJETO] ?? '').trim(),
-    cnpj: (colunas[COLUNA_CONTRATO.CNPJ] ?? '').trim() || undefined,
+    pae: (colunas[COLUNA_CONTRATO.PAE] ?? '').trim() || undefined,
     prd: (colunas[COLUNA_CONTRATO.PRD] ?? '').trim() || undefined,
-    valorPRD: valorPRDTexto ? parseCurrencyBR(valorPRDTexto) : undefined,
-    empenho: (colunas[COLUNA_CONTRATO.N_EMPENHO] ?? '').trim() || undefined,
+    empenho: (colunas[COLUNA_CONTRATO.EMPENHO] ?? '').trim() || undefined,
+    valorGlobal: valorGlobalTexto ? parseCurrencyBR(valorGlobalTexto) : undefined,
+    saldoAtualFinanceiro: saldoTexto ? parseCurrencyBR(saldoTexto) : undefined,
     inicioVigencia: parseDataBR(colunas[COLUNA_CONTRATO.INICIO_VIGENCIA]),
-    fimVigencia: parseDataBR(colunas[COLUNA_CONTRATO.TERMINO_VIGENCIA]),
+    fimVigencia: parseDataBR(colunas[COLUNA_CONTRATO.FIM_VIGENCIA]),
+    fiscalTitular: (colunas[COLUNA_CONTRATO.FISCAL_TITULAR] ?? '').trim() || undefined,
+    fiscalSuplente: (colunas[COLUNA_CONTRATO.FISCAL_SUPLENTE] ?? '').trim() || undefined,
+    unidadeDemandante: (colunas[COLUNA_CONTRATO.DEMANDANTE] ?? '').trim() || undefined,
+    pcaCodigo: (colunas[COLUNA_CONTRATO.PCA] ?? '').trim() || undefined,
   };
 }
 
 /**
  * Acha a linha (1-based, contando o cabeçalho como linha 1) onde gravar um
- * contrato: a que já tem o mesmo N° Contrato (coluna D), ou — se for um
- * contrato novo — a primeira linha em branco nessa coluna.
+ * contrato: a que já tem o mesmo N° Contrato (coluna F) — comparação
+ * exata, então não corre risco de bater com um número de empenho da
+ * segunda tabela solta da planilha (formato bem diferente). Um contrato
+ * novo é sempre acrescentado depois da última linha com algum conteúdo
+ * em `colunaNumero` (que deve cobrir a extensão real da aba, não só a
+ * tabela principal) — nunca reaproveita uma célula em branco no meio,
+ * porque na aba "GERAL" uma coluna "Nº Contrato" em branco não significa
+ * uma linha livre: é comum uma linha já ter PRD/Empenho preenchidos e o
+ * contrato ainda não ter sido formalizado.
  */
 export function acharLinhaParaContrato(
   colunaNumero: string[],
@@ -169,11 +281,6 @@ export function acharLinhaParaContrato(
   for (let i = 1; i < colunaNumero.length; i++) {
     if ((colunaNumero[i] ?? '').trim() === numeroNormalizado) {
       return { linha: i + 1, ehNova: false };
-    }
-  }
-  for (let i = 1; i < colunaNumero.length; i++) {
-    if (!(colunaNumero[i] ?? '').trim()) {
-      return { linha: i + 1, ehNova: true };
     }
   }
   return { linha: colunaNumero.length + 1, ehNova: true };

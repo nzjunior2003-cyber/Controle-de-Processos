@@ -6,7 +6,7 @@ import type { Contrato } from '../../types';
 import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
-import { calcularStatusContrato } from '../../lib/contratos';
+import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
 
 const CLASSE_INPUT =
   'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm';
@@ -224,22 +224,10 @@ export default function ContratoForm() {
         );
       } else {
         try {
-          const status = calcularStatusContrato({ ...dados, id: contratoId } as Contrato).status;
           const linha = await sincronizarContratoNaPlanilha(
             googleToken,
             ID_PLANILHA_CONTRATOS,
-            {
-              numero: dados.numero,
-              empresa: dados.empresa,
-              objeto: dados.objeto,
-              cnpj: dados.cnpj,
-              prd: dados.prd,
-              valorPRD: dados.valorPRD,
-              empenho: dados.empenho,
-              inicioVigencia: dados.inicioVigencia,
-              fimVigencia: dados.fimVigencia,
-              status,
-            },
+            contratoParaDadosPlanilha(dados),
             contrato?.planilha_linha,
           );
           if (linha !== contrato?.planilha_linha) {

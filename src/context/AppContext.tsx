@@ -47,6 +47,7 @@ import {
 import { localizacaoEfetiva, type EstadaProcesso } from '../lib/fluxoProcesso';
 import {
   ABA_GESTAO_CONTRATOS,
+  linhaTemOrdemValida,
   mapLinhaContratoDaPlanilha,
   type ContratoDaPlanilha,
 } from '../lib/planilhaContratos';
@@ -147,10 +148,12 @@ interface AppContextData {
   addContrato: (dados: Omit<Contrato, 'id'>) => Promise<string>;
   updateContrato: (id: string, dados: Partial<Contrato>) => Promise<void>;
   deleteContrato: (id: string) => Promise<void>;
-  addExecucao: (dados: Omit<ExecucaoContrato, 'id'>) => Promise<void>;
+  addExecucao: (
+    dados: Omit<ExecucaoContrato, 'id'>,
+  ) => Promise<{ saldoAtualFinanceiro: number; saldoAtualQuantitativo?: number }>;
   deleteExecucao: (id: string, contratoId: string) => Promise<void>;
   addOcorrencia: (dados: Omit<Ocorrencia, 'id'>) => Promise<void>;
-  addAditivo: (dados: Omit<Aditivo, 'id'>) => Promise<void>;
+  addAditivo: (dados: Omit<Aditivo, 'id'>) => Promise<Partial<Contrato>>;
   addProcedimento: (dados: Omit<ProcedimentoLicitatorio, 'id'>) => Promise<void>;
   updateProcedimento: (id: string, dados: Partial<ProcedimentoLicitatorio>) => Promise<void>;
   addSancionatorio: (dados: Omit<ProcessoSancionatorio, 'id'>) => Promise<void>;
@@ -660,12 +663,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 
   /**
-   * Importa os contratos da aba "Gestão de Contratos" da planilha para o
-   * app: cria os que ainda não existem (casando pelo N° do Contrato) e
-   * atualiza os campos que a planilha controla nos que já existem. Como a
-   * planilha não tem valor global/saldo (conceito só do app, usado para
-   * abater as execuções), um contrato novo importado usa o Valor do PRD
-   * como estimativa inicial de saldo — o Gestor pode corrigir na edição.
+   * Importa os contratos da aba "GERAL" da planilha para o app: cria os
+   * que ainda não existem (casando pelo N° do Contrato) e atualiza os
+   * campos que a planilha controla nos que já existem — incluindo Valor
+   * Global e Saldo Atual, que aqui são sempre sobrescritos pelo valor da
+   * planilha (a pedido: sincronização mútua desses dois campos, e não só
+   * na criação). Por isso, depois de rodar isso, qualquer execução (NF)
+   * lançada no app que ainda não tenha sido refletida na planilha (ver
+   * `pushSaldoAposMovimentacao` em GestaoContratos) seria sobrescrita —
+   * o cadastro/edição de contrato e o lançamento de execuções empurram o
+   * saldo de volta pra planilha assim que acontecem, pelo mesmo motivo.
+   *
+   * A tabela principal da aba termina na primeira linha com a coluna "Nº"
+   * (Ordem) em branco — abaixo dela há uma segunda tabela solta com
+   * colunas deslocadas que não pode ser lida por engano (`limiteLinhasValidas`).
    */
   const syncContratosDaPlanilha = useCallback(
     async (url: string) => {
@@ -694,8 +705,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         });
       });
 
-      // A primeira linha é cabeçalho; os dados reais começam na segunda.
-      const linhasDeDados = linhas.slice(1);
+      // A aba "GERAL" é várias sub-tabelas coladas manualmente ao longo do
+      // ano (cada uma com seu próprio título repetido, às vezes uma
+      // segunda tabela solta de controle avulso com colunas deslocadas) —
+      // só uma linha de contrato de verdade tem um número inteiro na
+      // coluna "Nº" (Ordem); título/separador/segunda tabela não têm.
+      const linhasDeDados = linhas.slice(1).filter((linha) => linhaTemOrdemValida(linha[0]));
       const validos = linhasDeDados
         .map((linha) => mapLinhaContratoDaPlanilha(linha))
         .filter((c): c is ContratoDaPlanilha => c !== null);
@@ -709,7 +724,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const agora = new Date().toISOString();
 
         validos.slice(inicio, inicio + 400).forEach((dados) => {
-          const { numero, ...resto } = dados;
+          const { numero, valorGlobal, saldoAtualFinanceiro, ...resto } = dados;
           const campos = Object.fromEntries(
             Object.entries(resto).filter(([, v]) => v !== undefined),
           );
@@ -721,21 +736,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           if (idExistente) {
             lote.set(
               doc(db, 'contratos', idExistente),
-              { ...campos, numero, atualizado_em: agora },
+              {
+                ...campos,
+                numero,
+                ...(valorGlobal !== undefined ? { valorGlobal } : {}),
+                ...(saldoAtualFinanceiro !== undefined ? { saldoAtualFinanceiro } : {}),
+                atualizado_em: agora,
+              },
               { merge: true },
             );
             atualizados++;
           } else {
             const novaRef = doc(collection(db, 'contratos'));
             idsCriadosNestaSincronizacao.set(numero, novaRef.id);
-            const valorBase = dados.valorPRD ?? 0;
+            const valorBase = valorGlobal ?? 0;
             lote.set(novaRef, {
               ...campos,
               numero,
-              pae: '',
+              pae: campos.pae ?? '',
               valorGlobal: valorBase,
               saldoInicialFinanceiro: valorBase,
-              saldoAtualFinanceiro: valorBase,
+              saldoAtualFinanceiro: saldoAtualFinanceiro ?? valorBase,
               inicioVigencia: dados.inicioVigencia || agora,
               fimVigencia: dados.fimVigencia || agora,
               criado_em: agora,
@@ -1028,30 +1049,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const execucaoRef = doc(collection(db, 'execucoes'));
     const agora = new Date().toISOString();
 
-    await runTransaction(db, async (transacao) => {
+    const novoSaldo = await runTransaction(db, async (transacao) => {
       const contratoSnap = await transacao.get(contratoRef);
       if (!contratoSnap.exists()) {
         throw new Error('Contrato não encontrado.');
       }
       const contrato = contratoSnap.data() as Contrato;
-      const novoSaldo = abaterSaldo(contrato, dados);
+      const saldo = abaterSaldo(contrato, dados);
 
-      if (novoSaldo.saldoAtualFinanceiro < 0) {
+      if (saldo.saldoAtualFinanceiro < 0) {
         console.warn(
-          `Saldo financeiro do contrato ${dados.contratoId} ficou negativo: ${novoSaldo.saldoAtualFinanceiro}`,
+          `Saldo financeiro do contrato ${dados.contratoId} ficou negativo: ${saldo.saldoAtualFinanceiro}`,
         );
       }
-      if ((novoSaldo.saldoAtualQuantitativo ?? 0) < 0 && 'saldoAtualQuantitativo' in novoSaldo) {
+      if ((saldo.saldoAtualQuantitativo ?? 0) < 0 && 'saldoAtualQuantitativo' in saldo) {
         console.warn(
-          `Saldo quantitativo do contrato ${dados.contratoId} ficou negativo: ${novoSaldo.saldoAtualQuantitativo}`,
+          `Saldo quantitativo do contrato ${dados.contratoId} ficou negativo: ${saldo.saldoAtualQuantitativo}`,
         );
       }
 
       transacao.set(execucaoRef, { ...dados, criado_em: agora });
-      transacao.update(contratoRef, { ...novoSaldo, atualizado_em: agora });
+      transacao.update(contratoRef, { ...saldo, atualizado_em: agora });
+      return saldo;
     });
 
     await registrarAuditoria('execucoes', execucaoRef.id, 'CREATE', dados);
+    return novoSaldo;
   }, [registrarAuditoria]);
 
   /** Remove uma execução e devolve valor/quantidade ao saldo atual do contrato. */
@@ -1156,6 +1179,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       await registrarAuditoria('aditivos', aditivoRef.id, 'CREATE', dados);
       await registrarAuditoria('contratos', dados.contratoId, 'UPDATE', atualizacaoContrato, contratoAntes);
+      return atualizacaoContrato;
     },
     [usuarioAtual, registrarAuditoria],
   );

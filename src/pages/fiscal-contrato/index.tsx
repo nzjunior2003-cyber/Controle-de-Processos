@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FileCheck, Filter, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { initAuth } from '../../lib/googleAuth';
+import type { Contrato } from '../../types';
+import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
+import { getAccessToken, initAuth } from '../../lib/googleAuth';
+import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
+import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
 import KpisContratos from '../../components/contratos/KpisContratos';
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
 import ExecucaoModal from '../../components/contratos/ExecucaoModal';
@@ -11,6 +15,30 @@ import {
   filtrarContratosDoFiscal,
   type ContratoComStatus,
 } from '../../lib/contratos';
+
+/**
+ * Depois de uma execução (NF) lançada no app mudar o saldo do contrato,
+ * empurra esse campo de volta pra planilha — só se já houver uma sessão
+ * Google autenticada (não força um popup de login no meio do
+ * lançamento); falha aqui não deve travar o fluxo do fiscal.
+ */
+async function pushSaldoNaPlanilha(
+  contrato: ContratoComStatus,
+  atualizacao: Partial<Pick<Contrato, 'valorGlobal' | 'saldoAtualFinanceiro'>>,
+): Promise<void> {
+  try {
+    const googleToken = await getAccessToken();
+    if (!googleToken) return;
+    await sincronizarContratoNaPlanilha(
+      googleToken,
+      ID_PLANILHA_CONTRATOS,
+      contratoParaDadosPlanilha({ ...contrato, ...atualizacao }),
+      contrato.planilha_linha,
+    );
+  } catch (erro) {
+    console.error('Erro ao sincronizar saldo do contrato com a planilha:', erro);
+  }
+}
 
 export default function FiscalContrato() {
   const { processos, pcas, usuarioAtual, contratos, execucoes, addExecucao, ocorrencias, addOcorrencia } =
@@ -115,7 +143,10 @@ export default function FiscalContrato() {
           ocorrencias={ocorrencias.filter((o) => o.contratoId === contratoModalAtivo.id)}
           comQuantidade
           comOcorrencias
-          onAddExecucao={(execucao) => addExecucao(execucao)}
+          onAddExecucao={async (execucao) => {
+            const novoSaldo = await addExecucao(execucao);
+            await pushSaldoNaPlanilha(contratoModalAtivo, novoSaldo);
+          }}
           onAddOcorrencia={({ descricao, tipo }) =>
             addOcorrencia({
               contratoId: contratoModalAtivo.id,

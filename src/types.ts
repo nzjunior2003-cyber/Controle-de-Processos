@@ -263,6 +263,10 @@ export interface Contrato {
    * aos contratos do seu Gestor responsável.
    */
   gestorGeralId?: string;
+  /** Unidade demandante do contrato (só vem da sincronização com a planilha — sem campo próprio no cadastro ainda). */
+  unidadeDemandante?: string;
+  /** Código do PCA vinculado, como texto livre (só vem da sincronização com a planilha). */
+  pcaCodigo?: string;
   /** Linha (1-based) da planilha "Gestão de Contratos" onde este contrato está sincronizado. */
   planilha_linha?: number;
   criado_em?: string;

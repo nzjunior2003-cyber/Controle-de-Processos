@@ -149,15 +149,45 @@ async function updateContratoSheetRow(
 }
 
 /**
- * Cria ou atualiza a linha de um contrato na aba "Gestão de Contratos":
+ * Busca a linha de um contrato pelo N° Contrato (coluna F) da aba "GERAL".
+ * Um contrato novo é sempre acrescentado depois da última linha com
+ * QUALQUER conteúdo na aba inteira (`A:Z`, não só a coluna F) — a aba tem
+ * várias sub-tabelas coladas manualmente ao longo do ano, então uma
+ * célula em branco na coluna F no meio da planilha não é uma linha livre
+ * seguramente reaproveitável.
+ */
+async function localizarLinhaContrato(
+  accessToken: string,
+  spreadsheetId: string,
+  numeroContrato: string,
+): Promise<{ linha: number; ehNova: boolean }> {
+  const [colunaNumero, linhasCompletas] = await Promise.all([
+    getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos('F:F')).then((l) =>
+      l.map((v) => v[0] ?? ''),
+    ),
+    getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos('A:Z')),
+  ]);
+
+  const totalLinhas = Math.max(colunaNumero.length, linhasCompletas.length);
+  const colunaAjustada =
+    colunaNumero.length >= totalLinhas
+      ? colunaNumero
+      : [...colunaNumero, ...new Array(totalLinhas - colunaNumero.length).fill('')];
+
+  return acharLinhaParaContrato(colunaAjustada, numeroContrato);
+}
+
+/**
+ * Cria ou atualiza a linha de um contrato na aba "GERAL":
  *
  * - Contrato novo: acha a primeira linha em branco na coluna do N°
- *   Contrato (D) e preenche o número sequencial da coluna "Nº" (A) se ela
+ *   Contrato (F) e preenche o número sequencial da coluna "Nº" (A) se ela
  *   estiver vazia.
  * - Contrato já existente: acha a linha pelo N° Contrato (usando
  *   `linhaConhecida` como atalho quando já sabida) e sobrescreve só as
- *   colunas que o app gerencia — o resto da linha (Tipo, Unidade Gestora,
- *   Dados do Fiscal, CNPJ, Contratos/pasta etc.) é preservado como estava.
+ *   colunas que o app gerencia — o resto da linha (Data de Emissão,
+ *   Alerta, Recebimentos por ano, Valor Aditivado etc.) é preservado como
+ *   estava.
  *
  * Devolve o número da linha usada, para guardar em `planilha_linha` e
  * agilizar a próxima atualização.
@@ -175,23 +205,17 @@ export async function sincronizarContratoNaPlanilha(
     const [linhaAtual] = await getSheetValues(
       accessToken,
       spreadsheetId,
-      rangeNaAbaContratos(`D${linhaConhecida}:D${linhaConhecida}`),
+      rangeNaAbaContratos(`F${linhaConhecida}:F${linhaConhecida}`),
     );
     if ((linhaAtual?.[0] ?? '').trim() === dados.numero.trim()) {
       linha = linhaConhecida;
       ehNova = false;
     } else {
       // A linha guardada não bate mais (planilha reorganizada) — busca de novo.
-      const colunaNumero = (
-        await getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos('D:D'))
-      ).map((l) => l[0] ?? '');
-      ({ linha, ehNova } = acharLinhaParaContrato(colunaNumero, dados.numero));
+      ({ linha, ehNova } = await localizarLinhaContrato(accessToken, spreadsheetId, dados.numero));
     }
   } else {
-    const colunaNumero = (
-      await getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos('D:D'))
-    ).map((l) => l[0] ?? '');
-    ({ linha, ehNova } = acharLinhaParaContrato(colunaNumero, dados.numero));
+    ({ linha, ehNova } = await localizarLinhaContrato(accessToken, spreadsheetId, dados.numero));
   }
 
   const linhaExistente = ehNova
