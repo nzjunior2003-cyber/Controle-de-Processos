@@ -178,7 +178,10 @@ export default function Aquisicoes() {
       {activeTab === 'processos' ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-             <div className="bg-white p-5 rounded-lg border shadow-sm border-l-4 border-l-gray-400 border-gray-200">
+             <div
+               onClick={() => setFiltroTempo('todos')}
+               className={`bg-white p-5 rounded-lg border shadow-sm border-l-4 border-l-gray-400 cursor-pointer transition-colors ${filtroTempo === 'todos' ? 'ring-2 ring-gray-400 bg-gray-50 border-gray-300' : 'border-gray-200 hover:bg-gray-50'}`}
+             >
                <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total de Processos</p>

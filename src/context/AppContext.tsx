@@ -545,7 +545,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('URL inválida. Não foi possível encontrar o ID da planilha.');
       }
 
-      const fetchUrl = `https://docs.google.com/spreadsheets/d/${correspondencia[1]}/gviz/tq?tqx=out:csv`;
+      const fetchUrl = `https://docs.google.com/spreadsheets/d/${correspondencia[1]}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('Processos 2026')}`;
       const resposta = await fetch(fetchUrl);
       if (!resposta.ok) {
         throw new Error(
