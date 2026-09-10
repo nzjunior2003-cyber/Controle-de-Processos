@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, BellRing, Clock, FileText, Filter, Mail, PlusCircle, Search, ShieldAlert } from 'lucide-react';
+import { AlertCircle, BellRing, Clock, FileText, Filter, Mail, PlusCircle, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
-import { initAuth } from '../../lib/googleAuth';
+import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
+import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
+import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
 import { AlertasModal } from '../../components/AlertasModal';
 import KpisContratos, { type FiltroKpi } from '../../components/contratos/KpisContratos';
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
@@ -21,6 +23,7 @@ export default function GestaoContratos() {
     pcas,
     usuarioAtual,
     contratos,
+    updateContrato,
     execucoes,
     addExecucao,
     ocorrencias,
@@ -35,6 +38,7 @@ export default function GestaoContratos() {
   const [contratoSelecionado, setContratoSelecionado] = useState<ContratoComStatus | null>(null);
   const [alertasModalOpen, setAlertasModalOpen] = useState(false);
   const [filtroKpi, setFiltroKpi] = useState<FiltroKpi>(null);
+  const [sincronizando, setSincronizando] = useState(false);
 
   useEffect(() => {
     const cancelar = initAuth();
@@ -71,6 +75,61 @@ export default function GestaoContratos() {
   const isMasterOrGestao =
     usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'gestao';
 
+  const handleSincronizar = async () => {
+    setSincronizando(true);
+    try {
+      let googleToken: string | null = await getAccessToken();
+      if (!googleToken) {
+        const resultado = await googleSignIn();
+        googleToken = resultado?.accessToken ?? null;
+      }
+      if (!googleToken) {
+        alert('Não foi possível conectar ao Google para sincronizar com a planilha.');
+        return;
+      }
+
+      let sincronizados = 0;
+      let comErro = 0;
+      for (const contrato of contratosComStatus) {
+        try {
+          const linha = await sincronizarContratoNaPlanilha(
+            googleToken,
+            ID_PLANILHA_CONTRATOS,
+            {
+              numero: contrato.numero,
+              empresa: contrato.empresa,
+              objeto: contrato.objeto,
+              cnpj: contrato.cnpj,
+              prd: contrato.prd,
+              valorPRD: contrato.valorPRD,
+              empenho: contrato.empenho,
+              inicioVigencia: contrato.inicioVigencia,
+              fimVigencia: contrato.fimVigencia,
+              status: contrato.status,
+            },
+            contrato.planilha_linha,
+          );
+          if (linha !== contrato.planilha_linha) {
+            await updateContrato(contrato.id, { planilha_linha: linha });
+          }
+          sincronizados++;
+        } catch (erroContrato) {
+          console.error(`Erro ao sincronizar o contrato ${contrato.numero}:`, erroContrato);
+          comErro++;
+        }
+      }
+
+      alert(
+        `Sincronização concluída: ${sincronizados} contrato(s) enviado(s) para a planilha` +
+          (comErro > 0 ? `, ${comErro} com erro (veja o console).` : '.'),
+      );
+    } catch (erro) {
+      alert('Erro ao sincronizar com a planilha: ' + (erro instanceof Error ? erro.message : String(erro)));
+    } finally {
+      setSincronizando(false);
+    }
+  };
+
   // Sempre a versão mais atual do contrato selecionado (não a foto tirada
   // no clique) — essencial pra refletir na hora um aditivo/execução recém
   // lançados sem precisar fechar e reabrir o modal.
@@ -88,6 +147,18 @@ export default function GestaoContratos() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isMasterOrGestao && (
+            <button
+              type="button"
+              onClick={handleSincronizar}
+              disabled={sincronizando}
+              title="Envia os contratos do sistema para a planilha de Gestão de Contratos"
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`-ml-1 mr-2 h-5 w-5 ${sincronizando ? 'animate-spin' : ''}`} />
+              {sincronizando ? 'Sincronizando...' : 'Sincronizar Planilha'}
+            </button>
+          )}
           {isMasterOrGestao && (
             <button
               onClick={() => navigate('/sistema/gestao-contratos/novo')}
