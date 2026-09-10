@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Contrato } from '../../types';
+import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
+import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
+import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
+import { calcularStatusContrato } from '../../lib/contratos';
 
 const CLASSE_INPUT =
   'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm';
@@ -32,6 +36,7 @@ interface FormState {
   portaria: string;
   fonteRecurso: string;
   prd: string;
+  valorPRD: string;
   empenho: string;
   dotacao: string;
   linkContrato: string;
@@ -61,6 +66,7 @@ const estadoVazio: FormState = {
   portaria: '',
   fonteRecurso: '',
   prd: '',
+  valorPRD: '',
   empenho: '',
   dotacao: '',
   linkContrato: '',
@@ -94,6 +100,7 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
     portaria: contrato.portaria ?? '',
     fonteRecurso: contrato.fonteRecurso ?? '',
     prd: contrato.prd ?? '',
+    valorPRD: contrato.valorPRD != null ? String(contrato.valorPRD) : '',
     empenho: contrato.empenho ?? '',
     dotacao: contrato.dotacao ?? '',
     linkContrato: contrato.linkContrato ?? '',
@@ -113,6 +120,11 @@ export default function ContratoForm() {
 
   const contrato = id ? contratos.find((c) => c.id === id) ?? null : null;
   const emEdicao = !!id;
+
+  useEffect(() => {
+    const cancelar = initAuth();
+    return () => cancelar();
+  }, []);
 
   const [form, setForm] = useState<FormState>(() => contratoParaFormulario(contrato));
   const [salvando, setSalvando] = useState(false);
@@ -174,15 +186,72 @@ export default function ContratoForm() {
         portaria: form.portaria || '',
         fonteRecurso: form.fonteRecurso || '',
         prd: form.prd || '',
+        valorPRD: form.valorPRD ? Number(form.valorPRD.replace(',', '.')) : undefined,
         empenho: form.empenho || '',
         dotacao: form.dotacao || '',
         linkContrato: form.linkContrato || null,
       };
 
+      // Pede a autorização do Google ANTES de gravar no Firestore: feita
+      // depois, o popup de login perde a associação com o clique do
+      // usuário e a maioria dos navegadores bloqueia silenciosamente.
+      let googleToken: string | null = null;
+      let erroGoogle: unknown = null;
+      try {
+        googleToken = await getAccessToken();
+        if (!googleToken) {
+          const resultado = await googleSignIn();
+          googleToken = resultado?.accessToken ?? null;
+        }
+      } catch (erroAuth) {
+        erroGoogle = erroAuth;
+      }
+
+      let contratoId: string;
       if (emEdicao && id) {
         await updateContrato(id, dados);
+        contratoId = id;
       } else {
-        await addContrato(dados);
+        contratoId = await addContrato(dados);
+      }
+
+      if (!googleToken) {
+        alert(
+          'O contrato foi salvo no sistema, mas não foi possível conectar ao Google para ' +
+            'replicar na planilha automaticamente' +
+            (erroGoogle instanceof Error ? `: ${erroGoogle.message}` : '.') +
+            ' Adicione/atualize a linha manualmente ou tente sincronizar depois.',
+        );
+      } else {
+        try {
+          const status = calcularStatusContrato({ ...dados, id: contratoId } as Contrato).status;
+          const linha = await sincronizarContratoNaPlanilha(
+            googleToken,
+            ID_PLANILHA_CONTRATOS,
+            {
+              numero: dados.numero,
+              empresa: dados.empresa,
+              objeto: dados.objeto,
+              cnpj: dados.cnpj,
+              prd: dados.prd,
+              valorPRD: dados.valorPRD,
+              empenho: dados.empenho,
+              inicioVigencia: dados.inicioVigencia,
+              fimVigencia: dados.fimVigencia,
+              status,
+            },
+            contrato?.planilha_linha,
+          );
+          if (linha !== contrato?.planilha_linha) {
+            await updateContrato(contratoId, { planilha_linha: linha });
+          }
+        } catch (erroPlanilha) {
+          console.error('Erro ao gravar o contrato na planilha:', erroPlanilha);
+          alert(
+            'O contrato foi salvo no sistema, mas não foi possível gravá-lo na planilha automaticamente: ' +
+              (erroPlanilha instanceof Error ? erroPlanilha.message : String(erroPlanilha)),
+          );
+        }
       }
 
       navigate('/sistema/gestao-contratos');
@@ -481,6 +550,15 @@ export default function ContratoForm() {
                   type="text"
                   value={form.prd}
                   onChange={(e) => handleChange('prd', e.target.value)}
+                  className={CLASSE_INPUT}
+                />
+              </div>
+              <div>
+                <label className={CLASSE_LABEL}>Valor do PRD (R$)</label>
+                <input
+                  type="number"
+                  value={form.valorPRD}
+                  onChange={(e) => handleChange('valorPRD', e.target.value)}
                   className={CLASSE_INPUT}
                 />
               </div>

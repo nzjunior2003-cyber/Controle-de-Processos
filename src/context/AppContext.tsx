@@ -136,7 +136,7 @@ interface AppContextData {
   updateUsuario: (id: string, dados: Partial<Usuario>) => Promise<void>;
   addUsuario: (dados: Omit<Usuario, 'id'> & { senha?: string }) => Promise<void>;
   deleteUsuario: (id: string) => Promise<void>;
-  addContrato: (dados: Omit<Contrato, 'id'>) => Promise<void>;
+  addContrato: (dados: Omit<Contrato, 'id'>) => Promise<string>;
   updateContrato: (id: string, dados: Partial<Contrato>) => Promise<void>;
   deleteContrato: (id: string) => Promise<void>;
   addExecucao: (dados: Omit<ExecucaoContrato, 'id'>) => Promise<void>;
@@ -888,6 +888,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       };
       const id = await criarEm('contratos', contratoCompleto);
       await registrarAuditoria('contratos', id, 'CREATE', contratoCompleto);
+      return id;
     },
     [criarEm, contratos, usuarioAtual, registrarAuditoria],
   );

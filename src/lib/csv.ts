@@ -163,6 +163,10 @@ export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha 
 export const ID_PLANILHA_PROCESSOS = '1deakLqP8-enEgY384EkFyYedgo5WYSONjvYIBJDwqXE';
 export const URL_PLANILHA_PROCESSOS = `https://docs.google.com/spreadsheets/d/${ID_PLANILHA_PROCESSOS}/edit?usp=sharing`;
 
+/** Id da planilha de Gestão de Contratos (aba "GESTÃO DE CONTRATOS - 2026 - GERAL"). */
+export const ID_PLANILHA_CONTRATOS = '15THU7EvmhSWXD6_KNlHZoCYNeTWz2IycZYMe8cSolmw';
+export const URL_PLANILHA_CONTRATOS = `https://docs.google.com/spreadsheets/d/${ID_PLANILHA_CONTRATOS}/edit?usp=sharing`;
+
 /**
  * Mapeia uma linha posicional (planilha sem cabeçalho reconhecido) para um PCA.
  * Usado na sincronização manual a partir de uma URL pública qualquer.

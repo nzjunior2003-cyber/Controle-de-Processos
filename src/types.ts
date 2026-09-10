@@ -251,6 +251,8 @@ export interface Contrato {
   portaria?: string;
   fonteRecurso?: string;
   prd?: string;
+  /** Valor do PRD (Pedido de Reconhecimento de Despesa), distinto do valor global do contrato. */
+  valorPRD?: number;
   empenho?: string;
   dotacao?: string;
   linkContrato?: string | null;
@@ -261,6 +263,8 @@ export interface Contrato {
    * aos contratos do seu Gestor responsável.
    */
   gestorGeralId?: string;
+  /** Linha (1-based) da planilha "Gestão de Contratos" onde este contrato está sincronizado. */
+  planilha_linha?: number;
   criado_em?: string;
   atualizado_em?: string;
 }

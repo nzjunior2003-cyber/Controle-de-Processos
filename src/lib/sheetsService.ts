@@ -12,6 +12,15 @@ import {
   proximoNumeroSequencial,
   type DadosProcessoParaPlanilha,
 } from './planilhaProcessos';
+import {
+  ABA_GESTAO_CONTRATOS,
+  acharLinhaParaContrato,
+  aplicarColunasNaLinhaContrato,
+  COLUNA_CONTRATO,
+  montarValoresColunasContrato,
+  proximoNumeroSequencialContrato,
+  type DadosContratoParaPlanilha,
+} from './planilhaContratos';
 
 async function chamarSheetsApi(
   accessToken: string,
@@ -118,6 +127,90 @@ export async function sincronizarProcessoNaPlanilha(
 
   const linhaFinal = aplicarColunasNaLinha(linhaExistente, valoresColunas);
   await updateSheetRow(accessToken, spreadsheetId, linha, linhaFinal);
+
+  return linha;
+}
+
+/** Prefixa um intervalo A1 com o nome da aba "Gestão de Contratos" (tem espaços, por isso entre aspas simples). */
+function rangeNaAbaContratos(range: string): string {
+  return `'${ABA_GESTAO_CONTRATOS}'!${range}`;
+}
+
+/** Sobrescreve uma linha inteira (1-based) da aba de contratos com os valores informados. */
+async function updateContratoSheetRow(
+  accessToken: string,
+  spreadsheetId: string,
+  linha: number,
+  valores: string[],
+): Promise<void> {
+  await chamarSheetsApi(accessToken, spreadsheetId, 'PUT', rangeNaAbaContratos(`A${linha}:AA${linha}`), {
+    values: [valores],
+  });
+}
+
+/**
+ * Cria ou atualiza a linha de um contrato na aba "Gestão de Contratos":
+ *
+ * - Contrato novo: acha a primeira linha em branco na coluna do N°
+ *   Contrato (D) e preenche o número sequencial da coluna "Nº" (A) se ela
+ *   estiver vazia.
+ * - Contrato já existente: acha a linha pelo N° Contrato (usando
+ *   `linhaConhecida` como atalho quando já sabida) e sobrescreve só as
+ *   colunas que o app gerencia — o resto da linha (Tipo, Unidade Gestora,
+ *   Dados do Fiscal, CNPJ, Contratos/pasta etc.) é preservado como estava.
+ *
+ * Devolve o número da linha usada, para guardar em `planilha_linha` e
+ * agilizar a próxima atualização.
+ */
+export async function sincronizarContratoNaPlanilha(
+  accessToken: string,
+  spreadsheetId: string,
+  dados: DadosContratoParaPlanilha,
+  linhaConhecida?: number,
+): Promise<number> {
+  let linha: number;
+  let ehNova: boolean;
+
+  if (linhaConhecida) {
+    const [linhaAtual] = await getSheetValues(
+      accessToken,
+      spreadsheetId,
+      rangeNaAbaContratos(`D${linhaConhecida}:D${linhaConhecida}`),
+    );
+    if ((linhaAtual?.[0] ?? '').trim() === dados.numero.trim()) {
+      linha = linhaConhecida;
+      ehNova = false;
+    } else {
+      // A linha guardada não bate mais (planilha reorganizada) — busca de novo.
+      const colunaNumero = (
+        await getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos('D:D'))
+      ).map((l) => l[0] ?? '');
+      ({ linha, ehNova } = acharLinhaParaContrato(colunaNumero, dados.numero));
+    }
+  } else {
+    const colunaNumero = (
+      await getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos('D:D'))
+    ).map((l) => l[0] ?? '');
+    ({ linha, ehNova } = acharLinhaParaContrato(colunaNumero, dados.numero));
+  }
+
+  const linhaExistente = ehNova
+    ? undefined
+    : (await getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos(`A${linha}:AA${linha}`)))[0];
+
+  const valoresColunas = montarValoresColunasContrato(dados);
+
+  if (ehNova && !(linhaExistente?.[0] ?? '').trim()) {
+    const [linhaAnterior] = await getSheetValues(
+      accessToken,
+      spreadsheetId,
+      rangeNaAbaContratos(`A${linha - 1}:A${linha - 1}`),
+    );
+    valoresColunas[COLUNA_CONTRATO.ORDEM] = proximoNumeroSequencialContrato(linhaAnterior?.[0]);
+  }
+
+  const linhaFinal = aplicarColunasNaLinhaContrato(linhaExistente, valoresColunas);
+  await updateContratoSheetRow(accessToken, spreadsheetId, linha, linhaFinal);
 
   return linha;
 }
