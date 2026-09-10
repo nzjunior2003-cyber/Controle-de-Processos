@@ -89,8 +89,11 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
     controlaQuantidade: contrato.saldoInicialQuantitativo != null,
     saldoInicialQuantitativo:
       contrato.saldoInicialQuantitativo != null ? String(contrato.saldoInicialQuantitativo) : '',
-    inicioVigencia: contrato.inicioVigencia ?? '',
-    fimVigencia: contrato.fimVigencia ?? '',
+    // O <input type="date"> só aceita "aaaa-mm-dd" — cortar o restante
+    // cobre tanto esse formato quanto o ISO completo (com hora) que a
+    // sincronização com a planilha grava.
+    inicioVigencia: contrato.inicioVigencia ? contrato.inicioVigencia.slice(0, 10) : '',
+    fimVigencia: contrato.fimVigencia ? contrato.fimVigencia.slice(0, 10) : '',
     fiscalTitular: contrato.fiscalTitular ?? '',
     fiscalEmail: contrato.fiscalEmail ?? '',
     fiscalTitularContato: contrato.fiscalTitularContato ?? '',
@@ -120,6 +123,12 @@ export default function ContratoForm() {
 
   const contrato = id ? contratos.find((c) => c.id === id) ?? null : null;
   const emEdicao = !!id;
+  // Só trava o controle por quantidade quando o contrato JÁ tinha essa
+  // baseline definida antes desta edição (evita alterar o saldo depois
+  // de execuções já lançadas) — um contrato que nunca teve isso
+  // configurado (ex.: importado da planilha, que não rastreia
+  // quantidade) pode ativar normalmente na edição.
+  const controleQuantidadeJaEstabelecido = contrato?.saldoInicialQuantitativo != null;
 
   useEffect(() => {
     const cancelar = initAuth();
@@ -424,7 +433,7 @@ export default function ContratoForm() {
                   type="checkbox"
                   checked={form.controlaQuantidade}
                   onChange={(e) => handleChange('controlaQuantidade', e.target.checked)}
-                  disabled={emEdicao}
+                  disabled={controleQuantidadeJaEstabelecido}
                   className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
                 />
                 <label htmlFor="controlaQuantidade" className="text-sm text-gray-700">
@@ -439,7 +448,7 @@ export default function ContratoForm() {
                     value={form.saldoInicialQuantitativo}
                     onChange={(e) => handleChange('saldoInicialQuantitativo', e.target.value)}
                     className={CLASSE_INPUT}
-                    disabled={emEdicao}
+                    disabled={controleQuantidadeJaEstabelecido}
                   />
                 </div>
               )}
