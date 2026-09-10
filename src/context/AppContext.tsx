@@ -46,6 +46,11 @@ import {
 } from '../lib/csv';
 import { localizacaoEfetiva, type EstadaProcesso } from '../lib/fluxoProcesso';
 import {
+  ABA_GESTAO_CONTRATOS,
+  mapLinhaContratoDaPlanilha,
+  type ContratoDaPlanilha,
+} from '../lib/planilhaContratos';
+import {
   abaterSaldo,
   aplicarAditivoFinanceiro,
   devolverSaldo,
@@ -131,6 +136,9 @@ interface AppContextData {
   ) => Promise<void>;
   syncPcasFromPublicUrl: (url: string) => Promise<void>;
   syncProcessosDaPlanilha: (
+    url: string,
+  ) => Promise<{ criados: number; atualizados: number; ignorados: number }>;
+  syncContratosDaPlanilha: (
     url: string,
   ) => Promise<{ criados: number; atualizados: number; ignorados: number }>;
   updateUsuario: (id: string, dados: Partial<Usuario>) => Promise<void>;
@@ -652,6 +660,100 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 
   /**
+   * Importa os contratos da aba "Gestão de Contratos" da planilha para o
+   * app: cria os que ainda não existem (casando pelo N° do Contrato) e
+   * atualiza os campos que a planilha controla nos que já existem. Como a
+   * planilha não tem valor global/saldo (conceito só do app, usado para
+   * abater as execuções), um contrato novo importado usa o Valor do PRD
+   * como estimativa inicial de saldo — o Gestor pode corrigir na edição.
+   */
+  const syncContratosDaPlanilha = useCallback(
+    async (url: string) => {
+      const db = requireDb();
+      const correspondencia = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (!correspondencia) {
+        throw new Error('URL inválida. Não foi possível encontrar o ID da planilha.');
+      }
+
+      const fetchUrl = `https://docs.google.com/spreadsheets/d/${correspondencia[1]}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(ABA_GESTAO_CONTRATOS)}`;
+      const resposta = await fetch(fetchUrl);
+      if (!resposta.ok) {
+        throw new Error(
+          "Não foi possível acessar a planilha. Verifique se ela está pública ('Qualquer pessoa com o link').",
+        );
+      }
+
+      const csv = await resposta.text();
+      const Papa = (await import('papaparse')).default;
+
+      const linhas = await new Promise<string[][]>((resolve) => {
+        Papa.parse<string[]>(csv, {
+          header: false,
+          skipEmptyLines: true,
+          complete: (resultado) => resolve(resultado.data),
+        });
+      });
+
+      // A primeira linha é cabeçalho; os dados reais começam na segunda.
+      const linhasDeDados = linhas.slice(1);
+      const validos = linhasDeDados
+        .map((linha) => mapLinhaContratoDaPlanilha(linha))
+        .filter((c): c is ContratoDaPlanilha => c !== null);
+
+      let criados = 0;
+      let atualizados = 0;
+      const idsCriadosNestaSincronizacao = new Map<string, string>();
+
+      for (let inicio = 0; inicio < validos.length; inicio += 400) {
+        const lote = writeBatch(db);
+        const agora = new Date().toISOString();
+
+        validos.slice(inicio, inicio + 400).forEach((dados) => {
+          const { numero, ...resto } = dados;
+          const campos = Object.fromEntries(
+            Object.entries(resto).filter(([, v]) => v !== undefined),
+          );
+
+          const idExistente =
+            contratos.find((c) => c.numero === numero)?.id ??
+            idsCriadosNestaSincronizacao.get(numero);
+
+          if (idExistente) {
+            lote.set(
+              doc(db, 'contratos', idExistente),
+              { ...campos, numero, atualizado_em: agora },
+              { merge: true },
+            );
+            atualizados++;
+          } else {
+            const novaRef = doc(collection(db, 'contratos'));
+            idsCriadosNestaSincronizacao.set(numero, novaRef.id);
+            const valorBase = dados.valorPRD ?? 0;
+            lote.set(novaRef, {
+              ...campos,
+              numero,
+              pae: '',
+              valorGlobal: valorBase,
+              saldoInicialFinanceiro: valorBase,
+              saldoAtualFinanceiro: valorBase,
+              inicioVigencia: dados.inicioVigencia || agora,
+              fimVigencia: dados.fimVigencia || agora,
+              criado_em: agora,
+              atualizado_em: agora,
+            });
+            criados++;
+          }
+        });
+
+        await lote.commit();
+      }
+
+      return { criados, atualizados, ignorados: linhasDeDados.length - validos.length };
+    },
+    [contratos],
+  );
+
+  /**
    * Grava um log de auditoria (coleção `logs_auditoria`) para uma alteração
    * de dados. Nunca lança: uma falha ao registrar o log não pode impedir a
    * operação principal que a chamou.
@@ -1127,6 +1229,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addMovimentacao,
       syncPcasFromPublicUrl,
       syncProcessosDaPlanilha,
+      syncContratosDaPlanilha,
       updateUsuario,
       addUsuario,
       deleteUsuario,
@@ -1175,6 +1278,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addMovimentacao,
       syncPcasFromPublicUrl,
       syncProcessosDaPlanilha,
+      syncContratosDaPlanilha,
       updateUsuario,
       addUsuario,
       deleteUsuario,

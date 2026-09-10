@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { AlertCircle, BellRing, Clock, FileText, Filter, Mail, PlusCircle, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
-import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
-import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
-import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
+import { URL_PLANILHA_CONTRATOS } from '../../lib/csv';
+import { initAuth } from '../../lib/googleAuth';
 import { AlertasModal } from '../../components/AlertasModal';
 import KpisContratos, { type FiltroKpi } from '../../components/contratos/KpisContratos';
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
@@ -23,7 +22,7 @@ export default function GestaoContratos() {
     pcas,
     usuarioAtual,
     contratos,
-    updateContrato,
+    syncContratosDaPlanilha,
     execucoes,
     addExecucao,
     ocorrencias,
@@ -78,53 +77,14 @@ export default function GestaoContratos() {
   const handleSincronizar = async () => {
     setSincronizando(true);
     try {
-      let googleToken: string | null = await getAccessToken();
-      if (!googleToken) {
-        const resultado = await googleSignIn();
-        googleToken = resultado?.accessToken ?? null;
-      }
-      if (!googleToken) {
-        alert('Não foi possível conectar ao Google para sincronizar com a planilha.');
-        return;
-      }
-
-      let sincronizados = 0;
-      let comErro = 0;
-      for (const contrato of contratosComStatus) {
-        try {
-          const linha = await sincronizarContratoNaPlanilha(
-            googleToken,
-            ID_PLANILHA_CONTRATOS,
-            {
-              numero: contrato.numero,
-              empresa: contrato.empresa,
-              objeto: contrato.objeto,
-              cnpj: contrato.cnpj,
-              prd: contrato.prd,
-              valorPRD: contrato.valorPRD,
-              empenho: contrato.empenho,
-              inicioVigencia: contrato.inicioVigencia,
-              fimVigencia: contrato.fimVigencia,
-              status: contrato.status,
-            },
-            contrato.planilha_linha,
-          );
-          if (linha !== contrato.planilha_linha) {
-            await updateContrato(contrato.id, { planilha_linha: linha });
-          }
-          sincronizados++;
-        } catch (erroContrato) {
-          console.error(`Erro ao sincronizar o contrato ${contrato.numero}:`, erroContrato);
-          comErro++;
-        }
-      }
-
+      const resultado = await syncContratosDaPlanilha(URL_PLANILHA_CONTRATOS);
       alert(
-        `Sincronização concluída: ${sincronizados} contrato(s) enviado(s) para a planilha` +
-          (comErro > 0 ? `, ${comErro} com erro (veja o console).` : '.'),
+        `Sincronização concluída: ${resultado.criados} contrato(s) novo(s), ` +
+          `${resultado.atualizados} atualizado(s)` +
+          (resultado.ignorados > 0 ? `, ${resultado.ignorados} linha(s) ignorada(s) (sem N° do Contrato).` : '.'),
       );
     } catch (erro) {
-      alert('Erro ao sincronizar com a planilha: ' + (erro instanceof Error ? erro.message : String(erro)));
+      alert('Erro ao sincronizar a planilha: ' + (erro instanceof Error ? erro.message : String(erro)));
     } finally {
       setSincronizando(false);
     }
@@ -152,7 +112,7 @@ export default function GestaoContratos() {
               type="button"
               onClick={handleSincronizar}
               disabled={sincronizando}
-              title="Envia os contratos do sistema para a planilha de Gestão de Contratos"
+              title="Atualiza os contratos com os dados mais recentes da planilha de Gestão de Contratos"
               className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`-ml-1 mr-2 h-5 w-5 ${sincronizando ? 'animate-spin' : ''}`} />

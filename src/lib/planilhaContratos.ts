@@ -6,7 +6,10 @@
  * Gestora, Dados do Fiscal, pasta/rótulo do contrato etc. — algumas com
  * cabeçalho desalinhado dos dados reais nessa planilha legada) nunca são
  * tocadas por essa sincronização — continuam só do preenchimento manual.
+ * A leitura (planilha -> app) usa os mesmos índices de coluna, por posição
+ * em vez de nome de cabeçalho, pelo mesmo motivo do desalinhamento.
  */
+import { parseCurrencyBR, parseDataBR } from './csv';
 
 export const ABA_GESTAO_CONTRATOS = 'GESTÃO DE CONTRATOS - 2026 - GERAL';
 
@@ -113,6 +116,44 @@ export function aplicarColunasNaLinhaContrato(
 export function proximoNumeroSequencialContrato(valorLinhaAnterior: string | undefined): string {
   const numero = Number.parseInt((valorLinhaAnterior ?? '').trim(), 10);
   return Number.isFinite(numero) && numero > 0 ? String(numero + 1) : '1';
+}
+
+/** Dados de um Contrato extraídos de uma linha (posicional) da planilha. */
+export interface ContratoDaPlanilha {
+  numero: string;
+  empresa: string;
+  objeto: string;
+  cnpj?: string;
+  prd?: string;
+  valorPRD?: number;
+  empenho?: string;
+  inicioVigencia?: string;
+  fimVigencia?: string;
+}
+
+/**
+ * Mapeia uma linha posicional (array de colunas, sem cabeçalho) da aba
+ * "Gestão de Contratos" para os campos que o app consegue preencher.
+ * Devolve null quando a linha não tem N° do Contrato (não dá pra
+ * localizar/atualizar sem essa chave).
+ */
+export function mapLinhaContratoDaPlanilha(colunas: string[]): ContratoDaPlanilha | null {
+  const numero = (colunas[COLUNA_CONTRATO.N_CONTRATO] ?? '').trim();
+  if (!numero) return null;
+
+  const valorPRDTexto = (colunas[COLUNA_CONTRATO.VALOR_PRD] ?? '').trim();
+
+  return {
+    numero,
+    empresa: (colunas[COLUNA_CONTRATO.EMPRESA] ?? '').trim(),
+    objeto: (colunas[COLUNA_CONTRATO.OBJETO] ?? '').trim(),
+    cnpj: (colunas[COLUNA_CONTRATO.CNPJ] ?? '').trim() || undefined,
+    prd: (colunas[COLUNA_CONTRATO.PRD] ?? '').trim() || undefined,
+    valorPRD: valorPRDTexto ? parseCurrencyBR(valorPRDTexto) : undefined,
+    empenho: (colunas[COLUNA_CONTRATO.N_EMPENHO] ?? '').trim() || undefined,
+    inicioVigencia: parseDataBR(colunas[COLUNA_CONTRATO.INICIO_VIGENCIA]),
+    fimVigencia: parseDataBR(colunas[COLUNA_CONTRATO.TERMINO_VIGENCIA]),
+  };
 }
 
 /**
