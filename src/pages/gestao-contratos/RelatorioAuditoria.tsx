@@ -112,6 +112,20 @@ export default function RelatorioAuditoriaContrato() {
             <div><dt className="text-xs text-gray-500">Fiscal Titular</dt><dd>{contrato.fiscalTitular || '-'}</dd></div>
             <div><dt className="text-xs text-gray-500">Fiscal Suplente</dt><dd>{contrato.fiscalSuplente || '-'}</dd></div>
           </dl>
+
+          {contrato.historicoFiscal && contrato.historicoFiscal.length > 0 && (
+            <div className="mt-3">
+              <dt className="text-xs text-gray-500 mb-1">Fiscais Anteriores</dt>
+              <ul className="text-xs text-gray-700 space-y-0.5">
+                {contrato.historicoFiscal.map((periodo) => (
+                  <li key={periodo.id}>
+                    {periodo.fiscalTitular || 'Sem titular'}
+                    {periodo.fiscalSuplente ? ` (suplente: ${periodo.fiscalSuplente})` : ''} — {formatarData(periodo.desde)} a {formatarData(periodo.ate)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
 
         <section className="mb-6">
@@ -156,7 +170,21 @@ export default function RelatorioAuditoriaContrato() {
                   <tr key={exec.id} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2 whitespace-nowrap">{formatarData(exec.data)}</td>
                     <td className="py-1.5 pr-2">{exec.tipo || 'NF/Fatura'}: {exec.nf}</td>
-                    <td className="py-1.5 pr-2 text-gray-600">{exec.observacao || '-'}</td>
+                    <td className="py-1.5 pr-2 text-gray-600">
+                      {exec.observacao || '-'}
+                      {exec.itensConsumidos && exec.itensConsumidos.length > 0 && (
+                        <ul className="text-xs text-gray-500 mt-0.5">
+                          {exec.itensConsumidos.map((consumo) => {
+                            const item = contrato.itens?.find((i) => i.id === consumo.itemId);
+                            return (
+                              <li key={consumo.itemId}>
+                                {item?.descricao ?? 'item removido'}: {consumo.quantidade}{item?.unidade ? ` ${item.unidade}` : ''}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </td>
                     <td className="py-1.5 pr-2 text-right">{exec.quantidade ?? '-'}</td>
                     <td className="py-1.5 text-right font-medium">{formatarMoeda(exec.valor)}</td>
                   </tr>
@@ -192,7 +220,21 @@ export default function RelatorioAuditoriaContrato() {
                   <tr key={aditivo.id} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2 whitespace-nowrap">{formatarData(aditivo.data)}</td>
                     <td className="py-1.5 pr-2">{TIPO_ADITIVO_LABELS[aditivo.tipo] ?? aditivo.tipo}</td>
-                    <td className="py-1.5 pr-2">{aditivo.numero}</td>
+                    <td className="py-1.5 pr-2">
+                      {aditivo.numero}
+                      {aditivo.itensAcrescidos && aditivo.itensAcrescidos.length > 0 && (
+                        <ul className="text-xs text-gray-500 mt-0.5">
+                          {aditivo.itensAcrescidos.map((acrescimo) => {
+                            const item = contrato.itens?.find((i) => i.id === acrescimo.itemId);
+                            return (
+                              <li key={acrescimo.itemId}>
+                                + {acrescimo.quantidade}{item?.unidade ? ` ${item.unidade}` : ''} em {item?.descricao ?? 'item removido'}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </td>
                     <td className="py-1.5 pr-2">{aditivo.novaFimVigencia ? formatarData(aditivo.novaFimVigencia) : '-'}</td>
                     <td className="py-1.5 text-right font-medium">
                       {typeof aditivo.valorAcrescido === 'number' ? formatarMoeda(aditivo.valorAcrescido) : '-'}

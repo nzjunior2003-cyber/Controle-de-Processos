@@ -6,6 +6,7 @@ import type { Contrato, ItemContrato } from '../../types';
 import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
 import { getOrCreateFolder, uploadFileToDrive } from '../../lib/driveService';
+import { enviarEmail } from '../../lib/emailService';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
 import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
 import {
@@ -344,6 +345,50 @@ export default function ContratoForm() {
               (erroPlanilha instanceof Error ? erroPlanilha.message : String(erroPlanilha)),
           );
         }
+      }
+
+      // Avisa por e-mail sempre que um fiscal/suplente é definido ou
+      // substituído — compara com o que já estava salvo antes (não
+      // dispara de novo se a edição não mexeu nesses campos).
+      const vigenciaFormatada = form.fimVigencia
+        ? new Date(`${form.fimVigencia}T00:00:00`).toLocaleDateString('pt-BR')
+        : 'não informada';
+      try {
+        if (dados.fiscalEmail && dados.fiscalEmail !== (contrato?.fiscalEmail ?? '')) {
+          await enviarEmail({
+            to: dados.fiscalEmail,
+            subject: `Você foi designado Fiscal do Contrato ${form.numero}`,
+            html: `
+              <h2>Designação de Fiscal — Contrato ${form.numero}</h2>
+              <p>Prezado(a) ${form.fiscalTitular || 'Fiscal'},</p>
+              <p>Você foi designado(a) <b>Fiscal Titular</b> do contrato <b>${form.numero}</b>
+              (${form.empresa}), com vigência até ${vigenciaFormatada}.</p>
+              <p>Acesse o sistema, módulo Fiscal do Contrato, para mais detalhes.</p>
+            `,
+          });
+        }
+        if (
+          dados.fiscalSuplenteEmail &&
+          dados.fiscalSuplenteEmail !== (contrato?.fiscalSuplenteEmail ?? '')
+        ) {
+          await enviarEmail({
+            to: dados.fiscalSuplenteEmail,
+            subject: `Você foi designado Fiscal Suplente do Contrato ${form.numero}`,
+            html: `
+              <h2>Designação de Fiscal Suplente — Contrato ${form.numero}</h2>
+              <p>Prezado(a) ${form.fiscalSuplente || 'Fiscal Suplente'},</p>
+              <p>Você foi designado(a) <b>Fiscal Suplente</b> do contrato <b>${form.numero}</b>
+              (${form.empresa}), com vigência até ${vigenciaFormatada}.</p>
+              <p>Acesse o sistema, módulo Fiscal do Contrato, para mais detalhes.</p>
+            `,
+          });
+        }
+      } catch (erroEmail) {
+        console.error('Erro ao notificar o novo fiscal/suplente por e-mail:', erroEmail);
+        alert(
+          'O contrato foi salvo, mas não foi possível enviar o e-mail de aviso ao novo fiscal/suplente: ' +
+            (erroEmail instanceof Error ? erroEmail.message : String(erroEmail)),
+        );
       }
 
       navigate('/sistema/gestao-contratos');
