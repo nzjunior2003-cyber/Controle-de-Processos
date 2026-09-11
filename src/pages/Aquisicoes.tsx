@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Search, Filter, AlertCircle, FilePlus, Clock, Database, List, RefreshCw } from 'lucide-react';
+import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import IntegracaoPCA from './IntegracaoPCA';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS } from '../types';
@@ -15,7 +15,7 @@ export default function Aquisicoes() {
   const [sincronizando, setSincronizando] = useState(false);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
-  const [filtroTempo, setFiltroTempo] = useState<'todos' | 'verde' | 'amarelo' | 'vermelho'>('todos');
+  const [filtroTempo, setFiltroTempo] = useState<'todos' | 'verde' | 'amarelo' | 'vermelho' | 'contratado'>('todos');
   const [filtroRito, setFiltroRito] = useState('');
   const [filtroNatureza, setFiltroNatureza] = useState('');
   const [filtroSetorAtual, setFiltroSetorAtual] = useState('');
@@ -61,6 +61,7 @@ export default function Aquisicoes() {
     if (filtroPrevisaoPca === 'nao' && p.pca_id) return false;
 
     if (filtroTempo === 'todos') return true;
+    if (filtroTempo === 'contratado') return p.status === 'contratado_aditivado';
 
     const dias = p.ultima_tramitacao ? Math.max(0, differenceInDays(hoje, new Date(p.ultima_tramitacao))) : 0;
     if (filtroTempo === 'verde' && dias < 10) return true;
@@ -80,6 +81,8 @@ export default function Aquisicoes() {
     },
     { verde: 0, amarelo: 0, vermelho: 0 }
   );
+
+  const contagemContratadoAditivado = processos.filter((p) => p.status === 'contratado_aditivado').length;
 
   const isMasterOrApoio = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'apoio';
 
@@ -161,7 +164,7 @@ export default function Aquisicoes() {
 
       {activeTab === 'processos' ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
              <div
                onClick={() => setFiltroTempo('todos')}
                className={`bg-white p-5 rounded-lg border shadow-sm border-l-4 border-l-gray-400 cursor-pointer transition-colors ${filtroTempo === 'todos' ? 'ring-2 ring-gray-400 bg-gray-50 border-gray-300' : 'border-gray-200 hover:bg-gray-50'}`}
@@ -208,6 +211,18 @@ export default function Aquisicoes() {
                     <h3 className="text-2xl font-bold text-gray-900 mt-1">{contagemTempo.vermelho}</h3>
                   </div>
                   <AlertCircle className="w-5 h-5 text-red-600" />
+               </div>
+             </div>
+             <div
+               onClick={() => setFiltroTempo(filtroTempo === 'contratado' ? 'todos' : 'contratado')}
+               className={`bg-white p-5 rounded-lg border shadow-sm border-l-4 border-l-purple-500 cursor-pointer transition-colors ${filtroTempo === 'contratado' ? 'ring-2 ring-purple-500 bg-purple-50 border-purple-200' : 'border-gray-200 hover:bg-gray-50'}`}
+             >
+               <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contratado/Aditivado</p>
+                    <h3 className="text-2xl font-bold text-gray-900 mt-1">{contagemContratadoAditivado}</h3>
+                  </div>
+                  <FileCheck2 className="w-5 h-5 text-purple-500" />
                </div>
              </div>
           </div>
