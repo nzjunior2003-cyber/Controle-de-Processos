@@ -152,7 +152,14 @@ export function filtrarContratosPorGestor<T extends Contrato>(
   usuario: { gestorResponsavelId?: string } | null | undefined,
 ): T[] {
   if (!usuario?.gestorResponsavelId) return contratos;
-  return contratos.filter((c) => c.gestorGeralId === usuario.gestorResponsavelId);
+  // Um contrato sem gestorGeralId ainda não foi "reivindicado" por
+  // nenhum Gestor — é o caso de todo contrato importado da planilha
+  // (a sincronização não atribui gestor nenhum). Sem essa checagem, um
+  // Auxiliar nunca enxergaria nenhum desses contratos (só o Gestor
+  // "raiz", que não passa pelo filtro), mesmo tendo perfil pra
+  // gerenciá-los — na prática, ficava impedido de editar quase
+  // qualquer contrato.
+  return contratos.filter((c) => !c.gestorGeralId || c.gestorGeralId === usuario.gestorResponsavelId);
 }
 
 /** Máximo de contratos ativos que um mesmo Fiscal Titular pode acumular. */

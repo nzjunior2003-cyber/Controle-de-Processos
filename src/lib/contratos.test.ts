@@ -296,9 +296,14 @@ describe('filtrarContratosPorGestor', () => {
     expect(resultado).toEqual(contratos);
   });
 
-  it('um Auxiliar só vê os contratos do seu Gestor responsável', () => {
+  it('um Auxiliar vê os contratos do seu Gestor responsável e os ainda sem gestor atribuído', () => {
     const resultado = filtrarContratosPorGestor(contratos, { gestorResponsavelId: 'g1' });
-    expect(resultado.map((c) => c.id)).toEqual(['c1']);
+    expect(resultado.map((c) => c.id)).toEqual(['c1', 'c3']);
+  });
+
+  it('um Auxiliar não vê contratos já atribuídos a outro Gestor', () => {
+    const resultado = filtrarContratosPorGestor(contratos, { gestorResponsavelId: 'g1' });
+    expect(resultado.map((c) => c.id)).not.toContain('c2');
   });
 
   it('devolve todos os contratos sem usuário (nada para restringir)', () => {
