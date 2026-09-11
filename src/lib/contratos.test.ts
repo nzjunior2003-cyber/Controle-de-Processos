@@ -3,6 +3,7 @@ import {
   abaterItens,
   abaterSaldo,
   aplicarAditivoFinanceiro,
+  aplicarAditivoQuantidade,
   buscarContratos,
   calcularStatusContrato,
   devolverItens,
@@ -14,6 +15,7 @@ import {
   marcoAlertaVencimento,
   mesclarItensContrato,
   ordenarContratosPorNumero,
+  registrarTrocaFiscal,
   validarLimiteFiscal,
 } from './contratos';
 import type { Contrato, ItemContrato } from '../types';
@@ -277,6 +279,84 @@ describe('mesclarItensContrato', () => {
     ]);
     expect(resultado).toHaveLength(1);
     expect(resultado[0].id).toBe('i2');
+  });
+});
+
+describe('aplicarAditivoQuantidade', () => {
+  it('soma o acréscimo à quantidade inicial E à atual do item', () => {
+    const itens: ItemContrato[] = [
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 60 },
+    ];
+    const resultado = aplicarAditivoQuantidade(itens, [{ itemId: 'i1', quantidade: 20 }]);
+    expect(resultado?.[0]).toEqual({
+      id: 'i1',
+      descricao: 'Papel A4',
+      quantidadeInicial: 120,
+      quantidadeAtual: 80,
+    });
+  });
+
+  it('não altera itens que não foram acrescidos', () => {
+    const itens: ItemContrato[] = [
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 60 },
+      { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50, quantidadeAtual: 50 },
+    ];
+    const resultado = aplicarAditivoQuantidade(itens, [{ itemId: 'i1', quantidade: 20 }]);
+    expect(resultado?.find((i) => i.id === 'i2')).toEqual(itens[1]);
+  });
+});
+
+describe('registrarTrocaFiscal', () => {
+  const contratoBase = {
+    fiscalTitular: 'Fiscal A',
+    fiscalEmail: 'a@cbmpa.gov.br',
+    fiscalTitularContato: '',
+    fiscalSuplente: 'Suplente A',
+    fiscalSuplenteEmail: '',
+    fiscalSuplenteContato: '',
+    historicoFiscal: undefined,
+    criado_em: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('não registra nada quando os campos de fiscal não mudam', () => {
+    const resultado = registrarTrocaFiscal(contratoBase, { fiscalTitular: 'Fiscal A' });
+    expect(resultado).toBeUndefined();
+  });
+
+  it('não registra nada na primeira atribuição (contrato nunca teve fiscal antes)', () => {
+    const resultado = registrarTrocaFiscal(
+      { ...contratoBase, fiscalTitular: undefined, fiscalSuplente: undefined },
+      { fiscalTitular: 'Fiscal A' },
+    );
+    expect(resultado).toBeUndefined();
+  });
+
+  it('fecha um período com os dados anteriores quando o titular muda', () => {
+    const agora = '2026-06-15T00:00:00.000Z';
+    const resultado = registrarTrocaFiscal(contratoBase, { fiscalTitular: 'Fiscal B' }, agora);
+    expect(resultado).toHaveLength(1);
+    expect(resultado?.[0]).toMatchObject({
+      fiscalTitular: 'Fiscal A',
+      fiscalSuplente: 'Suplente A',
+      desde: contratoBase.criado_em,
+      ate: agora,
+    });
+  });
+
+  it('encadeia períodos: a próxima troca começa onde a anterior terminou', () => {
+    const primeiraTroca = registrarTrocaFiscal(contratoBase, { fiscalTitular: 'Fiscal B' }, '2026-06-15T00:00:00.000Z');
+    const contratoComHistorico = { ...contratoBase, fiscalTitular: 'Fiscal B', historicoFiscal: primeiraTroca };
+    const segundaTroca = registrarTrocaFiscal(
+      contratoComHistorico,
+      { fiscalTitular: 'Fiscal C' },
+      '2026-09-01T00:00:00.000Z',
+    );
+    expect(segundaTroca).toHaveLength(2);
+    expect(segundaTroca?.[1]).toMatchObject({
+      fiscalTitular: 'Fiscal B',
+      desde: '2026-06-15T00:00:00.000Z',
+      ate: '2026-09-01T00:00:00.000Z',
+    });
   });
 });
 

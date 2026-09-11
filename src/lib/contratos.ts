@@ -3,7 +3,7 @@
  * FiscalContrato (antes duplicadas nas duas páginas).
  */
 import { differenceInDays } from 'date-fns';
-import type { Contrato, ItemContrato } from '../types';
+import type { Contrato, HistoricoFiscalContrato, ItemContrato } from '../types';
 
 /** Opções fixas de Natureza de Despesa exibidas no cadastro/filtro de contratos. */
 export const OPCOES_NATUREZA_DESPESA_CONTRATO = ['CONSUMO', 'PERMANENTE', 'SERVIÇO'];
@@ -330,12 +330,13 @@ export interface Ocorrencia {
   criado_em?: string;
 }
 
-export type TipoAditivo = 'FINANCEIRO' | 'PRAZO' | 'FINANCEIRO_E_PRAZO';
+export type TipoAditivo = 'FINANCEIRO' | 'PRAZO' | 'FINANCEIRO_E_PRAZO' | 'QUANTIDADE';
 
 export const TIPO_ADITIVO_LABELS: Record<TipoAditivo, string> = {
   FINANCEIRO: 'Aditivo Financeiro',
   PRAZO: 'Aditivo de Prazo',
   FINANCEIRO_E_PRAZO: 'Aditivo Financeiro e de Prazo',
+  QUANTIDADE: 'Aditivo de Quantidade (Itens)',
 };
 
 /**
@@ -355,6 +356,8 @@ export interface Aditivo {
   valorAcrescido?: number;
   /** Presente quando tipo inclui PRAZO: nova data de fim de vigência. */
   novaFimVigencia?: string;
+  /** Presente quando tipo === QUANTIDADE: itens do contrato e quanto foi acrescido a cada um. */
+  itensAcrescidos?: ConsumoItemExecucao[];
   observacao?: string;
   registradoPorId: string;
   registradoPorNome: string;
@@ -375,6 +378,73 @@ export function aplicarAditivoFinanceiro(
     saldoInicialFinanceiro: (contrato.saldoInicialFinanceiro || 0) + valorAcrescido,
     saldoAtualFinanceiro: (contrato.saldoAtualFinanceiro || 0) + valorAcrescido,
   };
+}
+
+/**
+ * Aplica um aditivo de quantidade: soma o valor acrescido tanto à
+ * quantidade inicial quanto à atual de cada item informado — diferente
+ * de uma execução (que só abate a atual), um aditivo aumenta o total
+ * contratado do item.
+ */
+export function aplicarAditivoQuantidade(
+  itens: ItemContrato[] | undefined,
+  itensAcrescidos: ConsumoItemExecucao[] | undefined,
+): ItemContrato[] | undefined {
+  if (!itens || !itensAcrescidos || itensAcrescidos.length === 0) return itens;
+  const acrescimoPorId = new Map(itensAcrescidos.map((c) => [c.itemId, c.quantidade]));
+  return itens.map((item) => {
+    const acrescimo = acrescimoPorId.get(item.id);
+    if (!acrescimo) return item;
+    return {
+      ...item,
+      quantidadeInicial: item.quantidadeInicial + acrescimo,
+      quantidadeAtual: item.quantidadeAtual + acrescimo,
+    };
+  });
+}
+
+/**
+ * Fecha um novo período no histórico de Fiscal Titular/Suplente do
+ * contrato sempre que esses campos mudam numa edição — devolve
+ * `undefined` quando não houve mudança de fiscal (não escrever o campo,
+ * pra não sobrescrever à toa) ou quando o contrato nunca teve fiscal
+ * definido antes (nada a fechar/registrar na primeira atribuição).
+ */
+export function registrarTrocaFiscal(
+  contrato: Pick<
+    Contrato,
+    | 'fiscalTitular'
+    | 'fiscalEmail'
+    | 'fiscalTitularContato'
+    | 'fiscalSuplente'
+    | 'fiscalSuplenteEmail'
+    | 'fiscalSuplenteContato'
+    | 'historicoFiscal'
+    | 'criado_em'
+  >,
+  novosDados: Partial<Pick<Contrato, 'fiscalTitular' | 'fiscalEmail' | 'fiscalSuplente' | 'fiscalSuplenteEmail'>>,
+  agora: string = new Date().toISOString(),
+): HistoricoFiscalContrato[] | undefined {
+  const mudou = (['fiscalTitular', 'fiscalEmail', 'fiscalSuplente', 'fiscalSuplenteEmail'] as const).some(
+    (campo) => campo in novosDados && novosDados[campo] !== contrato[campo],
+  );
+  if (!mudou) return undefined;
+  if (!contrato.fiscalTitular && !contrato.fiscalSuplente) return undefined;
+
+  const historicoAnterior = contrato.historicoFiscal ?? [];
+  const ultimaAte = historicoAnterior[historicoAnterior.length - 1]?.ate;
+  const entradaFechada: HistoricoFiscalContrato = {
+    id: crypto.randomUUID(),
+    fiscalTitular: contrato.fiscalTitular,
+    fiscalEmail: contrato.fiscalEmail,
+    fiscalTitularContato: contrato.fiscalTitularContato,
+    fiscalSuplente: contrato.fiscalSuplente,
+    fiscalSuplenteEmail: contrato.fiscalSuplenteEmail,
+    fiscalSuplenteContato: contrato.fiscalSuplenteContato,
+    desde: ultimaAte ?? contrato.criado_em ?? agora,
+    ate: agora,
+  };
+  return [...historicoAnterior, entradaFechada];
 }
 
 export const formatarMoeda = (valor: number) =>

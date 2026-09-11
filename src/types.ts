@@ -274,6 +274,13 @@ export interface Contrato {
   fiscalSuplente?: string;
   fiscalSuplenteEmail?: string;
   fiscalSuplenteContato?: string;
+  /**
+   * Períodos anteriores de Fiscal Titular/Suplente deste contrato,
+   * fechados automaticamente toda vez que esses campos são alterados na
+   * edição — o fiscal ATUAL é sempre `fiscalTitular`/`fiscalSuplente`
+   * acima, nunca o último item daqui.
+   */
+  historicoFiscal?: HistoricoFiscalContrato[];
   portaria?: string;
   fonteRecurso?: string;
   /** Natureza de despesa do contrato (Consumo, Permanente ou Serviço). */
@@ -322,6 +329,19 @@ export interface ItemContrato {
   unidade?: string;
   quantidadeInicial: number;
   quantidadeAtual: number;
+}
+
+/** Um período fechado (`desde` até `ate`) em que alguém foi Fiscal Titular/Suplente de um contrato, antes de ser substituído. */
+export interface HistoricoFiscalContrato {
+  id: string;
+  fiscalTitular?: string;
+  fiscalEmail?: string;
+  fiscalTitularContato?: string;
+  fiscalSuplente?: string;
+  fiscalSuplenteEmail?: string;
+  fiscalSuplenteContato?: string;
+  desde: string;
+  ate: string;
 }
 
 export interface ItemProcedimento {

@@ -695,6 +695,25 @@ export default function ContratoForm() {
                 />
               </div>
             </div>
+
+            {contrato?.historicoFiscal && contrato.historicoFiscal.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-sm font-medium text-gray-700 mb-2">Histórico de Fiscais Anteriores</p>
+                <ul className="space-y-1">
+                  {contrato.historicoFiscal
+                    .slice()
+                    .reverse()
+                    .map((periodo) => (
+                      <li key={periodo.id} className="text-xs text-gray-600">
+                        {periodo.fiscalTitular || 'Sem titular'}
+                        {periodo.fiscalSuplente ? ` (suplente: ${periodo.fiscalSuplente})` : ''} —{' '}
+                        {new Date(periodo.desde).toLocaleDateString('pt-BR')} a{' '}
+                        {new Date(periodo.ate).toLocaleDateString('pt-BR')}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           <div>

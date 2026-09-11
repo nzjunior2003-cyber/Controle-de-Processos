@@ -55,9 +55,11 @@ import {
   abaterItens,
   abaterSaldo,
   aplicarAditivoFinanceiro,
+  aplicarAditivoQuantidade,
   devolverItens,
   devolverSaldo,
   gestorRaizDe,
+  registrarTrocaFiscal,
   validarLimiteFiscal,
   type Aditivo,
   type ExecucaoContrato,
@@ -1025,8 +1027,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         );
       }
       const anterior = contratos.find((c) => c.id === id);
-      await atualizarEm('contratos', id, dados);
-      await registrarAuditoria('contratos', id, 'UPDATE', dados, anterior);
+      const historicoFiscal = anterior ? registrarTrocaFiscal(anterior, dados) : undefined;
+      const dadosFinais = historicoFiscal !== undefined ? { ...dados, historicoFiscal } : dados;
+      await atualizarEm('contratos', id, dadosFinais);
+      await registrarAuditoria('contratos', id, 'UPDATE', dadosFinais, anterior);
     },
     [atualizarEm, contratos, registrarAuditoria],
   );
@@ -1176,11 +1180,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const contrato = contratoSnap.data() as Contrato;
 
         const atualizacao: Record<string, unknown> = {};
-        if (dados.tipo !== 'PRAZO' && typeof dados.valorAcrescido === 'number') {
+        if (dados.tipo !== 'PRAZO' && dados.tipo !== 'QUANTIDADE' && typeof dados.valorAcrescido === 'number') {
           Object.assign(atualizacao, aplicarAditivoFinanceiro(contrato, dados.valorAcrescido));
         }
-        if (dados.tipo !== 'FINANCEIRO' && dados.novaFimVigencia) {
+        if (dados.tipo !== 'FINANCEIRO' && dados.tipo !== 'QUANTIDADE' && dados.novaFimVigencia) {
           atualizacao.fimVigencia = dados.novaFimVigencia;
+        }
+        if (dados.tipo === 'QUANTIDADE' && dados.itensAcrescidos) {
+          const itensAtualizados = aplicarAditivoQuantidade(contrato.itens, dados.itensAcrescidos);
+          if (itensAtualizados) atualizacao.itens = itensAtualizados;
         }
 
         transacao.set(aditivoRef, { ...dados, criado_em: agora });

@@ -79,6 +79,7 @@ interface Props {
     data: string;
     valorAcrescido?: number;
     novaFimVigencia?: string;
+    itensAcrescidos?: ConsumoItemExecucao[];
     observacao?: string;
   }) => void | Promise<void>;
   /** Exibe a aba de ocorrências. */
@@ -118,6 +119,7 @@ export default function ExecucaoModal({
   );
   const [salvandoOcorrencia, setSalvandoOcorrencia] = useState(false);
   const [novoAditivo, setNovoAditivo] = useState<NovoAditivoForm>(ADITIVO_VAZIO);
+  const [linhasItensAditivo, setLinhasItensAditivo] = useState<LinhaItemConsumido[]>([]);
   const [salvandoAditivo, setSalvandoAditivo] = useState(false);
   const [erroAditivo, setErroAditivo] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -136,6 +138,18 @@ export default function ExecucaoModal({
   };
   const handleRemoveLinhaItem = (indice: number) => {
     setLinhasItens((anterior) => anterior.filter((_, i) => i !== indice));
+  };
+
+  const handleAddLinhaItemAditivo = () => {
+    setLinhasItensAditivo((anterior) => [...anterior, { itemId: itensContrato[0]?.id ?? '', quantidade: '' }]);
+  };
+  const handleLinhaItemAditivoChange = (indice: number, campo: keyof LinhaItemConsumido, valor: string) => {
+    setLinhasItensAditivo((anterior) =>
+      anterior.map((linha, i) => (i === indice ? { ...linha, [campo]: valor } : linha)),
+    );
+  };
+  const handleRemoveLinhaItemAditivo = (indice: number) => {
+    setLinhasItensAditivo((anterior) => anterior.filter((_, i) => i !== indice));
   };
 
   const execucoesDoContrato = execucoes.filter((e) => e.contratoId === contrato.id);
@@ -212,11 +226,19 @@ export default function ExecucaoModal({
     }
   };
 
+  const aditivoExigeValor = novoAditivo.tipo === 'FINANCEIRO' || novoAditivo.tipo === 'FINANCEIRO_E_PRAZO';
+  const aditivoExigePrazo = novoAditivo.tipo === 'PRAZO' || novoAditivo.tipo === 'FINANCEIRO_E_PRAZO';
+  const aditivoExigeItens = novoAditivo.tipo === 'QUANTIDADE';
+  const itensAcrescidosValidos = linhasItensAditivo.filter(
+    (linha) => linha.itemId && Number(linha.quantidade) > 0,
+  );
+
   const aditivoCamposInvalidos =
     !novoAditivo.numero ||
     !novoAditivo.data ||
-    (novoAditivo.tipo !== 'PRAZO' && !novoAditivo.valorAcrescido) ||
-    (novoAditivo.tipo !== 'FINANCEIRO' && !novoAditivo.novaFimVigencia);
+    (aditivoExigeValor && !novoAditivo.valorAcrescido) ||
+    (aditivoExigePrazo && !novoAditivo.novaFimVigencia) ||
+    (aditivoExigeItens && itensAcrescidosValidos.length === 0);
 
   const handleAddAditivo = async () => {
     if (aditivoCamposInvalidos || !onAddAditivo) return;
@@ -227,15 +249,20 @@ export default function ExecucaoModal({
         tipo: novoAditivo.tipo,
         numero: novoAditivo.numero,
         data: novoAditivo.data,
-        ...(novoAditivo.tipo !== 'PRAZO'
-          ? { valorAcrescido: Number(novoAditivo.valorAcrescido) || 0 }
-          : {}),
-        ...(novoAditivo.tipo !== 'FINANCEIRO'
-          ? { novaFimVigencia: novoAditivo.novaFimVigencia }
+        ...(aditivoExigeValor ? { valorAcrescido: Number(novoAditivo.valorAcrescido) || 0 } : {}),
+        ...(aditivoExigePrazo ? { novaFimVigencia: novoAditivo.novaFimVigencia } : {}),
+        ...(aditivoExigeItens
+          ? {
+              itensAcrescidos: itensAcrescidosValidos.map((linha) => ({
+                itemId: linha.itemId,
+                quantidade: Number(linha.quantidade),
+              })),
+            }
           : {}),
         observacao: novoAditivo.observacao || '',
       });
       setNovoAditivo(ADITIVO_VAZIO);
+      setLinhasItensAditivo([]);
     } catch (erro) {
       setErroAditivo(
         erro instanceof Error ? erro.message : 'Erro ao registrar o aditivo. Tente novamente.',
@@ -743,7 +770,7 @@ export default function ExecucaoModal({
                       className={CLASSE_INPUT}
                     />
                   </div>
-                  {novoAditivo.tipo !== 'PRAZO' && (
+                  {aditivoExigeValor && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
                         Valor Acrescido (R$)
@@ -761,7 +788,7 @@ export default function ExecucaoModal({
                       </p>
                     </div>
                   )}
-                  {novoAditivo.tipo !== 'FINANCEIRO' && (
+                  {aditivoExigePrazo && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
                         Nova Data de Fim de Vigência
@@ -774,6 +801,66 @@ export default function ExecucaoModal({
                         }
                         className={CLASSE_INPUT}
                       />
+                    </div>
+                  )}
+                  {aditivoExigeItens && (
+                    <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Itens Acrescidos</p>
+                      {!temItens && (
+                        <p className="text-xs text-gray-500">
+                          Este contrato ainda não tem itens cadastrados — cadastre-os na edição do
+                          contrato antes de registrar um aditivo de quantidade.
+                        </p>
+                      )}
+                      {temItens && (
+                        <>
+                          <div className="space-y-2">
+                            {linhasItensAditivo.map((linha, indice) => (
+                              <div key={indice} className="flex items-center gap-2">
+                                <select
+                                  value={linha.itemId}
+                                  onChange={(e) =>
+                                    handleLinhaItemAditivoChange(indice, 'itemId', e.target.value)
+                                  }
+                                  className={`${CLASSE_INPUT} flex-1`}
+                                >
+                                  {itensContrato.map((i) => (
+                                    <option key={i.id} value={i.id}>
+                                      {i.descricao} (atual: {i.quantidadeInicial}
+                                      {i.unidade ? ` ${i.unidade}` : ''})
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="number"
+                                  placeholder="Qtd. a acrescer"
+                                  value={linha.quantidade}
+                                  onChange={(e) =>
+                                    handleLinhaItemAditivoChange(indice, 'quantidade', e.target.value)
+                                  }
+                                  className={`${CLASSE_INPUT} w-28`}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveLinhaItemAditivo(indice)}
+                                  className="text-gray-400 hover:text-red-600"
+                                  title="Remover"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleAddLinhaItemAditivo}
+                            className="mt-2 inline-flex items-center text-xs font-medium text-red-700 hover:text-red-800"
+                          >
+                            <PlusCircle className="w-3 h-3 mr-1" />
+                            Adicionar item
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                   <div>
@@ -838,6 +925,19 @@ export default function ExecucaoModal({
                                 {format(new Date(aditivo.novaFimVigencia), 'dd/MM/yyyy')}
                               </span>
                             </p>
+                          )}
+                          {aditivo.itensAcrescidos && aditivo.itensAcrescidos.length > 0 && (
+                            <ul className="text-xs text-gray-700 list-disc list-inside">
+                              {aditivo.itensAcrescidos.map((acrescimo) => {
+                                const item = itensContrato.find((i) => i.id === acrescimo.itemId);
+                                return (
+                                  <li key={acrescimo.itemId}>
+                                    + {acrescimo.quantidade}
+                                    {item?.unidade ? ` ${item.unidade}` : ''} em {item?.descricao ?? 'item removido'}
+                                  </li>
+                                );
+                              })}
+                            </ul>
                           )}
                           {aditivo.observacao && (
                             <p className="text-xs text-gray-500 mt-1">{aditivo.observacao}</p>
