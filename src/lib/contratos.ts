@@ -5,9 +5,20 @@
 import { differenceInDays } from 'date-fns';
 import type { Contrato } from '../types';
 
+/** Opções fixas de Natureza de Despesa exibidas no cadastro/filtro de contratos. */
+export const OPCOES_NATUREZA_DESPESA_CONTRATO = ['CONSUMO', 'PERMANENTE', 'SERVIÇO'];
+
+/** Opções fixas de Fonte de Recurso exibidas no cadastro/filtro de contratos. */
+export const OPCOES_FONTE_RECURSO_CONTRATO = ['TESOURO', 'FEBOM', 'NOA', 'BNDES', 'TED', 'OUTRO'];
+
 export interface ContratoComStatus extends Contrato {
   diasRestantes: number;
-  status: 'VIGENTE' | 'FALTA MENOS DE 90 DIAS' | 'FALTA MENOS DE 30 DIAS' | 'VENCIDO';
+  status:
+    | 'VIGENTE'
+    | 'FALTA MENOS DE 90 DIAS'
+    | 'FALTA MENOS DE 30 DIAS'
+    | 'VENCIDO'
+    | 'CONCLUÍDO';
   cor: string;
   badge: string;
 }
@@ -20,6 +31,16 @@ export function calcularStatusContrato(
   const diasRestantes = Number.isNaN(dataFim.getTime())
     ? 0
     : differenceInDays(dataFim, hoje);
+
+  if (contrato.concluido) {
+    return {
+      ...contrato,
+      diasRestantes,
+      status: 'CONCLUÍDO',
+      cor: 'bg-slate-100 text-slate-700 border-slate-200',
+      badge: 'Concluído',
+    };
+  }
 
   let status: ContratoComStatus['status'] = 'VIGENTE';
   let cor = 'bg-emerald-100 text-emerald-800 border-emerald-200';
@@ -40,6 +61,40 @@ export function calcularStatusContrato(
   }
 
   return { ...contrato, diasRestantes, status, cor, badge };
+}
+
+/**
+ * Extrai (ano, número) do "Nº do Contrato" pra permitir ordenação — o
+ * campo é texto livre (às vezes só "nnn/aaaa", às vezes algo como "4º
+ * Termo Aditivo ao Contrato 021/2022/CBMPA"), então usa o último trecho
+ * "nnn/aaaa" encontrado na string. Devolve null quando não acha nenhum.
+ */
+export function extrairAnoNumeroContrato(numero: string): { ano: number; numero: number } | null {
+  const ocorrencias = [...numero.matchAll(/(\d+)\s*\/\s*(\d{4})/g)];
+  if (ocorrencias.length === 0) return null;
+  const ultima = ocorrencias[ocorrencias.length - 1];
+  return { numero: Number(ultima[1]), ano: Number(ultima[2]) };
+}
+
+/**
+ * Ordena contratos por ano e número (extraídos de `numero` via
+ * `extrairAnoNumeroContrato`); contratos sem um número reconhecível vão
+ * para o fim, independente da direção. `direcao: 'desc'` inverte a ordem.
+ */
+export function ordenarContratosPorNumero<T extends Contrato>(
+  contratos: T[],
+  direcao: 'asc' | 'desc' = 'asc',
+): T[] {
+  const sinal = direcao === 'asc' ? 1 : -1;
+  return [...contratos].sort((a, b) => {
+    const chaveA = extrairAnoNumeroContrato(a.numero ?? '');
+    const chaveB = extrairAnoNumeroContrato(b.numero ?? '');
+    if (!chaveA && !chaveB) return 0;
+    if (!chaveA) return 1;
+    if (!chaveB) return -1;
+    if (chaveA.ano !== chaveB.ano) return (chaveA.ano - chaveB.ano) * sinal;
+    return (chaveA.numero - chaveB.numero) * sinal;
+  });
 }
 
 /** Restringe a lista aos contratos que um fiscal pode ver. */

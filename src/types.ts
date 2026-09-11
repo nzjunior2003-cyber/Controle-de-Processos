@@ -250,6 +250,10 @@ export interface Contrato {
   fiscalSuplenteContato?: string;
   portaria?: string;
   fonteRecurso?: string;
+  /** Natureza de despesa do contrato (Consumo, Permanente ou Serviço). */
+  naturezaDespesa?: string;
+  /** Marcado manualmente pelo Gestor quando o contrato foi encerrado/totalmente executado antes do fim da vigência (ou mesmo depois, como registro). */
+  concluido?: boolean;
   prd?: string;
   /** Valor do PRD (Pedido de Reconhecimento de Despesa), distinto do valor global do contrato. */
   valorPRD?: number;

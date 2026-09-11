@@ -7,6 +7,7 @@ import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
 import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
+import { OPCOES_FONTE_RECURSO_CONTRATO, OPCOES_NATUREZA_DESPESA_CONTRATO } from '../../lib/contratos';
 
 const CLASSE_INPUT =
   'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm';
@@ -35,6 +36,7 @@ interface FormState {
   fiscalSuplenteContato: string;
   portaria: string;
   fonteRecurso: string;
+  naturezaDespesa: string;
   prd: string;
   valorPRD: string;
   empenho: string;
@@ -65,6 +67,7 @@ const estadoVazio: FormState = {
   fiscalSuplenteContato: '',
   portaria: '',
   fonteRecurso: '',
+  naturezaDespesa: '',
   prd: '',
   valorPRD: '',
   empenho: '',
@@ -102,6 +105,7 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
     fiscalSuplenteContato: contrato.fiscalSuplenteContato ?? '',
     portaria: contrato.portaria ?? '',
     fonteRecurso: contrato.fonteRecurso ?? '',
+    naturezaDespesa: contrato.naturezaDespesa ?? '',
     prd: contrato.prd ?? '',
     valorPRD: contrato.valorPRD != null ? String(contrato.valorPRD) : '',
     empenho: contrato.empenho ?? '',
@@ -193,6 +197,7 @@ export default function ContratoForm() {
         fiscalSuplenteContato: form.fiscalSuplenteContato || '',
         portaria: form.portaria || '',
         fonteRecurso: form.fonteRecurso || '',
+        naturezaDespesa: form.naturezaDespesa || '',
         prd: form.prd || '',
         ...(form.valorPRD ? { valorPRD: Number(form.valorPRD.replace(',', '.')) } : {}),
         empenho: form.empenho || '',
@@ -533,12 +538,29 @@ export default function ContratoForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className={CLASSE_LABEL}>Fonte de Recurso</label>
-                <input
-                  type="text"
+                <select
                   value={form.fonteRecurso}
                   onChange={(e) => handleChange('fonteRecurso', e.target.value)}
-                  className={CLASSE_INPUT}
-                />
+                  className={`${CLASSE_INPUT} bg-white`}
+                >
+                  <option value="">Selecione...</option>
+                  {OPCOES_FONTE_RECURSO_CONTRATO.map((opcao) => (
+                    <option key={opcao} value={opcao}>{opcao}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={CLASSE_LABEL}>Natureza de Despesa</label>
+                <select
+                  value={form.naturezaDespesa}
+                  onChange={(e) => handleChange('naturezaDespesa', e.target.value)}
+                  className={`${CLASSE_INPUT} bg-white`}
+                >
+                  <option value="">Selecione...</option>
+                  {OPCOES_NATUREZA_DESPESA_CONTRATO.map((opcao) => (
+                    <option key={opcao} value={opcao}>{opcao}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className={CLASSE_LABEL}>PRD</label>

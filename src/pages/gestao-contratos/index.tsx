@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, BellRing, Clock, FileText, Filter, Mail, PlusCircle, RefreshCw, Search, ShieldAlert } from 'lucide-react';
+import {
+  AlertCircle, ArrowDownAZ, ArrowUpAZ, BellRing, Clock, FileText, Filter, Mail, PlusCircle,
+  RefreshCw, Search, ShieldAlert,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
 import type { Contrato } from '../../types';
@@ -16,6 +19,9 @@ import {
   buscarContratos,
   calcularStatusContrato,
   filtrarContratosPorGestor,
+  ordenarContratosPorNumero,
+  OPCOES_FONTE_RECURSO_CONTRATO,
+  OPCOES_NATUREZA_DESPESA_CONTRATO,
   type ContratoComStatus,
 } from '../../lib/contratos';
 
@@ -49,6 +55,7 @@ export default function GestaoContratos() {
     pcas,
     usuarioAtual,
     contratos,
+    updateContrato,
     syncContratosDaPlanilha,
     execucoes,
     addExecucao,
@@ -65,6 +72,11 @@ export default function GestaoContratos() {
   const [alertasModalOpen, setAlertasModalOpen] = useState(false);
   const [filtroKpi, setFiltroKpi] = useState<FiltroKpi>(null);
   const [sincronizando, setSincronizando] = useState(false);
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [filtroNatureza, setFiltroNatureza] = useState('');
+  const [filtroFonte, setFiltroFonte] = useState('');
+  const [filtroSituacao, setFiltroSituacao] = useState<'todos' | 'ativos' | 'concluidos'>('todos');
+  const [direcaoOrdenacao, setDirecaoOrdenacao] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     const cancelar = initAuth();
@@ -95,11 +107,26 @@ export default function GestaoContratos() {
     if (filtroKpi === 'vigentes') lista = lista.filter((c) => c.diasRestantes > 90);
     else if (filtroKpi === 'atencao') lista = lista.filter((c) => c.diasRestantes >= 0 && c.diasRestantes <= 90);
     else if (filtroKpi === 'vencidos') lista = lista.filter((c) => c.diasRestantes < 0);
-    return lista;
-  }, [contratosComStatus, busca, filtroKpi]);
+    if (filtroNatureza) lista = lista.filter((c) => c.naturezaDespesa === filtroNatureza);
+    if (filtroFonte) lista = lista.filter((c) => c.fonteRecurso === filtroFonte);
+    if (filtroSituacao === 'concluidos') lista = lista.filter((c) => c.concluido);
+    else if (filtroSituacao === 'ativos') lista = lista.filter((c) => !c.concluido);
+    return ordenarContratosPorNumero(lista, direcaoOrdenacao);
+  }, [contratosComStatus, busca, filtroKpi, filtroNatureza, filtroFonte, filtroSituacao, direcaoOrdenacao]);
+
+  const filtrosAtivos =
+    [filtroNatureza, filtroFonte].filter(Boolean).length + (filtroSituacao !== 'todos' ? 1 : 0);
 
   const isMasterOrGestao =
     usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'gestao';
+
+  const handleToggleConcluido = async (contrato: ContratoComStatus) => {
+    try {
+      await updateContrato(contrato.id, { concluido: !contrato.concluido });
+    } catch (erro) {
+      alert('Não foi possível atualizar a situação do contrato: ' + (erro instanceof Error ? erro.message : String(erro)));
+    }
+  };
 
   const handleSincronizar = async () => {
     setSincronizando(true);
@@ -214,11 +241,86 @@ export default function GestaoContratos() {
             placeholder="Buscar por PAE, Contrato, Empresa ou Objeto..."
           />
         </div>
-        <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-          <Filter className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
-          Filtros Avançados
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setDirecaoOrdenacao((d) => (d === 'asc' ? 'desc' : 'asc'))}
+            title="Ordenar por Nº do Contrato"
+            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 whitespace-nowrap"
+          >
+            {direcaoOrdenacao === 'asc' ? (
+              <ArrowUpAZ className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
+            ) : (
+              <ArrowDownAZ className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
+            )}
+            Nº {direcaoOrdenacao === 'asc' ? 'Crescente' : 'Decrescente'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMostrarFiltros((v) => !v)}
+            className={`inline-flex items-center px-3 py-2 border shadow-sm text-sm font-medium rounded-md whitespace-nowrap ${
+              mostrarFiltros ? 'border-red-300 bg-red-50 text-red-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <Filter className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
+            Filtros{filtrosAtivos > 0 ? ` (${filtrosAtivos})` : ''}
+          </button>
+        </div>
       </div>
+
+      {mostrarFiltros && (
+        <div className="bg-white p-4 shadow-sm rounded-lg border border-gray-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Natureza de Despesa</label>
+            <select
+              value={filtroNatureza}
+              onChange={(e) => setFiltroNatureza(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
+            >
+              <option value="">Todas</option>
+              {OPCOES_NATUREZA_DESPESA_CONTRATO.map((op) => <option key={op} value={op}>{op}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Fonte de Recurso</label>
+            <select
+              value={filtroFonte}
+              onChange={(e) => setFiltroFonte(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
+            >
+              <option value="">Todas</option>
+              {OPCOES_FONTE_RECURSO_CONTRATO.map((op) => <option key={op} value={op}>{op}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Situação</label>
+            <select
+              value={filtroSituacao}
+              onChange={(e) => setFiltroSituacao(e.target.value as 'todos' | 'ativos' | 'concluidos')}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
+            >
+              <option value="todos">Todas</option>
+              <option value="ativos">Em andamento</option>
+              <option value="concluidos">Concluídos</option>
+            </select>
+          </div>
+          {filtrosAtivos > 0 && (
+            <div className="sm:col-span-2 lg:col-span-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltroNatureza('');
+                  setFiltroFonte('');
+                  setFiltroSituacao('todos');
+                }}
+                className="text-sm text-red-600 hover:text-red-800 font-medium"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
         {abaAtiva === 'geral' && (
@@ -233,6 +335,7 @@ export default function GestaoContratos() {
                 ? (contrato) => navigate(`/sistema/gestao-contratos/${contrato.id}/editar`)
                 : undefined
             }
+            onToggleConcluido={isMasterOrGestao ? handleToggleConcluido : undefined}
             getPcaTitleByProcesso={getPcaTitleByProcesso}
           />
         )}

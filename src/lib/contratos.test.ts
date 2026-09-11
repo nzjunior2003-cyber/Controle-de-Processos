@@ -5,9 +5,11 @@ import {
   buscarContratos,
   calcularStatusContrato,
   devolverSaldo,
+  extrairAnoNumeroContrato,
   filtrarContratosDoFiscal,
   filtrarContratosPorGestor,
   gestorRaizDe,
+  ordenarContratosPorNumero,
   validarLimiteFiscal,
 } from './contratos';
 import type { Contrato } from '../types';
@@ -59,6 +61,57 @@ describe('calcularStatusContrato', () => {
     const resultado = calcularStatusContrato({ ...base, fimVigencia: '' }, hoje);
     expect(resultado.diasRestantes).toBe(0);
     expect(resultado.status).toBe('FALTA MENOS DE 30 DIAS');
+  });
+
+  it('marca como concluído quando sinalizado manualmente, mesmo vencido ou vigente', () => {
+    const vencido = calcularStatusContrato({ ...base, fimVigencia: '2026-01-10', concluido: true }, hoje);
+    expect(vencido.status).toBe('CONCLUÍDO');
+    expect(vencido.badge).toBe('Concluído');
+
+    const vigente = calcularStatusContrato({ ...base, concluido: true }, hoje);
+    expect(vigente.status).toBe('CONCLUÍDO');
+  });
+});
+
+describe('extrairAnoNumeroContrato', () => {
+  it('extrai número e ano de um "nnn/aaaa" simples', () => {
+    expect(extrairAnoNumeroContrato('053/2020')).toEqual({ numero: 53, ano: 2020 });
+  });
+
+  it('usa a última ocorrência "nnn/aaaa" em textos com mais contexto', () => {
+    expect(extrairAnoNumeroContrato('4º Termo Aditivo ao Contrato 021/2022/CBMPA')).toEqual({
+      numero: 21,
+      ano: 2022,
+    });
+  });
+
+  it('devolve null quando não encontra nenhum padrão "nnn/aaaa"', () => {
+    expect(extrairAnoNumeroContrato('Contrato sem número')).toBeNull();
+  });
+});
+
+describe('ordenarContratosPorNumero', () => {
+  const contratos: Contrato[] = [
+    { ...base, id: 'a', numero: '010/2025' },
+    { ...base, id: 'b', numero: '005/2024' },
+    { ...base, id: 'c', numero: '020/2025' },
+    { ...base, id: 'd', numero: 'sem número reconhecível' },
+  ];
+
+  it('ordena crescente por ano e depois por número', () => {
+    const resultado = ordenarContratosPorNumero(contratos, 'asc');
+    expect(resultado.map((c) => c.id)).toEqual(['b', 'a', 'c', 'd']);
+  });
+
+  it('ordena decrescente por ano e depois por número', () => {
+    const resultado = ordenarContratosPorNumero(contratos, 'desc');
+    expect(resultado.map((c) => c.id)).toEqual(['c', 'a', 'b', 'd']);
+  });
+
+  it('não muta o array original', () => {
+    const copia = [...contratos];
+    ordenarContratosPorNumero(contratos, 'asc');
+    expect(contratos).toEqual(copia);
   });
 });
 

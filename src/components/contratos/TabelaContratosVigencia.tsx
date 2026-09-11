@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, FileText, Pencil, PlusCircle, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, FileText, Pencil, PlusCircle, RotateCcw, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   formatarMoeda,
@@ -22,6 +22,8 @@ interface Props {
   onGerenciar: (contrato: ContratoComStatus) => void;
   /** Quando informado, exibe o botão de editar os dados cadastrais do contrato. */
   onEditar?: (contrato: ContratoComStatus) => void;
+  /** Quando informado, exibe o botão de marcar/desmarcar o contrato como concluído. */
+  onToggleConcluido?: (contrato: ContratoComStatus) => void;
   getPcaTitleByProcesso: (numeroProcesso: string) => string | null;
 }
 
@@ -37,6 +39,7 @@ export default function TabelaContratosVigencia({
   podeGerenciar,
   onGerenciar,
   onEditar,
+  onToggleConcluido,
   getPcaTitleByProcesso,
 }: Props) {
   const [expandido, setExpandido] = useState<string | null>(null);
@@ -46,11 +49,11 @@ export default function TabelaContratosVigencia({
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PAE / Contrato</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empresa / Objeto</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vigência</th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor Global</th>
-            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Situação</th>
+            <th scope="col" className="pl-4 pr-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">PAE / Contrato</th>
+            <th scope="col" className="pl-2 pr-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Empresa / Objeto</th>
+            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vigência</th>
+            <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor Global</th>
+            <th scope="col" className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Situação</th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -67,7 +70,7 @@ export default function TabelaContratosVigencia({
             return (
               <React.Fragment key={item.id}>
                 <tr className={`hover:bg-gray-50 ${isExpanded ? 'bg-blue-50/20' : ''}`}>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="pl-4 pr-2 py-2 whitespace-nowrap">
                     <button
                       onClick={() => setExpandido(isExpanded ? null : item.id)}
                       className="text-left group flex flex-col focus:outline-none"
@@ -76,32 +79,32 @@ export default function TabelaContratosVigencia({
                         Nº {item.numero}
                         {isExpanded ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
                       </span>
-                      <span className="text-xs text-gray-500 mt-1">PAE: {item.pae}</span>
+                      <span className="text-xs text-gray-500">PAE: {item.pae}</span>
                     </button>
                     {pcaIdCode && (
-                      <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                      <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
                         <ShieldCheck className="w-3 h-3 mr-1" />
                         PCA: {pcaIdCode}
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4 max-w-xs">
+                  <td className="pl-2 pr-4 py-2 max-w-xs">
                     <div className="text-sm font-medium text-gray-900 truncate" title={item.empresa}>{item.empresa}</div>
-                    <div className="text-xs text-gray-500 mt-1 line-clamp-2" title={item.objeto}>{item.objeto}</div>
+                    <div className="text-xs text-gray-500 line-clamp-2" title={item.objeto}>{item.objeto}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-2 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{formatarData(item.fimVigencia)}</div>
-                    <div className={`text-xs font-medium mt-1 ${item.diasRestantes < 0 ? 'text-red-600' : item.diasRestantes <= 90 ? 'text-amber-600' : 'text-gray-500'}`}>
+                    <div className={`text-xs font-medium ${item.diasRestantes < 0 ? 'text-red-600' : item.diasRestantes <= 90 ? 'text-amber-600' : 'text-gray-500'}`}>
                       {item.diasRestantes < 0
                         ? `Vencido há ${Math.abs(item.diasRestantes)} dias`
                         : `Faltam ${item.diasRestantes} dias`}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <td className="px-4 py-2 whitespace-nowrap text-right">
                     <div className="text-sm font-medium text-gray-900">{formatarMoeda(item.valorGlobal)}</div>
-                    <div className="text-xs text-gray-500 mt-1">Executado: {percExec}%</div>
+                    <div className="text-xs text-gray-500">Executado: {percExec}%</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                  <td className="px-4 py-2 whitespace-nowrap text-center">
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${item.cor}`}>
                       {item.badge}
                     </span>
@@ -110,7 +113,7 @@ export default function TabelaContratosVigencia({
 
                 {isExpanded && (
                   <tr className="bg-blue-50/10">
-                    <td colSpan={5} className="px-6 py-4 border-b border-blue-100">
+                    <td colSpan={5} className="px-4 py-3 border-b border-blue-100">
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm bg-white p-4 rounded-lg border border-blue-100 shadow-sm">
                         <div className="space-y-4">
                           <div>
@@ -135,10 +138,32 @@ export default function TabelaContratosVigencia({
                             {onEditar && (
                               <button
                                 onClick={() => onEditar(item)}
-                                className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none mb-2"
+                                className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none mr-2 mb-2"
                               >
                                 <Pencil className="w-4 h-4 mr-1.5" />
                                 Editar Contrato
+                              </button>
+                            )}
+                            {onToggleConcluido && (
+                              <button
+                                onClick={() => onToggleConcluido(item)}
+                                className={`inline-flex items-center px-3 py-1.5 border text-xs font-medium rounded-md shadow-sm focus:outline-none mb-2 ${
+                                  item.concluido
+                                    ? 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+                                    : 'border-transparent text-white bg-emerald-600 hover:bg-emerald-700'
+                                }`}
+                              >
+                                {item.concluido ? (
+                                  <>
+                                    <RotateCcw className="w-4 h-4 mr-1.5" />
+                                    Reabrir Contrato
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                                    Marcar como Concluído
+                                  </>
+                                )}
                               </button>
                             )}
                           </div>
