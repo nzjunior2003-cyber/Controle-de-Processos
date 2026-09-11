@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, PlusCircle, Upload, X } from 'lucide-react';
+import { FileText, PlusCircle, Trash2, Upload, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { getAccessToken, googleSignIn } from '../../lib/googleAuth';
 import { getOrCreateFolder, uploadFileToDrive } from '../../lib/driveService';
@@ -8,12 +8,18 @@ import {
   TIPO_ADITIVO_LABELS,
   TIPO_OCORRENCIA_LABELS,
   type Aditivo,
+  type ConsumoItemExecucao,
   type ContratoComStatus,
   type ExecucaoContrato,
   type Ocorrencia,
   type TipoAditivo,
   type TipoOcorrencia,
 } from '../../lib/contratos';
+
+interface LinhaItemConsumido {
+  itemId: string;
+  quantidade: string;
+}
 
 const CLASSE_INPUT =
   'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm';
@@ -115,6 +121,22 @@ export default function ExecucaoModal({
   const [salvandoAditivo, setSalvandoAditivo] = useState(false);
   const [erroAditivo, setErroAditivo] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [linhasItens, setLinhasItens] = useState<LinhaItemConsumido[]>([]);
+
+  const itensContrato = contrato.itens ?? [];
+  const temItens = itensContrato.length > 0;
+
+  const handleAddLinhaItem = () => {
+    setLinhasItens((anterior) => [...anterior, { itemId: itensContrato[0]?.id ?? '', quantidade: '' }]);
+  };
+  const handleLinhaItemChange = (indice: number, campo: keyof LinhaItemConsumido, valor: string) => {
+    setLinhasItens((anterior) =>
+      anterior.map((linha, i) => (i === indice ? { ...linha, [campo]: valor } : linha)),
+    );
+  };
+  const handleRemoveLinhaItem = (indice: number) => {
+    setLinhasItens((anterior) => anterior.filter((_, i) => i !== indice));
+  };
 
   const execucoesDoContrato = execucoes.filter((e) => e.contratoId === contrato.id);
   const valorExecutado = execucoesDoContrato.reduce((acc, atual) => acc + atual.valor, 0);
@@ -160,6 +182,10 @@ export default function ExecucaoModal({
         }
       }
 
+      const itensConsumidos: ConsumoItemExecucao[] = linhasItens
+        .filter((linha) => linha.itemId && Number(linha.quantidade) > 0)
+        .map((linha) => ({ itemId: linha.itemId, quantidade: Number(linha.quantidade) }));
+
       await onAddExecucao({
         contratoId: contrato.id,
         tipo: novaExecucao.tipo,
@@ -169,9 +195,11 @@ export default function ExecucaoModal({
         quantidade: Number(novaExecucao.quantidade) || 1,
         observacao: novaExecucao.observacao,
         arquivoLink,
+        ...(itensConsumidos.length > 0 ? { itensConsumidos } : {}),
       });
 
       setNovaExecucao(EXECUCAO_VAZIA);
+      setLinhasItens([]);
     } catch (erro) {
       console.error(erro);
       alert(
@@ -231,6 +259,17 @@ export default function ExecucaoModal({
             Gestão do Contrato nº {contrato.numero}
           </h3>
           <div className="flex items-center space-x-2">
+            {contrato.contratoPdfLink && (
+              <a
+                href={contrato.contratoPdfLink}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border border-gray-300 flex items-center"
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                Ver PDF do Contrato
+              </a>
+            )}
             <button
               type="button"
               onClick={() => window.open(`/sistema/gestao-contratos/${contrato.id}/relatorio`, '_blank')}
@@ -307,6 +346,22 @@ export default function ExecucaoModal({
                 <p className="text-xl font-bold text-emerald-600">{formatarMoeda(saldo)}</p>
               </div>
             </div>
+
+            {temItens && (
+              <div className="mt-4 border-t border-gray-200 pt-4">
+                <p className="text-xs text-gray-500 uppercase font-medium mb-2">Saldo por Item</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {itensContrato.map((item) => (
+                    <div key={item.id} className="flex justify-between text-sm bg-white border border-gray-200 rounded px-3 py-1.5">
+                      <span className="text-gray-700 truncate mr-2">{item.descricao}</span>
+                      <span className="font-medium text-gray-900 whitespace-nowrap">
+                        {item.quantidadeAtual}/{item.quantidadeInicial}{item.unidade ? ` ${item.unidade}` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {(!(comOcorrencias || comAditivos) || aba === 'execucao') && (
@@ -406,6 +461,57 @@ export default function ExecucaoModal({
                       className={CLASSE_INPUT}
                     />
                   </div>
+                  {temItens && (
+                    <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Itens Recebidos/Consumidos</p>
+                      <div className="space-y-2">
+                        {linhasItens.map((linha, indice) => {
+                          const item = itensContrato.find((i) => i.id === linha.itemId);
+                          return (
+                            <div key={indice} className="flex items-center gap-2">
+                              <select
+                                value={linha.itemId}
+                                onChange={(e) => handleLinhaItemChange(indice, 'itemId', e.target.value)}
+                                className={`${CLASSE_INPUT} flex-1`}
+                              >
+                                {itensContrato.map((i) => (
+                                  <option key={i.id} value={i.id}>
+                                    {i.descricao} (saldo: {i.quantidadeAtual}{i.unidade ? ` ${i.unidade}` : ''})
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                type="number"
+                                placeholder="Qtd."
+                                value={linha.quantidade}
+                                onChange={(e) => handleLinhaItemChange(indice, 'quantidade', e.target.value)}
+                                className={`${CLASSE_INPUT} w-24`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveLinhaItem(indice)}
+                                className="text-gray-400 hover:text-red-600"
+                                title="Remover"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                              {item && Number(linha.quantidade) > item.quantidadeAtual && (
+                                <p className="text-xs text-amber-600">Acima do saldo</p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddLinhaItem}
+                        className="mt-2 inline-flex items-center text-xs font-medium text-red-700 hover:text-red-800"
+                      >
+                        <PlusCircle className="w-3 h-3 mr-1" />
+                        Adicionar item
+                      </button>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Comprovante (NF / Recibo)</label>
                     <input
@@ -467,6 +573,19 @@ export default function ExecucaoModal({
                               <p className="text-lg font-bold text-red-600">- {formatarMoeda(exec.valor)}</p>
                             </div>
                           </div>
+                          {exec.itensConsumidos && exec.itensConsumidos.length > 0 && (
+                            <ul className="text-xs text-gray-600 mb-2 list-disc list-inside">
+                              {exec.itensConsumidos.map((consumo) => {
+                                const item = itensContrato.find((i) => i.id === consumo.itemId);
+                                return (
+                                  <li key={consumo.itemId}>
+                                    {item?.descricao ?? 'Item removido'}: {consumo.quantidade}
+                                    {item?.unidade ? ` ${item.unidade}` : ''}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
                           {exec.arquivoLink && (
                             <a
                               href={exec.arquivoLink}

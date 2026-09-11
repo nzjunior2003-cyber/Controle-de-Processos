@@ -52,8 +52,10 @@ import {
   type ContratoDaPlanilha,
 } from '../lib/planilhaContratos';
 import {
+  abaterItens,
   abaterSaldo,
   aplicarAditivoFinanceiro,
+  devolverItens,
   devolverSaldo,
   gestorRaizDe,
   validarLimiteFiscal,
@@ -1056,6 +1058,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
       const contrato = contratoSnap.data() as Contrato;
       const saldo = abaterSaldo(contrato, dados);
+      const itensAtualizados = abaterItens(contrato.itens, dados.itensConsumidos);
 
       if (saldo.saldoAtualFinanceiro < 0) {
         console.warn(
@@ -1069,7 +1072,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
 
       transacao.set(execucaoRef, { ...dados, criado_em: agora });
-      transacao.update(contratoRef, { ...saldo, atualizado_em: agora });
+      transacao.update(contratoRef, {
+        ...saldo,
+        ...(itensAtualizados ? { itens: itensAtualizados } : {}),
+        atualizado_em: agora,
+      });
       return saldo;
     });
 
@@ -1094,9 +1101,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const contrato = contratoSnap.data() as Contrato;
       const execucao = execucaoSnap.data() as ExecucaoContrato;
       const novoSaldo = devolverSaldo(contrato, execucao);
+      const itensRevertidos = devolverItens(contrato.itens, execucao.itensConsumidos);
 
       transacao.delete(execucaoRef);
-      transacao.update(contratoRef, { ...novoSaldo, atualizado_em: new Date().toISOString() });
+      transacao.update(contratoRef, {
+        ...novoSaldo,
+        ...(itensRevertidos ? { itens: itensRevertidos } : {}),
+        atualizado_em: new Date().toISOString(),
+      });
       return execucao;
     });
 

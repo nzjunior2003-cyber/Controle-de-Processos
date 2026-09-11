@@ -1,19 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
+  abaterItens,
   abaterSaldo,
   aplicarAditivoFinanceiro,
   buscarContratos,
   calcularStatusContrato,
+  devolverItens,
   devolverSaldo,
   extrairAnoNumeroContrato,
   filtrarContratosDoFiscal,
   filtrarContratosPorGestor,
   gestorRaizDe,
   marcoAlertaVencimento,
+  mesclarItensContrato,
   ordenarContratosPorNumero,
   validarLimiteFiscal,
 } from './contratos';
-import type { Contrato } from '../types';
+import type { Contrato, ItemContrato } from '../types';
 
 const base: Contrato = {
   id: 'c1',
@@ -206,6 +209,74 @@ describe('devolverSaldo', () => {
     const depoisDeAbater = abaterSaldo(original, execucao);
     const depoisDeDevolver = devolverSaldo(depoisDeAbater, execucao);
     expect(depoisDeDevolver).toEqual(original);
+  });
+});
+
+describe('abaterItens', () => {
+  const itens: ItemContrato[] = [
+    { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 100 },
+    { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50, quantidadeAtual: 50 },
+  ];
+
+  it('abate a quantidade só dos itens informados em itensConsumidos', () => {
+    const resultado = abaterItens(itens, [{ itemId: 'i1', quantidade: 30 }]);
+    expect(resultado?.find((i) => i.id === 'i1')?.quantidadeAtual).toBe(70);
+    expect(resultado?.find((i) => i.id === 'i2')?.quantidadeAtual).toBe(50);
+  });
+
+  it('devolve os itens inalterados quando não há itensConsumidos', () => {
+    expect(abaterItens(itens, undefined)).toBe(itens);
+    expect(abaterItens(itens, [])).toBe(itens);
+  });
+
+  it('devolve undefined quando o contrato não tem itens', () => {
+    expect(abaterItens(undefined, [{ itemId: 'i1', quantidade: 10 }])).toBeUndefined();
+  });
+});
+
+describe('devolverItens', () => {
+  it('abater seguido de devolver volta ao saldo original de cada item', () => {
+    const original: ItemContrato[] = [
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 100 },
+    ];
+    const consumo = [{ itemId: 'i1', quantidade: 40 }];
+    const depoisDeAbater = abaterItens(original, consumo);
+    const depoisDeDevolver = devolverItens(depoisDeAbater, consumo);
+    expect(depoisDeDevolver).toEqual(original);
+  });
+});
+
+describe('mesclarItensContrato', () => {
+  it('novo item nasce com quantidadeAtual = quantidadeInicial', () => {
+    const resultado = mesclarItensContrato([], [
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100 },
+    ]);
+    expect(resultado).toEqual([
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 100 },
+    ]);
+  });
+
+  it('preserva o consumo já registrado ao editar a quantidade inicial de um item existente', () => {
+    const antigos: ItemContrato[] = [
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 70 },
+    ];
+    // Aditivo aumentou a quantidade inicial de 100 para 150 — os 30 já consumidos continuam valendo.
+    const resultado = mesclarItensContrato(antigos, [
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 150 },
+    ]);
+    expect(resultado[0].quantidadeAtual).toBe(120);
+  });
+
+  it('remove itens que não estão mais na lista editada', () => {
+    const antigos: ItemContrato[] = [
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 70 },
+      { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50, quantidadeAtual: 50 },
+    ];
+    const resultado = mesclarItensContrato(antigos, [
+      { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50 },
+    ]);
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0].id).toBe('i2');
   });
 });
 

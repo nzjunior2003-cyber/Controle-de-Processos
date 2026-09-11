@@ -299,8 +299,29 @@ export interface Contrato {
   pcaCodigo?: string;
   /** Linha (1-based) da planilha "Gestão de Contratos" onde este contrato está sincronizado. */
   planilha_linha?: number;
+  /**
+   * Itens do contrato (bens de Consumo/Permanente), cada um com seu
+   * próprio saldo de quantidade — abatido a cada execução (NF) que
+   * informar consumo desse item. Independente do saldo financeiro e do
+   * saldo quantitativo agregado (`saldoAtual/InicialQuantitativo`).
+   */
+  itens?: ItemContrato[];
+  /**
+   * Link do PDF do contrato anexado (Google Drive), pra abrir direto
+   * pelo app — distinto de `linkContrato` (campo de texto livre, usado
+   * pra links externos como SEI/PAE).
+   */
+  contratoPdfLink?: string | null;
   criado_em?: string;
   atualizado_em?: string;
+}
+
+export interface ItemContrato {
+  id: string;
+  descricao: string;
+  unidade?: string;
+  quantidadeInicial: number;
+  quantidadeAtual: number;
 }
 
 export interface ItemProcedimento {

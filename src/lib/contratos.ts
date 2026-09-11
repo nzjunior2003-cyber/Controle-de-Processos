@@ -3,7 +3,7 @@
  * FiscalContrato (antes duplicadas nas duas páginas).
  */
 import { differenceInDays } from 'date-fns';
-import type { Contrato } from '../types';
+import type { Contrato, ItemContrato } from '../types';
 
 /** Opções fixas de Natureza de Despesa exibidas no cadastro/filtro de contratos. */
 export const OPCOES_NATUREZA_DESPESA_CONTRATO = ['CONSUMO', 'PERMANENTE', 'SERVIÇO'];
@@ -196,6 +196,12 @@ export function buscarContratos<T extends Contrato>(contratos: T[], busca: strin
   );
 }
 
+/** Quantidade de um item do contrato consumida/recebida numa execução (NF). */
+export interface ConsumoItemExecucao {
+  itemId: string;
+  quantidade: number;
+}
+
 /** Lançamento de execução financeira (NF/fatura/recibo) de um contrato. */
 export interface ExecucaoContrato {
   id: string;
@@ -205,6 +211,8 @@ export interface ExecucaoContrato {
   data: string;
   valor: number;
   quantidade?: number;
+  /** Itens do contrato (ver `Contrato.itens`) abatidos por esta execução, com a quantidade de cada um. */
+  itensConsumidos?: ConsumoItemExecucao[];
   observacao?: string;
   arquivoLink?: string | null;
   criado_em?: string;
@@ -247,6 +255,53 @@ export function devolverSaldo(
         }
       : {}),
   };
+}
+
+/** Abate dos itens do contrato a quantidade consumida por uma execução (NF), pelo `itemId`. */
+export function abaterItens(
+  itens: ItemContrato[] | undefined,
+  itensConsumidos: ConsumoItemExecucao[] | undefined,
+): ItemContrato[] | undefined {
+  if (!itens || !itensConsumidos || itensConsumidos.length === 0) return itens;
+  const quantidadePorId = new Map(itensConsumidos.map((c) => [c.itemId, c.quantidade]));
+  return itens.map((item) =>
+    quantidadePorId.has(item.id)
+      ? { ...item, quantidadeAtual: item.quantidadeAtual - (quantidadePorId.get(item.id) || 0) }
+      : item,
+  );
+}
+
+/** Devolve aos itens do contrato a quantidade de uma execução (NF) removida. */
+export function devolverItens(
+  itens: ItemContrato[] | undefined,
+  itensConsumidos: ConsumoItemExecucao[] | undefined,
+): ItemContrato[] | undefined {
+  if (!itens || !itensConsumidos || itensConsumidos.length === 0) return itens;
+  const quantidadePorId = new Map(itensConsumidos.map((c) => [c.itemId, c.quantidade]));
+  return itens.map((item) =>
+    quantidadePorId.has(item.id)
+      ? { ...item, quantidadeAtual: item.quantidadeAtual + (quantidadePorId.get(item.id) || 0) }
+      : item,
+  );
+}
+
+/**
+ * Aplica edições nos itens de um contrato (cadastro/edição no
+ * `ContratoForm`) preservando, item a item (pelo `id`), o quanto já foi
+ * consumido por execuções — assim, corrigir a quantidade inicial de um
+ * item (ex.: por aditivo) não apaga o consumo já registrado.
+ */
+export function mesclarItensContrato(
+  itensAntigos: ItemContrato[],
+  itensEditados: Array<Pick<ItemContrato, 'id' | 'descricao' | 'unidade' | 'quantidadeInicial'>>,
+): ItemContrato[] {
+  const antigosPorId = new Map(itensAntigos.map((item) => [item.id, item]));
+  return itensEditados.map((item) => {
+    const antigo = antigosPorId.get(item.id);
+    if (!antigo) return { ...item, quantidadeAtual: item.quantidadeInicial };
+    const consumido = antigo.quantidadeInicial - antigo.quantidadeAtual;
+    return { ...item, quantidadeAtual: Math.max(0, item.quantidadeInicial - consumido) };
+  });
 }
 
 export type TipoOcorrencia = 'OCORRENCIA' | 'ADITIVO' | 'ESCLARECIMENTO';

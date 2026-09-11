@@ -1,13 +1,37 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, FileText, PlusCircle, Save, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import type { Contrato } from '../../types';
+import type { Contrato, ItemContrato } from '../../types';
 import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
+import { getOrCreateFolder, uploadFileToDrive } from '../../lib/driveService';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
 import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
-import { OPCOES_FONTE_RECURSO_CONTRATO, OPCOES_NATUREZA_DESPESA_CONTRATO } from '../../lib/contratos';
+import {
+  mesclarItensContrato,
+  OPCOES_FONTE_RECURSO_CONTRATO,
+  OPCOES_NATUREZA_DESPESA_CONTRATO,
+} from '../../lib/contratos';
+
+/** Naturezas de despesa em que faz sentido cadastrar itens com quantidade própria (bens). */
+const NATUREZAS_COM_ITENS = ['CONSUMO', 'PERMANENTE'];
+
+interface ItemForm {
+  id: string;
+  descricao: string;
+  unidade: string;
+  quantidadeInicial: string;
+}
+
+function itensParaFormulario(itens?: ItemContrato[]): ItemForm[] {
+  return (itens ?? []).map((item) => ({
+    id: item.id,
+    descricao: item.descricao,
+    unidade: item.unidade ?? '',
+    quantidadeInicial: String(item.quantidadeInicial),
+  }));
+}
 
 const CLASSE_INPUT =
   'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm';
@@ -140,8 +164,29 @@ export default function ContratoForm() {
   }, []);
 
   const [form, setForm] = useState<FormState>(() => contratoParaFormulario(contrato));
+  const [itensForm, setItensForm] = useState<ItemForm[]>(() => itensParaFormulario(contrato?.itens));
+  const [arquivoContrato, setArquivoContrato] = useState<File | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  const mostrarItens = NATUREZAS_COM_ITENS.includes(form.naturezaDespesa);
+
+  const handleItemChange = (id: string, campo: keyof Omit<ItemForm, 'id'>, valor: string) => {
+    setItensForm((anterior) =>
+      anterior.map((item) => (item.id === id ? { ...item, [campo]: valor } : item)),
+    );
+  };
+
+  const handleAddItem = () => {
+    setItensForm((anterior) => [
+      ...anterior,
+      { id: crypto.randomUUID(), descricao: '', unidade: '', quantidadeInicial: '' },
+    ]);
+  };
+
+  const handleRemoveItem = (id: string) => {
+    setItensForm((anterior) => anterior.filter((item) => item.id !== id));
+  };
 
   const camposInvalidos =
     !form.numero ||
@@ -162,6 +207,51 @@ export default function ContratoForm() {
     setSalvando(true);
     setErro(null);
     try {
+      // Pede a autorização do Google ANTES de gravar no Firestore: feita
+      // depois, o popup de login perde a associação com o clique do
+      // usuário e a maioria dos navegadores bloqueia silenciosamente.
+      // O mesmo token serve tanto pra sincronizar com a planilha quanto
+      // pra anexar o PDF do contrato no Drive.
+      let googleToken: string | null = null;
+      let erroGoogle: unknown = null;
+      try {
+        googleToken = await getAccessToken();
+        if (!googleToken) {
+          const resultado = await googleSignIn();
+          googleToken = resultado?.accessToken ?? null;
+        }
+      } catch (erroAuth) {
+        erroGoogle = erroAuth;
+      }
+
+      let contratoPdfLink: string | null | undefined;
+      if (arquivoContrato) {
+        if (!googleToken) {
+          alert('Não foi possível conectar ao Google para anexar o PDF do contrato — tente novamente.');
+        } else {
+          try {
+            const arquivo = new File(
+              [arquivoContrato],
+              `Contrato_${form.numero.replace(/\//g, '-')}.pdf`,
+              { type: arquivoContrato.type || 'application/pdf' },
+            );
+            const pastaRaiz = await getOrCreateFolder(googleToken, 'Documentos de Contratos');
+            const pastaContrato = await getOrCreateFolder(
+              googleToken,
+              `Contrato ${form.numero} - ${form.empresa}`,
+              pastaRaiz,
+            );
+            contratoPdfLink = await uploadFileToDrive(googleToken, arquivo, pastaContrato);
+          } catch (erroUpload) {
+            console.error('Erro ao anexar o PDF do contrato:', erroUpload);
+            alert(
+              'Não foi possível anexar o PDF do contrato: ' +
+                (erroUpload instanceof Error ? erroUpload.message : String(erroUpload)),
+            );
+          }
+        }
+      }
+
       const dados: Omit<Contrato, 'id'> = {
         pae: form.pae,
         numero: form.numero,
@@ -203,22 +293,23 @@ export default function ContratoForm() {
         empenho: form.empenho || '',
         dotacao: form.dotacao || '',
         linkContrato: form.linkContrato || null,
+        ...(mostrarItens
+          ? {
+              itens: mesclarItensContrato(
+                contrato?.itens ?? [],
+                itensForm
+                  .filter((item) => item.descricao.trim())
+                  .map((item) => ({
+                    id: item.id,
+                    descricao: item.descricao.trim(),
+                    unidade: item.unidade.trim() || undefined,
+                    quantidadeInicial: Number(item.quantidadeInicial) || 0,
+                  })),
+              ),
+            }
+          : {}),
+        ...(contratoPdfLink !== undefined ? { contratoPdfLink } : {}),
       };
-
-      // Pede a autorização do Google ANTES de gravar no Firestore: feita
-      // depois, o popup de login perde a associação com o clique do
-      // usuário e a maioria dos navegadores bloqueia silenciosamente.
-      let googleToken: string | null = null;
-      let erroGoogle: unknown = null;
-      try {
-        googleToken = await getAccessToken();
-        if (!googleToken) {
-          const resultado = await googleSignIn();
-          googleToken = resultado?.accessToken ?? null;
-        }
-      } catch (erroAuth) {
-        erroGoogle = erroAuth;
-      }
 
       let contratoId: string;
       if (emEdicao && id) {
@@ -382,8 +473,83 @@ export default function ContratoForm() {
                   className={CLASSE_INPUT}
                 />
               </div>
+              <div>
+                <label className={CLASSE_LABEL}>PDF do Contrato</label>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => setArquivoContrato(e.target.files ? e.target.files[0] : null)}
+                  className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100"
+                />
+                {contrato?.contratoPdfLink && !arquivoContrato && (
+                  <a
+                    href={contrato.contratoPdfLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 inline-flex items-center text-xs text-red-600 hover:text-red-800 font-medium"
+                  >
+                    <FileText className="w-3 h-3 mr-1" />
+                    Ver PDF já anexado (escolher outro arquivo substitui)
+                  </a>
+                )}
+              </div>
             </div>
           </div>
+
+          {mostrarItens && (
+            <div>
+              <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
+                Itens do Contrato (Bens)
+              </h4>
+              <p className="text-sm text-gray-500 mb-4">
+                Cada item tem seu próprio saldo de quantidade, abatido a cada execução (NF) que
+                informar consumo/recebimento desse item — independente do saldo financeiro acima.
+              </p>
+              <div className="space-y-3">
+                {itensForm.map((item) => (
+                  <div key={item.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
+                    <input
+                      type="text"
+                      placeholder="Descrição do item"
+                      value={item.descricao}
+                      onChange={(e) => handleItemChange(item.id, 'descricao', e.target.value)}
+                      className={`${CLASSE_INPUT} sm:col-span-6`}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Unidade (ex.: UN, CX)"
+                      value={item.unidade}
+                      onChange={(e) => handleItemChange(item.id, 'unidade', e.target.value)}
+                      className={`${CLASSE_INPUT} sm:col-span-2`}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Quantidade"
+                      value={item.quantidadeInicial}
+                      onChange={(e) => handleItemChange(item.id, 'quantidadeInicial', e.target.value)}
+                      className={`${CLASSE_INPUT} sm:col-span-3`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(item.id)}
+                      className="sm:col-span-1 flex items-center justify-center text-gray-400 hover:text-red-600 py-2"
+                      title="Remover item"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  className="inline-flex items-center text-sm font-medium text-red-700 hover:text-red-800"
+                >
+                  <PlusCircle className="w-4 h-4 mr-1" />
+                  Adicionar item
+                </button>
+              </div>
+            </div>
+          )}
 
           <div>
             <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
