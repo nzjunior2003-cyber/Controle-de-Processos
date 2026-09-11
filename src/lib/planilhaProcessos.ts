@@ -29,7 +29,7 @@ export const OPCOES_FONTE_PROCESSO = [
 ];
 
 /** Rótulo gravado na coluna Q (Subfase do Processo) ao marcar um processo como contratado/aditivado pelo app. */
-export const SUBFASE_CONTRATADO_ADITIVADO = 'CONTRATADO/ADITIVADO';
+export const SUBFASE_CONTRATADO = 'CONTRATADO';
 
 /** Índices (0-based) das colunas da planilha que o app pode gravar/atualizar. */
 export const COLUNA = {
@@ -80,7 +80,7 @@ export interface DadosProcessoParaPlanilha {
    * Só é gravada na planilha quando informada — o app não gerencia essa
    * coluna no dia a dia (é do RPA/preenchimento manual), então omitir a
    * chave preserva o que já estava lá. Hoje só é usada pra marcar
-   * `SUBFASE_CONTRATADO_ADITIVADO` a partir do app.
+   * `SUBFASE_CONTRATADO` a partir do app.
    */
   subfase_processo?: string;
 }

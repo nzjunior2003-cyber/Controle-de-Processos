@@ -83,7 +83,7 @@ export function calcularMediaDiasPorRito(
   const agrupado = new Map<string, number[]>();
 
   processos
-    .filter((p) => p.rito_processual && (p.status === 'concluido' || p.status === 'arquivado'))
+    .filter((p) => p.rito_processual && (p.status === 'concluido' || p.status === 'arquivado' || p.status === 'contratado_aditivado'))
     .forEach((processo) => {
       const estadas = estadasPorProcesso.get(processo.id) ?? [];
       if (estadas.length === 0) return;

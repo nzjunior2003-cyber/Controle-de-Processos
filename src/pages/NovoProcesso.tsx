@@ -1,14 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, FileCheck2, Save } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { PcaAutocomplete } from '../components/PcaAutocomplete';
 import { CHECKLISTS_RITOS } from '../types';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
-import { OPCOES_FONTE_PROCESSO, OPCOES_NATUREZA_DESPESA } from '../lib/planilhaProcessos';
+import {
+  OPCOES_FONTE_PROCESSO,
+  OPCOES_NATUREZA_DESPESA,
+  processoParaDadosPlanilha,
+  SUBFASE_CONTRATADO,
+} from '../lib/planilhaProcessos';
 
 const paraDataInput = (isoOuVazio?: string) => (isoOuVazio ? isoOuVazio.split('T')[0] : '');
 
@@ -43,6 +48,57 @@ export default function NovoProcesso() {
     processo?.valor_estimado != null ? String(processo.valor_estimado) : '',
   );
   const [salvando, setSalvando] = useState(false);
+  const [marcandoContratado, setMarcandoContratado] = useState(false);
+
+  const jaContratadoAditivado = (processo?.subfase_processo ?? '').toUpperCase().includes('CONTRATADO');
+
+  // Marca a Subfase do Processo (coluna Q da planilha) com o valor
+  // "CONTRATADO" — a mesma opção já existente no menu suspenso da
+  // planilha — e o status "Contratado/Aditivado" no app. Representa o
+  // fim da fase de Instrução (que vai da abertura até a publicação do
+  // contrato) e a passagem pra fase de Gestão do Contrato. Sem
+  // "reverter": essa coluna também é escrita pelo RPA, sem um valor
+  // anterior confiável pra restaurar por aqui.
+  const handleMarcarContratadoAditivado = async () => {
+    if (!processo) return;
+    setMarcandoContratado(true);
+    try {
+      await updateProcesso(processo.id, {
+        subfase_processo: SUBFASE_CONTRATADO,
+        status: 'contratado_aditivado',
+      });
+
+      let googleToken = await getAccessToken();
+      if (!googleToken) {
+        const resultado = await googleSignIn();
+        googleToken = resultado?.accessToken ?? null;
+      }
+      if (!googleToken) {
+        alert(
+          'Situação atualizada no sistema, mas não foi possível conectar ao Google para ' +
+            'replicar na planilha automaticamente. Atualize a coluna Q manualmente ou tente de novo depois.',
+        );
+        return;
+      }
+
+      const linha = await sincronizarProcessoNaPlanilha(
+        googleToken,
+        ID_PLANILHA_PROCESSOS,
+        { ...processoParaDadosPlanilha(processo), subfase_processo: SUBFASE_CONTRATADO },
+        processo.planilha_linha,
+      );
+      if (linha !== processo.planilha_linha) {
+        await updateProcesso(processo.id, { planilha_linha: linha });
+      }
+    } catch (erro) {
+      alert(
+        'Não foi possível atualizar a situação do processo: ' +
+          (erro instanceof Error ? erro.message : String(erro)),
+      );
+    } finally {
+      setMarcandoContratado(false);
+    }
+  };
 
   const handleRitoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const valor = e.target.value;
@@ -174,7 +230,7 @@ export default function NovoProcesso() {
         >
           <ArrowLeft className="h-6 w-6" />
         </button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">
             {emEdicao ? `Editar Processo ${processo?.numero_processo}` : 'Novo Processo'}
           </h1>
@@ -184,6 +240,25 @@ export default function NovoProcesso() {
               : 'Cadastre um novo processo administrativo de aquisição ou contração.'}
           </p>
         </div>
+        {emEdicao && processo && (
+          jaContratadoAditivado ? (
+            <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-purple-50 text-purple-700 border border-purple-200">
+              <FileCheck2 className="-ml-1 mr-1.5 h-4 w-4" />
+              Contratado/Aditivado
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleMarcarContratadoAditivado}
+              disabled={marcandoContratado}
+              title="Marca o fim da fase de Instrução (abertura até a publicação do contrato) e o início da fase de Gestão do Contrato"
+              className="inline-flex items-center px-3 py-1.5 border border-purple-200 shadow-sm text-sm font-medium rounded-md text-purple-700 bg-white hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FileCheck2 className="-ml-1 mr-1.5 h-4 w-4" />
+              {marcandoContratado ? 'Atualizando...' : 'Marcar como Contratado/Aditivado'}
+            </button>
+          )
+        )}
       </div>
 
       <div className="bg-white shadow-sm rounded-lg border border-gray-200">

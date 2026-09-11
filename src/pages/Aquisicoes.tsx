@@ -4,24 +4,8 @@ import { useApp } from '../context/AppContext';
 import { Search, Filter, AlertCircle, FilePlus, Clock, Database, List, RefreshCw } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import IntegracaoPCA from './IntegracaoPCA';
-import type { StatusProcesso } from '../types';
+import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS } from '../types';
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
-
-const STATUS_LABELS: Record<StatusProcesso, string> = {
-  em_andamento: 'Em Andamento',
-  aprovado: 'Aprovado',
-  pendente: 'Pendente',
-  concluido: 'Concluído',
-  arquivado: 'Arquivado',
-};
-
-const STATUS_CORES: Record<StatusProcesso, string> = {
-  em_andamento: 'bg-blue-50 text-blue-700 outline-blue-200',
-  aprovado: 'bg-emerald-50 text-emerald-700 outline-emerald-200',
-  pendente: 'bg-amber-50 text-amber-700 outline-amber-200',
-  concluido: 'bg-green-50 text-green-700 outline-green-200',
-  arquivado: 'bg-gray-100 text-gray-600 outline-gray-300',
-};
 
 export default function Aquisicoes() {
   const { processos, setores, usuarioAtual, syncProcessosDaPlanilha } = useApp();

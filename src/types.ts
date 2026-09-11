@@ -31,7 +31,33 @@ export interface Setor {
   ordem_fluxo: number;
 }
 
-export type StatusProcesso = 'em_andamento' | 'aprovado' | 'pendente' | 'concluido' | 'arquivado';
+export type StatusProcesso =
+  | 'em_andamento'
+  | 'aprovado'
+  | 'pendente'
+  | 'contratado_aditivado'
+  | 'concluido'
+  | 'arquivado';
+
+/** Rótulos de exibição de StatusProcesso — usado tanto na lista (Aquisicoes) quanto no detalhe do processo. */
+export const STATUS_PROCESSO_LABELS: Record<StatusProcesso, string> = {
+  em_andamento: 'Em Andamento',
+  aprovado: 'Aprovado',
+  pendente: 'Pendente',
+  contratado_aditivado: 'Contratado/Aditivado',
+  concluido: 'Concluído',
+  arquivado: 'Arquivado',
+};
+
+/** Cores do badge de status (fundo/texto claros, pra usar com outline ou fundo sólido conforme a tela). */
+export const STATUS_PROCESSO_CORES: Record<StatusProcesso, string> = {
+  em_andamento: 'bg-blue-50 text-blue-700 outline-blue-200',
+  aprovado: 'bg-emerald-50 text-emerald-700 outline-emerald-200',
+  pendente: 'bg-amber-50 text-amber-700 outline-amber-200',
+  contratado_aditivado: 'bg-purple-50 text-purple-700 outline-purple-200',
+  concluido: 'bg-green-50 text-green-700 outline-green-200',
+  arquivado: 'bg-gray-100 text-gray-600 outline-gray-300',
+};
 
 export const CHECKLISTS_RITOS: Record<string, string[]> = {
   'Pregão Eletrônico': [

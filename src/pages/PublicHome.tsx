@@ -23,20 +23,22 @@ export default function PublicHome() {
   });
 
   const concluidos = processos.filter(p => p.status === 'concluido').length;
+  const contratadosAditivados = processos.filter(p => p.status === 'contratado_aditivado').length;
   const emAndamento = processos.filter(p => p.status === 'em_andamento').length;
 
   const dataStatus = [
     { name: 'Em Andamento', value: emAndamento },
+    { name: 'Contratado/Aditivado', value: contratadosAditivados },
     { name: 'Concluídos', value: concluidos },
     { name: 'Com Pendência', value: processos.filter(p => p.status === 'pendente').length },
   ];
 
   const dataFases = setores.map(s => ({
     name: s.sigla,
-    Processos: processos.filter(p => p.fase_atual_id === s.id && p.status !== 'concluido').length
+    Processos: processos.filter(p => p.fase_atual_id === s.id && p.status !== 'concluido' && p.status !== 'contratado_aditivado').length
   }));
 
-  const COLORS = ['#0284c7', '#059669', '#d97706'];
+  const COLORS = ['#0284c7', '#7c3aed', '#059669', '#d97706'];
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">

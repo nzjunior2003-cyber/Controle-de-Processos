@@ -3,12 +3,12 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, Clock, FileCheck2, MapPin, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { CHECKLISTS_RITOS } from '../types';
+import { CHECKLISTS_RITOS, STATUS_PROCESSO_LABELS } from '../types';
 import { calcularTempoTotal, localizacaoEfetiva, montarLinhaDoTempo } from '../lib/fluxoProcesso';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
 import { getAccessToken, googleSignIn } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
-import { processoParaDadosPlanilha, SUBFASE_CONTRATADO_ADITIVADO } from '../lib/planilhaProcessos';
+import { processoParaDadosPlanilha, SUBFASE_CONTRATADO } from '../lib/planilhaProcessos';
 
 const CORES_GANTT = [
   'bg-blue-400', 'bg-indigo-400', 'bg-purple-400', 'bg-emerald-400',
@@ -41,18 +41,21 @@ export default function DetalheProcesso() {
 
   const jaContratadoAditivado = (processo.subfase_processo ?? '').toUpperCase().includes('CONTRATADO');
 
-  // Marca a Subfase do Processo (coluna Q da planilha) como
-  // "CONTRATADO/ADITIVADO" — tanto no app quanto na planilha, na mesma
-  // ação. Não tem "reverter": essa coluna também é escrita pelo RPA, e
-  // não existe um valor anterior confiável pra restaurar por aqui — se
-  // precisar desfazer, é direto na planilha (o app absorve na próxima
-  // sincronização).
+  // Marca a Subfase do Processo (coluna Q da planilha) com o valor
+  // "CONTRATADO" — a mesma opção já existente no menu suspenso da
+  // planilha — e o status "Contratado/Aditivado" no app, na mesma ação.
+  // Representa o fim da fase de Instrução (que vai da abertura até a
+  // publicação do contrato) e a passagem pra fase de Gestão do
+  // Contrato. Não tem "reverter": essa coluna também é escrita pelo
+  // RPA, e não existe um valor anterior confiável pra restaurar por
+  // aqui — se precisar desfazer, é direto na planilha (o app absorve na
+  // próxima sincronização).
   const handleMarcarContratadoAditivado = async () => {
     setMarcandoContratado(true);
     try {
       await updateProcesso(processo.id, {
-        subfase_processo: SUBFASE_CONTRATADO_ADITIVADO,
-        status: 'concluido',
+        subfase_processo: SUBFASE_CONTRATADO,
+        status: 'contratado_aditivado',
       });
 
       let googleToken = await getAccessToken();
@@ -71,7 +74,7 @@ export default function DetalheProcesso() {
       const linha = await sincronizarProcessoNaPlanilha(
         googleToken,
         ID_PLANILHA_PROCESSOS,
-        { ...processoParaDadosPlanilha(processo), subfase_processo: SUBFASE_CONTRATADO_ADITIVADO },
+        { ...processoParaDadosPlanilha(processo), subfase_processo: SUBFASE_CONTRATADO },
         processo.planilha_linha,
       );
       if (linha !== processo.planilha_linha) {
@@ -136,11 +139,12 @@ export default function DetalheProcesso() {
         <div className="flex items-center gap-3">
           <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
             processo.status === 'em_andamento' ? 'bg-blue-100 text-blue-800' :
+            processo.status === 'contratado_aditivado' ? 'bg-purple-100 text-purple-800' :
             processo.status === 'concluido' ? 'bg-green-100 text-green-800' :
             processo.status === 'pendente' ? 'bg-amber-100 text-amber-800' :
             'bg-gray-100 text-gray-800'
           }`}>
-            {processo.status.replace('_', ' ').toUpperCase()}
+            {STATUS_PROCESSO_LABELS[processo.status].toUpperCase()}
           </span>
           {isMasterOrApoio && (
             <>

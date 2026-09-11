@@ -6,7 +6,7 @@ import {
   montarValoresColunasProcesso,
   processoParaDadosPlanilha,
   proximoNumeroSequencial,
-  SUBFASE_CONTRATADO_ADITIVADO,
+  SUBFASE_CONTRATADO,
   TOTAL_COLUNAS_PLANILHA,
 } from './planilhaProcessos';
 
@@ -70,9 +70,9 @@ describe('montarValoresColunasProcesso', () => {
       numero_processo: '2026/1',
       objeto: 'Objeto',
       unidade_demandante: 'DTIC',
-      subfase_processo: SUBFASE_CONTRATADO_ADITIVADO,
+      subfase_processo: SUBFASE_CONTRATADO,
     });
-    expect(comSubfase[COLUNA.SUBFASE_PROCESSO]).toBe('CONTRATADO/ADITIVADO');
+    expect(comSubfase[COLUNA.SUBFASE_PROCESSO]).toBe('CONTRATADO');
   });
 });
 

@@ -103,7 +103,8 @@ function celula(linha: LinhaPlanilha, nomeColuna: string): string {
 function inferirStatusProcesso(subfase: string): StatusProcesso {
   const valor = subfase.toUpperCase();
   if (valor.includes('CANCELADO')) return 'arquivado';
-  if (valor.includes('FINALIZADO') || valor.includes('CONTRATADO')) return 'concluido';
+  if (valor.includes('CONTRATADO')) return 'contratado_aditivado';
+  if (valor.includes('FINALIZADO')) return 'concluido';
   return 'em_andamento';
 }
 

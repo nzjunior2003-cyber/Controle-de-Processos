@@ -115,7 +115,7 @@ describe('mapSheetRowToProcesso', () => {
       numero_processo: '2026/2014417',
       objeto: 'Prorrogação do contrato',
       unidade_demandante: 'CSMV/MOP',
-      status: 'concluido',
+      status: 'contratado_aditivado',
       fonte: 'TESOURO',
       rito_processual: 'PRORROGAÇÃO',
       fase_processo: 'INTERNA',
@@ -136,6 +136,9 @@ describe('mapSheetRowToProcesso', () => {
     expect(mapSheetRowToProcesso({ ...linhaBase, 'SUBFASE DO PROCESSO': 'CANCELADO' })?.status).toBe(
       'arquivado',
     );
+    expect(
+      mapSheetRowToProcesso({ ...linhaBase, 'SUBFASE DO PROCESSO': 'CONTRATADO' })?.status,
+    ).toBe('contratado_aditivado');
     expect(
       mapSheetRowToProcesso({ ...linhaBase, 'SUBFASE DO PROCESSO': '9 FINALIZADO' })?.status,
     ).toBe('concluido');

@@ -20,6 +20,7 @@ export default function Dashboard() {
 
   const total = processos.length;
   const concluidos = processos.filter(p => p.status === 'concluido').length;
+  const contratadosAditivados = processos.filter(p => p.status === 'contratado_aditivado').length;
   const emAndamento = processos.filter(p => p.status === 'em_andamento').length;
   const comAlerta = processos.filter(p => p.possui_alerta).length;
 
@@ -28,9 +29,11 @@ export default function Dashboard() {
   // Top 8 localizações reais com mais processos em aberto agora — sem
   // isso, contar por fase_atual_id (fluxo fixo de 7 setores) mostraria
   // quase tudo empilhado em "Demandante" pros processos vindos da planilha.
+  // "Contratado/Aditivado" também sai da conta de "em aberto": a fase de
+  // Instrução (responsabilidade do Apoio) já terminou nesses processos.
   const contagemPorLocalizacao = new Map<string, number>();
   processos
-    .filter(p => p.status !== 'concluido' && p.status !== 'arquivado')
+    .filter(p => p.status !== 'concluido' && p.status !== 'arquivado' && p.status !== 'contratado_aditivado')
     .forEach(p => {
       const loc = localizacaoEfetiva(p, siglaDoSetor);
       contagemPorLocalizacao.set(loc, (contagemPorLocalizacao.get(loc) ?? 0) + 1);
@@ -42,11 +45,12 @@ export default function Dashboard() {
 
   const dataStatus = [
     { name: 'Em Andamento', value: emAndamento },
+    { name: 'Contratado/Aditivado', value: contratadosAditivados },
     { name: 'Concluídos', value: concluidos },
     { name: 'Com Pendência', value: processos.filter(p => p.status === 'pendente').length },
   ];
 
-  const COLORS = ['#0284c7', '#059669', '#d97706'];
+  const COLORS = ['#0284c7', '#7c3aed', '#059669', '#d97706'];
 
   const estadasPorProcesso = agruparEstadasPorProcesso(estadasProcesso);
   const mediaPorLocalizacao = calcularMediaDiasPorLocalizacao(estadasProcesso).slice(0, 8);
