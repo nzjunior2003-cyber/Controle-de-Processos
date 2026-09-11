@@ -308,22 +308,22 @@ export default function Aquisicoes() {
               <table className="w-full table-fixed divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="w-[13%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Nº PAE
                     </th>
-                    <th scope="col" className="w-[30%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[27%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Objeto
                     </th>
-                    <th scope="col" className="w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[21%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Setor Atual
                     </th>
-                    <th scope="col" className="w-[14%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Rito
                     </th>
-                    <th scope="col" className="w-[9%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[8%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Dias no Setor
                     </th>
-                    <th scope="col" className="w-[10%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                   </tr>
@@ -381,7 +381,7 @@ export default function Aquisicoes() {
                           </td>
                           <td className="px-4 py-4">
                             <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium outline outline-1 outline-offset-1 ${STATUS_CORES[proc.status]}`}
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium outline outline-1 outline-offset-1 whitespace-normal text-center ${STATUS_CORES[proc.status]}`}
                             >
                               {STATUS_LABELS[proc.status]}
                             </span>
