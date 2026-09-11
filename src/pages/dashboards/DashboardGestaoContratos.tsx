@@ -1,5 +1,6 @@
 import { useApp } from '../../context/AppContext';
 import KpisContratos from '../../components/contratos/KpisContratos';
+import GraficosContratos from '../../components/contratos/GraficosContratos';
 import { calcularStatusContrato, filtrarContratosPorGestor } from '../../lib/contratos';
 
 /**
@@ -25,10 +26,12 @@ export default function DashboardGestaoContratos() {
 
       <KpisContratos contratos={contratosComStatus} />
 
-      {contratosComStatus.length === 0 && (
+      {contratosComStatus.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
           Nenhum contrato no seu escopo até o momento.
         </div>
+      ) : (
+        <GraficosContratos contratos={contratosComStatus} />
       )}
     </div>
   );
