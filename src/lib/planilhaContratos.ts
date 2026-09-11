@@ -15,14 +15,25 @@
  * segunda tabela solta com colunas deslocadas) — `linhaTemOrdemValida`
  * reconhece uma linha de contrato de verdade (a única constante entre
  * as sub-tabelas é ter um número inteiro na coluna "Nº"/Ordem).
+ *
+ * Pior: nem todas as sub-tabelas têm as mesmas colunas depois de "Fim da
+ * Vigência" — algumas têm as 4 colunas extras "da Vigência" (Ano
+ * Exercício, Valor Global/Recebido/Saldo da Vigência) antes de
+ * Contratada, outras não. `detectarOffsetContrato` reconhece qual das
+ * duas variantes uma linha específica usa, olhando se a célula onde a
+ * Contratada deveria estar parece mesmo um nome de empresa (e não um
+ * valor em R$ pertencente a outra coluna).
  */
 import type { Contrato } from '../types';
 import { parseCurrencyBR, parseDataBR } from './csv';
 
 export const ABA_GESTAO_CONTRATOS = 'GERAL';
 
-/** Índices (0-based) das colunas da planilha que o app pode ler/gravar. */
-export const COLUNA_CONTRATO = {
+/**
+ * Índices (0-based) das colunas que não mudam de posição entre as duas
+ * variantes de layout observadas na planilha.
+ */
+const COLUNA_CONTRATO_BASE = {
   ORDEM: 0,
   EMPENHO: 1,
   PRD: 2,
@@ -32,18 +43,79 @@ export const COLUNA_CONTRATO = {
   INICIO_VIGENCIA: 6,
   ALERTA: 7,
   FIM_VIGENCIA: 8,
-  CONTRATADA: 13,
-  OBJETO: 14,
-  VALOR_GLOBAL: 15,
-  SALDO: 26,
-  FISCAL_TITULAR: 27,
-  FISCAL_SUPLENTE: 28,
-  DEMANDANTE: 29,
-  PCA: 30,
 } as const;
 
-/** A..AE (0..30) — cobre até a coluna PCA, a última que o app usa. */
+/** Deslocamento de colunas da variante "sem as 4 colunas extras da Vigência" (a mais antiga). */
+const OFFSET_LAYOUT_SEM_COLUNAS_VIGENCIA = 0;
+/** Deslocamento da variante atual do cabeçalho, com as 4 colunas extras da Vigência. */
+const OFFSET_LAYOUT_COM_COLUNAS_VIGENCIA = 4;
+
+/** Índices (0-based) das colunas deslocáveis, para um deslocamento (offset) já resolvido. */
+function colunasDeslocadas(offset: number) {
+  return {
+    ...COLUNA_CONTRATO_BASE,
+    CONTRATADA: 9 + offset,
+    OBJETO: 10 + offset,
+    VALOR_GLOBAL: 11 + offset,
+    SALDO: 22 + offset,
+    FISCAL_TITULAR: 23 + offset,
+    FISCAL_SUPLENTE: 24 + offset,
+    DEMANDANTE: 25 + offset,
+    PCA: 26 + offset,
+  } as const;
+}
+
+/**
+ * Índices (0-based) das colunas da planilha que o app usa como padrão —
+ * a variante atual do cabeçalho (com as 4 colunas extras da Vigência),
+ * usada pra gravar um contrato novo (acrescentado no fim da aba).
+ */
+export const COLUNA_CONTRATO = colunasDeslocadas(OFFSET_LAYOUT_COM_COLUNAS_VIGENCIA);
+
+/** A..AE (0..30) — cobre até a coluna PCA na variante mais larga do cabeçalho. */
 export const TOTAL_COLUNAS_PLANILHA_CONTRATOS = 31;
+
+/**
+ * Reconhece se um texto parece um nome de empresa (não um valor em R$,
+ * uma data ou um número puro pertencente a outra coluna) — usado pra
+ * decidir qual variante de layout uma linha específica usa.
+ */
+function pareceNomeDeEmpresa(texto: string): boolean {
+  const valor = texto.trim();
+  if (!valor) return false;
+  if (/^r\$/i.test(valor)) return false;
+  if (/^-?\d+([.,]\d+)?$/.test(valor)) return false;
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(valor)) return false;
+  return /[a-zà-öø-ÿ]/i.test(valor);
+}
+
+/**
+ * Descobre qual das duas variantes de layout uma linha usa, olhando se a
+ * célula onde a Contratada deveria estar (na variante atual, com as 4
+ * colunas extras) parece mesmo um nome de empresa; senão, tenta a
+ * posição da variante antiga. Sem uma linha existente (contrato novo),
+ * usa sempre a variante atual do cabeçalho.
+ */
+export function detectarOffsetContrato(linhaExistente: string[] | undefined): number {
+  if (!linhaExistente) return OFFSET_LAYOUT_COM_COLUNAS_VIGENCIA;
+  if (pareceNomeDeEmpresa(linhaExistente[9 + OFFSET_LAYOUT_COM_COLUNAS_VIGENCIA] ?? '')) {
+    return OFFSET_LAYOUT_COM_COLUNAS_VIGENCIA;
+  }
+  if (pareceNomeDeEmpresa(linhaExistente[9 + OFFSET_LAYOUT_SEM_COLUNAS_VIGENCIA] ?? '')) {
+    return OFFSET_LAYOUT_SEM_COLUNAS_VIGENCIA;
+  }
+  return OFFSET_LAYOUT_COM_COLUNAS_VIGENCIA;
+}
+
+/**
+ * Resolve o mapa de índices de coluna certo para uma linha específica
+ * (existente ou não) — combina `detectarOffsetContrato` com o cálculo
+ * das colunas deslocáveis, pra quem for gravar (`montarValoresColunasContrato`)
+ * não precisar lidar com offsets diretamente.
+ */
+export function resolverColunasContrato(linhaExistente: string[] | undefined): typeof COLUNA_CONTRATO {
+  return colunasDeslocadas(detectarOffsetContrato(linhaExistente));
+}
 
 const REGEX_CNPJ = /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/;
 
@@ -141,6 +213,9 @@ export function contratoParaDadosPlanilha(
  * Monta só os valores das colunas que o app gerencia, num mapa
  * índice-da-coluna -> valor — pra mesclar numa linha existente sem mexer
  * no resto (Data de Emissão, Alerta, Recebimentos por ano etc.).
+ * `colunas` é o mapa de índices já resolvido pra variante de layout da
+ * linha em questão (ver `detectarOffsetContrato`) — o padrão é a
+ * variante atual do cabeçalho, usada pra um contrato novo.
  * Demandante e PCA só entram no mapa quando informados, porque o
  * cadastro do app ainda não tem esses campos — sem essa checagem, gravar
  * um contrato existente apagaria o que já estava preenchido manualmente
@@ -148,23 +223,24 @@ export function contratoParaDadosPlanilha(
  */
 export function montarValoresColunasContrato(
   dados: DadosContratoParaPlanilha,
+  colunas: typeof COLUNA_CONTRATO = COLUNA_CONTRATO,
 ): Record<number, string> {
   const valores: Record<number, string> = {
-    [COLUNA_CONTRATO.CONTRATADA]: composeContratada(dados.empresa, dados.cnpj),
-    [COLUNA_CONTRATO.N_CONTRATO]: dados.numero,
-    [COLUNA_CONTRATO.PAE]: dados.pae || '',
-    [COLUNA_CONTRATO.PRD]: dados.prd || '',
-    [COLUNA_CONTRATO.EMPENHO]: dados.empenho || '',
-    [COLUNA_CONTRATO.OBJETO]: dados.objeto,
-    [COLUNA_CONTRATO.VALOR_GLOBAL]: formatarValorParaPlanilha(dados.valorGlobal),
-    [COLUNA_CONTRATO.SALDO]: formatarValorParaPlanilha(dados.saldoAtualFinanceiro),
-    [COLUNA_CONTRATO.INICIO_VIGENCIA]: paraDataBR(dados.inicioVigencia),
-    [COLUNA_CONTRATO.FIM_VIGENCIA]: paraDataBR(dados.fimVigencia),
-    [COLUNA_CONTRATO.FISCAL_TITULAR]: dados.fiscalTitular || '',
-    [COLUNA_CONTRATO.FISCAL_SUPLENTE]: dados.fiscalSuplente || '',
+    [colunas.CONTRATADA]: composeContratada(dados.empresa, dados.cnpj),
+    [colunas.N_CONTRATO]: dados.numero,
+    [colunas.PAE]: dados.pae || '',
+    [colunas.PRD]: dados.prd || '',
+    [colunas.EMPENHO]: dados.empenho || '',
+    [colunas.OBJETO]: dados.objeto,
+    [colunas.VALOR_GLOBAL]: formatarValorParaPlanilha(dados.valorGlobal),
+    [colunas.SALDO]: formatarValorParaPlanilha(dados.saldoAtualFinanceiro),
+    [colunas.INICIO_VIGENCIA]: paraDataBR(dados.inicioVigencia),
+    [colunas.FIM_VIGENCIA]: paraDataBR(dados.fimVigencia),
+    [colunas.FISCAL_TITULAR]: dados.fiscalTitular || '',
+    [colunas.FISCAL_SUPLENTE]: dados.fiscalSuplente || '',
   };
-  if (dados.unidadeDemandante) valores[COLUNA_CONTRATO.DEMANDANTE] = dados.unidadeDemandante;
-  if (dados.pcaCodigo) valores[COLUNA_CONTRATO.PCA] = dados.pcaCodigo;
+  if (dados.unidadeDemandante) valores[colunas.DEMANDANTE] = dados.unidadeDemandante;
+  if (dados.pcaCodigo) valores[colunas.PCA] = dados.pcaCodigo;
   return valores;
 }
 
@@ -235,30 +311,32 @@ export interface ContratoDaPlanilha {
  * sem essa chave — é também o sinal de que a linha é de fato um contrato,
  * não uma linha em branco ou de outra seção da planilha).
  */
-export function mapLinhaContratoDaPlanilha(colunas: string[]): ContratoDaPlanilha | null {
-  const numero = (colunas[COLUNA_CONTRATO.N_CONTRATO] ?? '').trim();
+export function mapLinhaContratoDaPlanilha(linha: string[]): ContratoDaPlanilha | null {
+  const numero = (linha[COLUNA_CONTRATO_BASE.N_CONTRATO] ?? '').trim();
   if (!numero) return null;
 
-  const { empresa, cnpj } = separarEmpresaECnpj((colunas[COLUNA_CONTRATO.CONTRATADA] ?? '').trim());
-  const valorGlobalTexto = (colunas[COLUNA_CONTRATO.VALOR_GLOBAL] ?? '').trim();
-  const saldoTexto = (colunas[COLUNA_CONTRATO.SALDO] ?? '').trim();
+  const colunas = colunasDeslocadas(detectarOffsetContrato(linha));
+
+  const { empresa, cnpj } = separarEmpresaECnpj((linha[colunas.CONTRATADA] ?? '').trim());
+  const valorGlobalTexto = (linha[colunas.VALOR_GLOBAL] ?? '').trim();
+  const saldoTexto = (linha[colunas.SALDO] ?? '').trim();
 
   return {
     numero,
     empresa,
     cnpj,
-    objeto: (colunas[COLUNA_CONTRATO.OBJETO] ?? '').trim(),
-    pae: (colunas[COLUNA_CONTRATO.PAE] ?? '').trim() || undefined,
-    prd: (colunas[COLUNA_CONTRATO.PRD] ?? '').trim() || undefined,
-    empenho: (colunas[COLUNA_CONTRATO.EMPENHO] ?? '').trim() || undefined,
+    objeto: (linha[colunas.OBJETO] ?? '').trim(),
+    pae: (linha[colunas.PAE] ?? '').trim() || undefined,
+    prd: (linha[colunas.PRD] ?? '').trim() || undefined,
+    empenho: (linha[colunas.EMPENHO] ?? '').trim() || undefined,
     valorGlobal: valorGlobalTexto ? parseCurrencyBR(valorGlobalTexto) : undefined,
     saldoAtualFinanceiro: saldoTexto ? parseCurrencyBR(saldoTexto) : undefined,
-    inicioVigencia: parseDataBR(colunas[COLUNA_CONTRATO.INICIO_VIGENCIA]),
-    fimVigencia: parseDataBR(colunas[COLUNA_CONTRATO.FIM_VIGENCIA]),
-    fiscalTitular: (colunas[COLUNA_CONTRATO.FISCAL_TITULAR] ?? '').trim() || undefined,
-    fiscalSuplente: (colunas[COLUNA_CONTRATO.FISCAL_SUPLENTE] ?? '').trim() || undefined,
-    unidadeDemandante: (colunas[COLUNA_CONTRATO.DEMANDANTE] ?? '').trim() || undefined,
-    pcaCodigo: (colunas[COLUNA_CONTRATO.PCA] ?? '').trim() || undefined,
+    inicioVigencia: parseDataBR(linha[colunas.INICIO_VIGENCIA]),
+    fimVigencia: parseDataBR(linha[colunas.FIM_VIGENCIA]),
+    fiscalTitular: (linha[colunas.FISCAL_TITULAR] ?? '').trim() || undefined,
+    fiscalSuplente: (linha[colunas.FISCAL_SUPLENTE] ?? '').trim() || undefined,
+    unidadeDemandante: (linha[colunas.DEMANDANTE] ?? '').trim() || undefined,
+    pcaCodigo: (linha[colunas.PCA] ?? '').trim() || undefined,
   };
 }
 

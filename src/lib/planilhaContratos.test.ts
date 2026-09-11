@@ -3,10 +3,12 @@ import {
   acharLinhaParaContrato,
   aplicarColunasNaLinhaContrato,
   COLUNA_CONTRATO,
+  detectarOffsetContrato,
   linhaTemOrdemValida,
   mapLinhaContratoDaPlanilha,
   montarValoresColunasContrato,
   proximoNumeroSequencialContrato,
+  resolverColunasContrato,
   TOTAL_COLUNAS_PLANILHA_CONTRATOS,
 } from './planilhaContratos';
 
@@ -92,6 +94,60 @@ describe('mapLinhaContratoDaPlanilha', () => {
   });
 });
 
+describe('mapLinhaContratoDaPlanilha: variante antiga do layout (sem as 4 colunas extras da Vigência)', () => {
+  it('reconhece a variante antiga e lê os campos das colunas certas', () => {
+    const linha = linhaVazia({
+      5: '133/2024', // N_CONTRATO — mesma posição nas duas variantes
+      9: 'WEBTRIP AGENCIA DE VIAGENS LTDA', // CONTRATADA na variante antiga
+      10: 'MARCAÇÃO DE PASSAGENS AÉREAS', // OBJETO na variante antiga
+      11: 'R$ 1.123.762,95', // VALOR_GLOBAL na variante antiga
+      22: 'R$ 191.166,54', // SALDO na variante antiga
+    });
+
+    const contrato = mapLinhaContratoDaPlanilha(linha);
+    expect(contrato?.numero).toBe('133/2024');
+    expect(contrato?.empresa).toBe('WEBTRIP AGENCIA DE VIAGENS LTDA');
+    expect(contrato?.objeto).toBe('MARCAÇÃO DE PASSAGENS AÉREAS');
+    expect(contrato?.valorGlobal).toBe(1123762.95);
+    expect(contrato?.saldoAtualFinanceiro).toBe(191166.54);
+  });
+
+  it('não confunde um valor em R$ (de outra coluna) com nome de empresa', () => {
+    // Linha real onde a coluna 13 (Contratada na variante atual) tem um
+    // valor em R$ de outra seção — sem a detecção, isso vazaria pro
+    // campo empresa e o valor global pegaria a coluna errada.
+    const linha = linhaVazia({
+      5: '133/2024',
+      9: 'WEBTRIP AGENCIA DE VIAGENS LTDA',
+      10: 'MARCAÇÃO DE PASSAGENS AÉREAS',
+      11: 'R$ 1.123.762,95',
+      13: 'R$ 0,00',
+    });
+
+    const contrato = mapLinhaContratoDaPlanilha(linha);
+    expect(contrato?.empresa).toBe('WEBTRIP AGENCIA DE VIAGENS LTDA');
+    expect(contrato?.valorGlobal).toBe(1123762.95);
+  });
+});
+
+describe('detectarOffsetContrato / resolverColunasContrato', () => {
+  it('detecta a variante atual (com as 4 colunas extras) quando a coluna 13 parece uma empresa', () => {
+    const linha = linhaVazia({ 13: 'Empresa Exemplo Ltda' });
+    expect(detectarOffsetContrato(linha)).toBe(4);
+    expect(resolverColunasContrato(linha).CONTRATADA).toBe(13);
+  });
+
+  it('detecta a variante antiga quando só a coluna 9 parece uma empresa', () => {
+    const linha = linhaVazia({ 9: 'Empresa Exemplo Ltda' });
+    expect(detectarOffsetContrato(linha)).toBe(0);
+    expect(resolverColunasContrato(linha).CONTRATADA).toBe(9);
+  });
+
+  it('usa a variante atual como padrão pra uma linha nova (sem linha existente)', () => {
+    expect(detectarOffsetContrato(undefined)).toBe(4);
+  });
+});
+
 describe('montarValoresColunasContrato', () => {
   it('monta os valores das colunas gerenciadas, compondo empresa e CNPJ', () => {
     const valores = montarValoresColunasContrato({
@@ -132,6 +188,18 @@ describe('montarValoresColunasContrato', () => {
 
     expect(valores[COLUNA_CONTRATO.DEMANDANTE]).toBe('DTIC');
     expect(valores[COLUNA_CONTRATO.PCA]).toBe('12');
+  });
+
+  it('grava nas colunas da variante antiga quando a linha existente usa esse layout', () => {
+    const linhaExistente = linhaVazia({ 9: 'Empresa Exemplo Ltda' });
+    const valores = montarValoresColunasContrato(
+      { numero: '1/2026', empresa: 'Empresa Exemplo Ltda', objeto: 'Objeto' },
+      resolverColunasContrato(linhaExistente),
+    );
+
+    expect(valores[9]).toBe('Empresa Exemplo Ltda');
+    expect(valores[10]).toBe('Objeto');
+    expect(valores[13]).toBeUndefined();
   });
 });
 

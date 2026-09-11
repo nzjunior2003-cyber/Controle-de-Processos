@@ -19,6 +19,7 @@ import {
   COLUNA_CONTRATO,
   montarValoresColunasContrato,
   proximoNumeroSequencialContrato,
+  resolverColunasContrato,
   type DadosContratoParaPlanilha,
 } from './planilhaContratos';
 
@@ -222,7 +223,7 @@ export async function sincronizarContratoNaPlanilha(
     ? undefined
     : (await getSheetValues(accessToken, spreadsheetId, rangeNaAbaContratos(`A${linha}:AE${linha}`)))[0];
 
-  const valoresColunas = montarValoresColunasContrato(dados);
+  const valoresColunas = montarValoresColunasContrato(dados, resolverColunasContrato(linhaExistente));
 
   if (ehNova && !(linhaExistente?.[0] ?? '').trim()) {
     const [linhaAnterior] = await getSheetValues(
