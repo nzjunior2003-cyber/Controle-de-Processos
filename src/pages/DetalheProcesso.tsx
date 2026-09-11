@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { ArrowLeft, Clock, MapPin, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, FileCheck2, MapPin, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { CHECKLISTS_RITOS } from '../types';
 import { calcularTempoTotal, localizacaoEfetiva, montarLinhaDoTempo } from '../lib/fluxoProcesso';
+import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
+import { getAccessToken, googleSignIn } from '../lib/googleAuth';
+import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
+import { processoParaDadosPlanilha, SUBFASE_CONTRATADO_ADITIVADO } from '../lib/planilhaProcessos';
 
 const CORES_GANTT = [
   'bg-blue-400', 'bg-indigo-400', 'bg-purple-400', 'bg-emerald-400',
@@ -17,6 +21,7 @@ export default function DetalheProcesso() {
   const { processos, setores, estadasProcesso, pcas, usuarioAtual, updateProcesso, deleteProcesso } = useApp();
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
+  const [marcandoContratado, setMarcandoContratado] = useState(false);
 
   const processo = processos.find(p => p.id === id);
   if (!processo) {
@@ -31,6 +36,54 @@ export default function DetalheProcesso() {
     } catch (erro) {
       alert(erro instanceof Error ? erro.message : 'Não foi possível excluir o processo.');
       setExcluindo(false);
+    }
+  };
+
+  const jaContratadoAditivado = (processo.subfase_processo ?? '').toUpperCase().includes('CONTRATADO');
+
+  // Marca a Subfase do Processo (coluna Q da planilha) como
+  // "CONTRATADO/ADITIVADO" — tanto no app quanto na planilha, na mesma
+  // ação. Não tem "reverter": essa coluna também é escrita pelo RPA, e
+  // não existe um valor anterior confiável pra restaurar por aqui — se
+  // precisar desfazer, é direto na planilha (o app absorve na próxima
+  // sincronização).
+  const handleMarcarContratadoAditivado = async () => {
+    setMarcandoContratado(true);
+    try {
+      await updateProcesso(processo.id, {
+        subfase_processo: SUBFASE_CONTRATADO_ADITIVADO,
+        status: 'concluido',
+      });
+
+      let googleToken = await getAccessToken();
+      if (!googleToken) {
+        const resultado = await googleSignIn();
+        googleToken = resultado?.accessToken ?? null;
+      }
+      if (!googleToken) {
+        alert(
+          'Situação atualizada no sistema, mas não foi possível conectar ao Google para ' +
+            'replicar na planilha automaticamente. Atualize a coluna Q manualmente ou tente de novo depois.',
+        );
+        return;
+      }
+
+      const linha = await sincronizarProcessoNaPlanilha(
+        googleToken,
+        ID_PLANILHA_PROCESSOS,
+        { ...processoParaDadosPlanilha(processo), subfase_processo: SUBFASE_CONTRATADO_ADITIVADO },
+        processo.planilha_linha,
+      );
+      if (linha !== processo.planilha_linha) {
+        await updateProcesso(processo.id, { planilha_linha: linha });
+      }
+    } catch (erro) {
+      alert(
+        'Não foi possível atualizar a situação do processo: ' +
+          (erro instanceof Error ? erro.message : String(erro)),
+      );
+    } finally {
+      setMarcandoContratado(false);
     }
   };
 
@@ -91,6 +144,22 @@ export default function DetalheProcesso() {
           </span>
           {isMasterOrApoio && (
             <>
+              {jaContratadoAditivado ? (
+                <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <FileCheck2 className="-ml-1 mr-1.5 h-4 w-4" />
+                  Contratado/Aditivado
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleMarcarContratadoAditivado}
+                  disabled={marcandoContratado}
+                  className="inline-flex items-center px-3 py-1.5 border border-emerald-200 shadow-sm text-sm font-medium rounded-md text-emerald-700 bg-white hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FileCheck2 className="-ml-1 mr-1.5 h-4 w-4" />
+                  {marcandoContratado ? 'Atualizando...' : 'Marcar como Contratado/Aditivado'}
+                </button>
+              )}
               <Link
                 to={`/sistema/processos/${processo.id}/editar`}
                 className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"

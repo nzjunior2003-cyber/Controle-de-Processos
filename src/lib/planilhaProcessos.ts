@@ -6,6 +6,8 @@
  * valores homologado/executado, Fase/Subfase) nunca são tocadas por essa
  * sincronização — continuam só do RPA/preenchimento manual.
  */
+import type { Processo } from '../types';
+
 export const OPCOES_NATUREZA_DESPESA = [
   'CONSUMO',
   'CONSUMO E PERMANENTE',
@@ -26,6 +28,9 @@ export const OPCOES_FONTE_PROCESSO = [
   'TESOURO',
 ];
 
+/** Rótulo gravado na coluna Q (Subfase do Processo) ao marcar um processo como contratado/aditivado pelo app. */
+export const SUBFASE_CONTRATADO_ADITIVADO = 'CONTRATADO/ADITIVADO';
+
 /** Índices (0-based) das colunas da planilha que o app pode gravar/atualizar. */
 export const COLUNA = {
   ORDEM: 0,
@@ -37,6 +42,7 @@ export const COLUNA = {
   FONTE: 9,
   V_ESTIMADO: 11,
   RITO_PROCESSUAL: 14,
+  SUBFASE_PROCESSO: 16,
   ANDAMENTO: 18,
   DATA_ENTRADA: 20,
   ANO_ENTRADA: 23,
@@ -70,6 +76,13 @@ export interface DadosProcessoParaPlanilha {
   andamento?: string;
   data_entrada?: string;
   pca_id?: string;
+  /**
+   * Só é gravada na planilha quando informada — o app não gerencia essa
+   * coluna no dia a dia (é do RPA/preenchimento manual), então omitir a
+   * chave preserva o que já estava lá. Hoje só é usada pra marcar
+   * `SUBFASE_CONTRATADO_ADITIVADO` a partir do app.
+   */
+  subfase_processo?: string;
 }
 
 /**
@@ -80,7 +93,7 @@ export interface DadosProcessoParaPlanilha {
 export function montarValoresColunasProcesso(
   dados: DadosProcessoParaPlanilha,
 ): Record<number, string> {
-  return {
+  const valores: Record<number, string> = {
     [COLUNA.N_PAE]: /^E-/i.test(dados.numero_processo) ? dados.numero_processo : `E-${dados.numero_processo}`,
     [COLUNA.OBJETO]: dados.objeto,
     [COLUNA.OBSERVACAO]: dados.descricao || '',
@@ -93,6 +106,42 @@ export function montarValoresColunasProcesso(
     [COLUNA.DATA_ENTRADA]: paraDataBR(dados.data_entrada),
     [COLUNA.ANO_ENTRADA]: dados.data_entrada ? paraDataBR(dados.data_entrada).slice(-4) : '',
     [COLUNA.PREVISAO_NO_PCA]: dados.pca_id ? 'SIM' : 'NÃO',
+  };
+  if (dados.subfase_processo !== undefined) {
+    valores[COLUNA.SUBFASE_PROCESSO] = dados.subfase_processo;
+  }
+  return valores;
+}
+
+/** Monta um `DadosProcessoParaPlanilha` a partir de um Processo do app, pra reaproveitar em qualquer tela que precise sincronizar. */
+export function processoParaDadosPlanilha(
+  processo: Pick<
+    Processo,
+    | 'numero_processo'
+    | 'objeto'
+    | 'descricao'
+    | 'unidade_demandante'
+    | 'natureza_despesa'
+    | 'fonte'
+    | 'valor_estimado'
+    | 'rito_processual'
+    | 'andamento'
+    | 'data_entrada'
+    | 'pca_id'
+  >,
+): DadosProcessoParaPlanilha {
+  return {
+    numero_processo: processo.numero_processo,
+    objeto: processo.objeto,
+    descricao: processo.descricao,
+    unidade_demandante: processo.unidade_demandante,
+    natureza_despesa: processo.natureza_despesa,
+    fonte: processo.fonte,
+    valor_estimado: processo.valor_estimado,
+    rito_processual: processo.rito_processual,
+    andamento: processo.andamento,
+    data_entrada: processo.data_entrada,
+    pca_id: processo.pca_id,
   };
 }
 

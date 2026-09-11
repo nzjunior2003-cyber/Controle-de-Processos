@@ -4,7 +4,9 @@ import {
   acharLinhaParaProcesso,
   aplicarColunasNaLinha,
   montarValoresColunasProcesso,
+  processoParaDadosPlanilha,
   proximoNumeroSequencial,
+  SUBFASE_CONTRATADO_ADITIVADO,
   TOTAL_COLUNAS_PLANILHA,
 } from './planilhaProcessos';
 
@@ -55,20 +57,69 @@ describe('montarValoresColunasProcesso', () => {
     });
     expect(valores[COLUNA.N_PAE]).toBe('E-2026/1');
   });
+
+  it('só grava a Subfase (coluna Q) quando informada, pra não apagar o que o RPA já preencheu', () => {
+    const semSubfase = montarValoresColunasProcesso({
+      numero_processo: '2026/1',
+      objeto: 'Objeto',
+      unidade_demandante: 'DTIC',
+    });
+    expect(semSubfase[COLUNA.SUBFASE_PROCESSO]).toBeUndefined();
+
+    const comSubfase = montarValoresColunasProcesso({
+      numero_processo: '2026/1',
+      objeto: 'Objeto',
+      unidade_demandante: 'DTIC',
+      subfase_processo: SUBFASE_CONTRATADO_ADITIVADO,
+    });
+    expect(comSubfase[COLUNA.SUBFASE_PROCESSO]).toBe('CONTRATADO/ADITIVADO');
+  });
+});
+
+describe('processoParaDadosPlanilha', () => {
+  it('monta os dados pra sincronização a partir de um Processo do app', () => {
+    const dados = processoParaDadosPlanilha({
+      numero_processo: '2026/1',
+      objeto: 'Objeto',
+      descricao: 'Descrição',
+      unidade_demandante: 'DTIC',
+      natureza_despesa: 'SERVIÇO',
+      fonte: 'TESOURO',
+      valor_estimado: 100,
+      rito_processual: 'PREGÃO ELETRÔNICO',
+      andamento: 'Em análise',
+      data_entrada: '2026-01-15T00:00:00.000Z',
+      pca_id: 'pca-1',
+    });
+
+    expect(dados).toEqual({
+      numero_processo: '2026/1',
+      objeto: 'Objeto',
+      descricao: 'Descrição',
+      unidade_demandante: 'DTIC',
+      natureza_despesa: 'SERVIÇO',
+      fonte: 'TESOURO',
+      valor_estimado: 100,
+      rito_processual: 'PREGÃO ELETRÔNICO',
+      andamento: 'Em análise',
+      data_entrada: '2026-01-15T00:00:00.000Z',
+      pca_id: 'pca-1',
+    });
+  });
 });
 
 describe('aplicarColunasNaLinha', () => {
   it('preserva colunas não gerenciadas ao mesclar', () => {
     const linhaExistente = new Array(TOTAL_COLUNAS_PLANILHA).fill('');
     linhaExistente[COLUNA.N_PAE] = 'E-2026/1';
-    linhaExistente[16] = 'CBM > DTIC > QCG'; // SETOR ATUAL, não gerenciado
+    linhaExistente[17] = 'CBM > DTIC > QCG'; // SETOR ATUAL, não gerenciado
     linhaExistente[19] = '27/08/2026'; // ÚLTIMA TRAMITAÇÃO, não gerenciado
 
     const resultado = aplicarColunasNaLinha(linhaExistente, { [COLUNA.OBJETO]: 'Novo objeto' });
 
     expect(resultado[COLUNA.N_PAE]).toBe('E-2026/1');
     expect(resultado[COLUNA.OBJETO]).toBe('Novo objeto');
-    expect(resultado[16]).toBe('CBM > DTIC > QCG');
+    expect(resultado[17]).toBe('CBM > DTIC > QCG');
     expect(resultado[19]).toBe('27/08/2026');
     expect(resultado).toHaveLength(TOTAL_COLUNAS_PLANILHA);
   });
