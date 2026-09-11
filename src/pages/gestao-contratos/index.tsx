@@ -93,7 +93,7 @@ export default function GestaoContratos() {
     return null;
   };
 
-  /** Um Auxiliar só vê os contratos do seu Gestor responsável; um Gestor "raiz" vê todos. */
+  /** Qualquer usuário do perfil Gestão de Contratos (Gestor "raiz" ou Auxiliar) vê todos os contratos. */
   const contratosDoEscopo = useMemo(
     () => filtrarContratosPorGestor(contratos, usuarioAtual),
     [contratos, usuarioAtual],

@@ -286,27 +286,16 @@ describe('gestorRaizDe', () => {
 });
 
 describe('filtrarContratosPorGestor', () => {
+  // Não filtra mais por hierarquia de Gestor — qualquer usuário do
+  // perfil Gestão de Contratos vê e gerencia todos os contratos.
   const doGestor1 = { ...base, id: 'c1', gestorGeralId: 'g1' };
   const doGestor2 = { ...base, id: 'c2', gestorGeralId: 'g2' };
   const semGestor = { ...base, id: 'c3', gestorGeralId: undefined };
   const contratos = [doGestor1, doGestor2, semGestor];
 
-  it('um Gestor raiz (sem gestorResponsavelId) vê todos os contratos', () => {
-    const resultado = filtrarContratosPorGestor(contratos, {});
-    expect(resultado).toEqual(contratos);
-  });
-
-  it('um Auxiliar vê os contratos do seu Gestor responsável e os ainda sem gestor atribuído', () => {
-    const resultado = filtrarContratosPorGestor(contratos, { gestorResponsavelId: 'g1' });
-    expect(resultado.map((c) => c.id)).toEqual(['c1', 'c3']);
-  });
-
-  it('um Auxiliar não vê contratos já atribuídos a outro Gestor', () => {
-    const resultado = filtrarContratosPorGestor(contratos, { gestorResponsavelId: 'g1' });
-    expect(resultado.map((c) => c.id)).not.toContain('c2');
-  });
-
-  it('devolve todos os contratos sem usuário (nada para restringir)', () => {
+  it('devolve todos os contratos, independente do Gestor responsável do usuário', () => {
+    expect(filtrarContratosPorGestor(contratos, {})).toEqual(contratos);
+    expect(filtrarContratosPorGestor(contratos, { gestorResponsavelId: 'g1' })).toEqual(contratos);
     expect(filtrarContratosPorGestor(contratos, null)).toEqual(contratos);
   });
 });

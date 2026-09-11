@@ -5,9 +5,9 @@ import { calcularStatusContrato, filtrarContratosPorGestor } from '../../lib/con
 
 /**
  * Reaproveita os mesmos KPIs já exibidos dentro do módulo Gestão de
- * Contratos (Vigentes/Atenção/Vencidos/Valor Global) — um Auxiliar só vê
- * o escopo do seu Gestor responsável (mesma regra de
- * `filtrarContratosPorGestor`); um Gestor "raiz" ou o master veem todos.
+ * Contratos (Vigentes/Atenção/Vencidos/Valor Global) — qualquer usuário
+ * do perfil Gestão de Contratos (Gestor "raiz" ou Auxiliar) vê todos os
+ * contratos, sem distinção.
  */
 export default function DashboardGestaoContratos() {
   const { contratos, usuarioAtual } = useApp();

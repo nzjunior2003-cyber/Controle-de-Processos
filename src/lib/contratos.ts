@@ -143,23 +143,19 @@ export function gestorRaizDe(
 }
 
 /**
- * Restringe a lista de contratos aos do Gestor responsável por um Auxiliar
- * (via `gestorGeralId` do contrato); um Gestor "raiz" (sem
- * `gestorResponsavelId`) vê todos os contratos normalmente.
+ * Qualquer usuário do perfil Gestão de Contratos (Gestor "raiz" ou
+ * Auxiliar) vê e gerencia todos os contratos, sem distinção — a
+ * restrição por `gestorGeralId`/`gestorResponsavelId` foi removida a
+ * pedido: um Auxiliar não deve ficar travado sem enxergar contratos só
+ * porque a hierarquia de Gestores não bate. A função continua existindo
+ * (sem filtrar nada) pra não exigir mudar os dois lugares que já a
+ * chamam (GestaoContratos e seu dashboard).
  */
 export function filtrarContratosPorGestor<T extends Contrato>(
   contratos: T[],
-  usuario: { gestorResponsavelId?: string } | null | undefined,
+  _usuario?: { gestorResponsavelId?: string } | null,
 ): T[] {
-  if (!usuario?.gestorResponsavelId) return contratos;
-  // Um contrato sem gestorGeralId ainda não foi "reivindicado" por
-  // nenhum Gestor — é o caso de todo contrato importado da planilha
-  // (a sincronização não atribui gestor nenhum). Sem essa checagem, um
-  // Auxiliar nunca enxergaria nenhum desses contratos (só o Gestor
-  // "raiz", que não passa pelo filtro), mesmo tendo perfil pra
-  // gerenciá-los — na prática, ficava impedido de editar quase
-  // qualquer contrato.
-  return contratos.filter((c) => !c.gestorGeralId || c.gestorGeralId === usuario.gestorResponsavelId);
+  return contratos;
 }
 
 /** Máximo de contratos ativos que um mesmo Fiscal Titular pode acumular. */
