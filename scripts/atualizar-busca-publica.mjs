@@ -2,9 +2,9 @@
 /**
  * Reconstrói a coleção `busca_publica` (leitura liberada a qualquer um,
  * sem login — ver firestore.rules) a partir de `processos` e `contratos`
- * — só um resumo mínimo e seguro de cada um (nunca o documento inteiro:
- * nada de valores, dados de fiscal/demandante, contatos etc.), pra
- * alimentar a busca pública da tela inicial (PublicHome.tsx).
+ * — um resumo de cada um com os campos de transparência pedidos (nunca o
+ * documento inteiro: sem CNPJ, contatos, e-mails etc.), pra alimentar a
+ * busca pública da tela inicial (PublicHome.tsx).
  *
  * Pensado pra rodar periodicamente via GitHub Actions (ver
  * .github/workflows/atualizar-busca-publica.yml), usando a mesma conta
@@ -19,6 +19,7 @@
 import { readFileSync } from 'fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { differenceInDays } from 'date-fns';
 
 const CREDENCIAIS_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 const PROJECT_ID = process.env.FIREBASE_PROJECT_ID;
@@ -48,20 +49,41 @@ async function main() {
   initializeApp({ credential: cert(credenciais), projectId: PROJECT_ID });
   const db = getFirestore();
 
-  const [processosSnap, contratosSnap, atualSnap] = await Promise.all([
+  const [processosSnap, contratosSnap, estadasSnap, atualSnap] = await Promise.all([
     db.collection('processos').get(),
     db.collection('contratos').get(),
+    db.collection('estadas_processo').get(),
     db.collection('busca_publica').get(),
   ]);
 
+  // Estada em curso (data_fim vazia) de cada processo, pra calcular há
+  // quantos dias ele está no setor/localização atual.
+  const estadaEmCursoPorProcesso = new Map();
+  estadasSnap.docs.forEach((doc) => {
+    const e = doc.data();
+    if (e.data_fim || !e.processo_id || !e.data_inicio) return;
+    estadaEmCursoPorProcesso.set(e.processo_id, e);
+  });
+
+  const agora = new Date();
   const esperados = new Map();
   processosSnap.docs.forEach((doc) => {
     const p = doc.data();
     if (!p.numero_processo) return;
+    const estadaAtual = estadaEmCursoPorProcesso.get(doc.id);
+    const diasNoSetorAtual = estadaAtual
+      ? Math.max(0, differenceInDays(agora, new Date(estadaAtual.data_inicio)))
+      : null;
     esperados.set(`processo_${doc.id}`, {
       tipo: 'processo',
       numero: p.numero_processo,
       objeto: p.objeto ?? '',
+      setorAtual: p.localizacao_atual ?? null,
+      andamento: p.andamento ?? null,
+      fonte: p.fonte ?? null,
+      naturezaDespesa: p.natureza_despesa ?? null,
+      valorEstimado: p.valor_estimado ?? null,
+      diasNoSetorAtual,
     });
   });
   contratosSnap.docs.forEach((doc) => {
@@ -72,6 +94,11 @@ async function main() {
       numero: c.numero,
       empresa: c.empresa ?? '',
       objeto: c.objeto ?? '',
+      valorGlobal: c.valorGlobal ?? null,
+      saldoAtualFinanceiro: c.saldoAtualFinanceiro ?? null,
+      fiscalTitular: c.fiscalTitular ?? null,
+      inicioVigencia: c.inicioVigencia ?? null,
+      fimVigencia: c.fimVigencia ?? null,
     });
   });
 

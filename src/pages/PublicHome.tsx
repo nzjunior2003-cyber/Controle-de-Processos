@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
-import { Search, LogIn, PieChart as PieChartIcon, FileText, FileCheck2 } from 'lucide-react';
+import { Search, LogIn, PieChart as PieChartIcon, FileText, FileCheck2, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getDb } from '../lib/firebase';
+import { formatarMoeda } from '../lib/contratos';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import LoginModal from '../components/LoginModal';
 
@@ -12,12 +13,33 @@ interface ItemBuscaPublica {
   numero: string;
   objeto: string;
   empresa?: string;
+  // Campos extras de processo
+  setorAtual?: string | null;
+  andamento?: string | null;
+  fonte?: string | null;
+  naturezaDespesa?: string | null;
+  valorEstimado?: number | null;
+  diasNoSetorAtual?: number | null;
+  // Campos extras de contrato
+  valorGlobal?: number | null;
+  saldoAtualFinanceiro?: number | null;
+  fiscalTitular?: string | null;
+  inicioVigencia?: string | null;
+  fimVigencia?: string | null;
+}
+
+function formatarData(data?: string | null): string {
+  if (!data) return '—';
+  const d = new Date(data);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('pt-BR');
 }
 
 export default function PublicHome() {
   const { processos, setores } = useApp();
   const [busca, setBusca] = useState('');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [itemSelecionado, setItemSelecionado] = useState<ItemBuscaPublica | null>(null);
 
   // Índice público de busca (só número/objeto/empresa — nunca o
   // documento inteiro) — mantido por scripts/atualizar-busca-publica.mjs,
@@ -147,7 +169,11 @@ export default function PublicHome() {
               ) : (
                 <ul className="divide-y divide-gray-200 border border-gray-200 rounded-lg overflow-hidden">
                   {resultados.slice(0, 50).map((item) => (
-                    <li key={item.id} className="p-4 hover:bg-gray-50 flex items-start gap-3">
+                    <li
+                      key={item.id}
+                      onClick={() => setItemSelecionado(item)}
+                      className="p-4 hover:bg-gray-50 flex items-start gap-3 cursor-pointer"
+                    >
                       <span
                         className={`mt-0.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
                           item.tipo === 'processo' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
@@ -221,6 +247,111 @@ export default function PublicHome() {
 
       {isLoginModalOpen && (
         <LoginModal onClose={() => setIsLoginModalOpen(false)} />
+      )}
+
+      {itemSelecionado && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+          onClick={() => setItemSelecionado(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between p-6 border-b border-gray-200">
+              <div>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mb-2 ${
+                    itemSelecionado.tipo === 'processo' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+                  }`}
+                >
+                  {itemSelecionado.tipo === 'processo' ? (
+                    <FileText className="w-3 h-3 mr-1" />
+                  ) : (
+                    <FileCheck2 className="w-3 h-3 mr-1" />
+                  )}
+                  {itemSelecionado.tipo === 'processo' ? 'Processo' : 'Contrato'}
+                </span>
+                <h3 className="text-lg font-bold text-gray-900">{itemSelecionado.numero}</h3>
+              </div>
+              <button
+                onClick={() => setItemSelecionado(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Objeto</dt>
+                <dd className="mt-1 text-sm text-gray-900">{itemSelecionado.objeto || '—'}</dd>
+              </div>
+
+              {itemSelecionado.tipo === 'processo' ? (
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Setor Atual</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{itemSelecionado.setorAtual || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Andamento</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{itemSelecionado.andamento || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Fonte</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{itemSelecionado.fonte || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Dias no Setor Atual</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {itemSelecionado.diasNoSetorAtual != null ? `${itemSelecionado.diasNoSetorAtual} dias` : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Natureza</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{itemSelecionado.naturezaDespesa || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Valor</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {itemSelecionado.valorEstimado != null ? formatarMoeda(itemSelecionado.valorEstimado) : '—'}
+                    </dd>
+                  </div>
+                </dl>
+              ) : (
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Fornecedor</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{itemSelecionado.empresa || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Fiscal</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{itemSelecionado.fiscalTitular || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Valor Global</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {itemSelecionado.valorGlobal != null ? formatarMoeda(itemSelecionado.valorGlobal) : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Saldo Financeiro</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {itemSelecionado.saldoAtualFinanceiro != null ? formatarMoeda(itemSelecionado.saldoAtualFinanceiro) : '—'}
+                    </dd>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <dt className="text-sm font-medium text-gray-500">Vigência</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {formatarData(itemSelecionado.inicioVigencia)} a {formatarData(itemSelecionado.fimVigencia)}
+                    </dd>
+                  </div>
+                </dl>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
