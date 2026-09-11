@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, Send, AlertTriangle, Clock, Activity, CheckCircle } from 'lucide-react';
 import type { Contrato } from '../types';
-import type { ExecucaoContrato } from '../lib/contratos';
+import { marcoAlertaVencimento, type ExecucaoContrato } from '../lib/contratos';
 import { enviarEmail } from '../lib/emailService';
 
 interface AlertasModalProps {
@@ -32,14 +32,19 @@ export function AlertasModal({ isOpen, onClose, contratos, execucoes = [] }: Ale
   // mesmo com vigência vencida ou saldo baixo — não há mais nada a fazer.
   const contratosAtivos = contratos.filter((c) => !c.concluido);
 
+  // Guarda qual dos três marcos (90/60/30 dias) cada contrato alcançou,
+  // pra mostrar/mencionar o marco certo no email e na lista.
+  const marcoPorContrato = new Map<string, 90 | 60 | 30>();
+
   const alertasVencimento = contratosAtivos.filter(c => {
     if (!c.fimVigencia) return false;
     const fim = new Date(c.fimVigencia);
     if (Number.isNaN(fim.getTime())) return false;
-    const diffTime = Math.abs(fim.getTime() - hoje.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    // Alerta se faltam menos de 60 dias
-    return fim >= hoje && diffDays <= 60;
+    const diasRestantes = Math.ceil((fim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+    const marco = marcoAlertaVencimento(diasRestantes);
+    if (marco === null) return false;
+    marcoPorContrato.set(c.id, marco);
+    return true;
   });
 
   const alertasSaldo = contratosAtivos.filter(c => {
@@ -59,7 +64,9 @@ export function AlertasModal({ isOpen, onClose, contratos, execucoes = [] }: Ale
     try {
       for (const contrato of alertasGeral) {
         const motivoStr: string[] = [];
-        if (alertasVencimento.includes(contrato)) motivoStr.push('vencimento próximo');
+        if (alertasVencimento.includes(contrato)) {
+          motivoStr.push(`vencimento em até ${marcoPorContrato.get(contrato.id)} dias`);
+        }
         if (alertasSaldo.includes(contrato)) motivoStr.push('saldo baixo (< 20%)');
 
         const corpo = `
@@ -121,7 +128,7 @@ export function AlertasModal({ isOpen, onClose, contratos, execucoes = [] }: Ale
 
         <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
           <p className="text-sm text-gray-500 mb-6">
-            O sistema envia alertas automáticos por e-mail para os fiscais informando sobre o <b>término próximo dos contratos (≤ 60 dias)</b>, o <b>prazo para envio de NF/Faturas e/ou recibos</b>, e quando o <b>nível do saldo for insatisfatório (≤ 20%)</b>.
+            O sistema envia alertas automáticos por e-mail para os fiscais informando sobre o <b>término próximo dos contratos (90, 60 e 30 dias antes do vencimento)</b>, o <b>prazo para envio de NF/Faturas e/ou recibos</b>, e quando o <b>nível do saldo for insatisfatório (≤ 20%)</b>.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -166,7 +173,11 @@ export function AlertasModal({ isOpen, onClose, contratos, execucoes = [] }: Ale
                       <td className="px-4 py-3 text-sm text-gray-900 font-medium">#{c.numero}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         <div className="flex flex-col gap-1">
-                          {alertasVencimento.includes(c) && <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Vencimento</span>}
+                          {alertasVencimento.includes(c) && (
+                            <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                              Vencimento ({marcoPorContrato.get(c.id)}d)
+                            </span>
+                          )}
                           {alertasSaldo.includes(c) && <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-800">Saldo Baixo</span>}
                         </div>
                       </td>

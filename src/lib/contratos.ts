@@ -8,6 +8,23 @@ import type { Contrato } from '../types';
 /** Opções fixas de Natureza de Despesa exibidas no cadastro/filtro de contratos. */
 export const OPCOES_NATUREZA_DESPESA_CONTRATO = ['CONSUMO', 'PERMANENTE', 'SERVIÇO'];
 
+/** Marcos (em dias) do alerta automático de vencimento enviado aos fiscais. */
+export const MARCOS_ALERTA_VENCIMENTO = [90, 60, 30] as const;
+
+/**
+ * Marco de alerta de vencimento em que um contrato se encaixa — o mais
+ * apertado que ele já alcançou (ex.: com 25 dias restantes, cai no marco
+ * de 30, não no de 60 ou 90). Devolve null pra contratos já vencidos
+ * (tratados como um alerta à parte) ou com mais de 90 dias pela frente.
+ */
+export function marcoAlertaVencimento(diasRestantes: number): 90 | 60 | 30 | null {
+  if (diasRestantes < 0) return null;
+  if (diasRestantes <= 30) return 30;
+  if (diasRestantes <= 60) return 60;
+  if (diasRestantes <= 90) return 90;
+  return null;
+}
+
 /** Opções fixas de Fonte de Recurso exibidas no cadastro/filtro de contratos. */
 export const OPCOES_FONTE_RECURSO_CONTRATO = ['TESOURO', 'FEBOM', 'NOA', 'BNDES', 'TED', 'OUTRO'];
 

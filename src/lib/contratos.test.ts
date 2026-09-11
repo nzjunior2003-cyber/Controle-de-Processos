@@ -9,6 +9,7 @@ import {
   filtrarContratosDoFiscal,
   filtrarContratosPorGestor,
   gestorRaizDe,
+  marcoAlertaVencimento,
   ordenarContratosPorNumero,
   validarLimiteFiscal,
 } from './contratos';
@@ -70,6 +71,22 @@ describe('calcularStatusContrato', () => {
 
     const vigente = calcularStatusContrato({ ...base, concluido: true }, hoje);
     expect(vigente.status).toBe('CONCLUÍDO');
+  });
+});
+
+describe('marcoAlertaVencimento', () => {
+  it('cai no marco mais apertado que o contrato já alcançou', () => {
+    expect(marcoAlertaVencimento(90)).toBe(90);
+    expect(marcoAlertaVencimento(75)).toBe(90);
+    expect(marcoAlertaVencimento(60)).toBe(60);
+    expect(marcoAlertaVencimento(45)).toBe(60);
+    expect(marcoAlertaVencimento(30)).toBe(30);
+    expect(marcoAlertaVencimento(0)).toBe(30);
+  });
+
+  it('devolve null pra mais de 90 dias ou já vencido', () => {
+    expect(marcoAlertaVencimento(91)).toBeNull();
+    expect(marcoAlertaVencimento(-1)).toBeNull();
   });
 });
 
