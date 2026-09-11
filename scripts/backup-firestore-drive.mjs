@@ -72,9 +72,14 @@ async function exportarFirestore() {
 }
 
 async function enviarParaDrive(conteudoJson, credenciais) {
+  // Precisa do escopo "drive" (não o mais restrito "drive.file"): a pasta
+  // de backup foi criada e compartilhada por um usuário humano, não pela
+  // própria conta de serviço, e "drive.file" só enxerga arquivos/pastas
+  // que o app mesmo criou ou abriu — com ele, a conta de serviço não
+  // consegue ver a pasta compartilhada (erro 404 "File not found").
   const auth = new google.auth.GoogleAuth({
     credentials: credenciais,
-    scopes: ['https://www.googleapis.com/auth/drive.file'],
+    scopes: ['https://www.googleapis.com/auth/drive'],
   });
   const drive = google.drive({ version: 'v3', auth });
 
