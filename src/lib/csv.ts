@@ -155,7 +155,7 @@ export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha 
     subfase_processo: subfase || undefined,
     localizacao_atual: celula(linha, 'SETOR ATUAL') || undefined,
     andamento: celula(linha, 'ANDAMENTO') || undefined,
-    data_entrada: parseDataBR(celula(linha, 'DATA DE ENTRADA')),
+    data_entrada: parseDataBR(celula(linha, 'DATA DE CADASTRO') || celula(linha, 'DATA DE ENTRADA')),
     ultima_tramitacao: parseDataBR(celula(linha, 'ÚLTIMA TRAMITAÇÃO')),
   };
 }

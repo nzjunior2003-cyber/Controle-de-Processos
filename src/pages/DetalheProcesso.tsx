@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, Clock, FileCheck2, MapPin, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { differenceInDays, format } from 'date-fns';
 import { CHECKLISTS_RITOS, STATUS_PROCESSO_LABELS } from '../types';
-import { calcularTempoTotal, localizacaoEfetiva, montarLinhaDoTempo } from '../lib/fluxoProcesso';
+import { localizacaoEfetiva, montarLinhaDoTempo } from '../lib/fluxoProcesso';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
 import { getAccessToken, googleSignIn } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
@@ -96,7 +96,17 @@ export default function DetalheProcesso() {
   const linhaDoTempo = montarLinhaDoTempo(
     estadasProcesso.filter(e => e.processo_id === processo.id),
   );
-  const tempoTotalDias = calcularTempoTotal(estadasProcesso.filter(e => e.processo_id === processo.id));
+  // Tempo Total = dias entre a Data de Cadastro e a conclusão/contratação
+  // (ou hoje, se ainda estiver em andamento) — não o somatório das estadas.
+  const tempoTotalDias = processo.data_entrada
+    ? Math.max(
+        0,
+        differenceInDays(
+          processo.data_conclusao ? new Date(processo.data_conclusao) : new Date(),
+          new Date(processo.data_entrada),
+        ),
+      )
+    : undefined;
   const diasNaLocalizacaoAtual = linhaDoTempo[linhaDoTempo.length - 1]?.dias;
 
   const checklistDisponivel = processo.rito_processual ? CHECKLISTS_RITOS[processo.rito_processual] : undefined;

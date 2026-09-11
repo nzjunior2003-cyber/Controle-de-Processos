@@ -44,7 +44,8 @@ export const COLUNA = {
   RITO_PROCESSUAL: 14,
   SUBFASE_PROCESSO: 16,
   ANDAMENTO: 18,
-  DATA_ENTRADA: 20,
+  /** Coluna V — "Data de Cadastro" (mesmo campo `data_entrada` do app; antes ficava na coluna U). */
+  DATA_ENTRADA: 21,
   ANO_ENTRADA: 23,
   PREVISAO_NO_PCA: 24,
 } as const;
