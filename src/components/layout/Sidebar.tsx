@@ -16,12 +16,17 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   const perfil = usuarioAtual?.perfil;
   const isMaster = perfil === 'master';
   
+  // Todo usuário ativo enxerga e navega por todos os módulos operacionais —
+  // só consegue criar/editar/excluir no módulo do próprio perfil (cada
+  // tela já trava as ações de escrita por perfil; ver isMasterOrApoio/
+  // isMasterOrGestao/isMasterOrContratos/isMasterOrFiscal em cada página).
+  // Usuários e Auditoria continuam exclusivos do master.
   const navigation = [
     { name: 'Início', href: '/sistema', icon: Home, show: true },
-    { name: 'Apoio e Suprimento', href: '/sistema/apoio', icon: Package, show: isMaster || perfil === 'apoio' },
-    { name: 'Contratos e ARP\'s', href: '/sistema/contratos-arps', icon: FileText, show: isMaster || perfil === 'contratos' },
-    { name: 'Gestão de Contratos', href: '/sistema/gestao-contratos', icon: CheckSquare, show: isMaster || perfil === 'gestao' },
-    { name: 'Fiscal do Contrato', href: '/sistema/fiscal-contrato', icon: FileCheck, show: isMaster || perfil === 'fiscal' },
+    { name: 'Apoio e Suprimento', href: '/sistema/apoio', icon: Package, show: true },
+    { name: 'Contratos e ARP\'s', href: '/sistema/contratos-arps', icon: FileText, show: true },
+    { name: 'Gestão de Contratos', href: '/sistema/gestao-contratos', icon: CheckSquare, show: true },
+    { name: 'Fiscal do Contrato', href: '/sistema/fiscal-contrato', icon: FileCheck, show: true },
     { name: 'Dashboard Corporativo', href: '/sistema/dashboard', icon: PieChart, show: true },
     { name: 'Usuários', href: '/sistema/usuarios', icon: Users, show: isMaster },
     { name: 'Auditoria', href: '/sistema/auditoria', icon: History, show: isMaster },
