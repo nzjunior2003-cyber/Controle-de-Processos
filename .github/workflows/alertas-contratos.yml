@@ -1,0 +1,41 @@
+name: Alertas diários de contratos aos fiscais
+
+on:
+  schedule:
+    # 09:00 UTC = 06:00 em Belém (UTC-3) — início do expediente
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  alertas:
+    name: Enviar alertas de vencimento e saldo baixo
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gravar credenciais do Firebase
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/firebase-sa.json
+
+      - name: Disparar alertas
+        run: npx tsx scripts/enviar-alertas-contratos.ts
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
+          FIREBASE_PROJECT_ID: controle-de-procesos
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+
+      - name: Remover credenciais temporárias
+        if: always()
+        run: rm -f /tmp/firebase-sa.json
