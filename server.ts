@@ -23,6 +23,34 @@ const getTransporter = () => {
   return null;
 };
 
+/**
+ * Confirma que a requisição trouxe um ID token válido de um usuário
+ * autenticado neste projeto Firebase — sem depender do firebase-admin,
+ * usando a API pública do Identity Toolkit (a mesma api key, já pública
+ * no bundle do front, faz a validação). Sem isso, /api/send-email fica
+ * aberto pra qualquer um na internet disparar e-mail em nome do sistema.
+ */
+async function idTokenValido(idToken: string | undefined): Promise<boolean> {
+  if (!idToken) return false;
+  const apiKey = process.env.VITE_FIREBASE_API_KEY;
+  if (!apiKey) return false;
+  try {
+    const resposta = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      },
+    );
+    if (!resposta.ok) return false;
+    const dados = await resposta.json();
+    return Array.isArray(dados.users) && dados.users.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -39,8 +67,14 @@ async function startServer() {
   // Firebase Authentication (sendPasswordResetEmail).
   app.post("/api/send-email", async (req, res) => {
     try {
+      const authHeader = req.headers.authorization ?? "";
+      const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+      if (!(await idTokenValido(idToken))) {
+        return res.status(401).json({ error: "Não autenticado." });
+      }
+
       const { to, subject, text, html } = req.body;
-      
+
       if (!to || !subject || (!text && !html)) {
         return res.status(400).json({ error: "Missing required fields (to, subject, text/html)" });
       }

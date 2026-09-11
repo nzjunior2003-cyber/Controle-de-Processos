@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Send, AlertTriangle, Clock, Activity, CheckCircle } from 'lucide-react';
 import type { Contrato } from '../types';
 import type { ExecucaoContrato } from '../lib/contratos';
+import { enviarEmail } from '../lib/emailService';
 
 interface AlertasModalProps {
   isOpen: boolean;
@@ -27,7 +28,11 @@ export function AlertasModal({ isOpen, onClose, contratos, execucoes = [] }: Ale
     return (contrato.valorGlobal || 0) - executado;
   };
 
-  const alertasVencimento = contratos.filter(c => {
+  // Contratos já concluídos/encerrados manualmente não geram alerta,
+  // mesmo com vigência vencida ou saldo baixo — não há mais nada a fazer.
+  const contratosAtivos = contratos.filter((c) => !c.concluido);
+
+  const alertasVencimento = contratosAtivos.filter(c => {
     if (!c.fimVigencia) return false;
     const fim = new Date(c.fimVigencia);
     if (Number.isNaN(fim.getTime())) return false;
@@ -37,7 +42,7 @@ export function AlertasModal({ isOpen, onClose, contratos, execucoes = [] }: Ale
     return fim >= hoje && diffDays <= 60;
   });
 
-  const alertasSaldo = contratos.filter(c => {
+  const alertasSaldo = contratosAtivos.filter(c => {
     // Alerta se o saldo for menor ou igual a 20% do valor total
     if (!c.valorGlobal) return false;
     const porcentagem = (saldoDoContrato(c) / c.valorGlobal) * 100;
@@ -72,18 +77,15 @@ export function AlertasModal({ isOpen, onClose, contratos, execucoes = [] }: Ale
 
         const destinatario = contrato.fiscalEmail || contrato.contatoEmail;
         if (destinatario) {
-          const res = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+          try {
+            await enviarEmail({
               to: destinatario,
               subject: `[ALERTA AUTOMÁTICO] Contrato ${contrato.numero} - Ações Necessárias`,
-              html: corpo
-            })
-          });
-
-          if (res.ok) {
+              html: corpo,
+            });
             enviados++;
+          } catch (erroEnvio) {
+            console.error(`Erro ao enviar alerta do contrato ${contrato.numero}:`, erroEnvio);
           }
         }
       }

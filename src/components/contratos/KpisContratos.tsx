@@ -11,10 +11,13 @@ interface Props {
 }
 
 export default function KpisContratos({ contratos, filtro, onFiltrar }: Props) {
-  const vigentes = contratos.filter((c) => c.diasRestantes > 90).length;
-  const atencao = contratos.filter((c) => c.diasRestantes >= 0 && c.diasRestantes <= 90).length;
-  const vencidos = contratos.filter((c) => c.diasRestantes < 0).length;
-  const valorTotalVigente = contratos
+  // Contratos já concluídos não contam nos KPIs de vigência/vencimento —
+  // não há mais nada pendente neles, mesmo que a data já tenha passado.
+  const contratosAtivos = contratos.filter((c) => !c.concluido);
+  const vigentes = contratosAtivos.filter((c) => c.diasRestantes > 90).length;
+  const atencao = contratosAtivos.filter((c) => c.diasRestantes >= 0 && c.diasRestantes <= 90).length;
+  const vencidos = contratosAtivos.filter((c) => c.diasRestantes < 0).length;
+  const valorTotalVigente = contratosAtivos
     .filter((c) => c.diasRestantes >= 0)
     .reduce((acumulado, atual) => acumulado + (atual.valorGlobal || 0), 0);
 

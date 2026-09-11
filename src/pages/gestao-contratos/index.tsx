@@ -11,6 +11,7 @@ import { ID_PLANILHA_CONTRATOS, URL_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { getAccessToken, initAuth } from '../../lib/googleAuth';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
 import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
+import { enviarEmail } from '../../lib/emailService';
 import { AlertasModal } from '../../components/AlertasModal';
 import KpisContratos, { type FiltroKpi } from '../../components/contratos/KpisContratos';
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
@@ -77,6 +78,7 @@ export default function GestaoContratos() {
   const [filtroFonte, setFiltroFonte] = useState('');
   const [filtroSituacao, setFiltroSituacao] = useState<'todos' | 'ativos' | 'concluidos'>('todos');
   const [direcaoOrdenacao, setDirecaoOrdenacao] = useState<'asc' | 'desc'>('asc');
+  const [enviandoEmailId, setEnviandoEmailId] = useState<string | null>(null);
 
   useEffect(() => {
     const cancelar = initAuth();
@@ -104,9 +106,14 @@ export default function GestaoContratos() {
 
   const filtrados = useMemo(() => {
     let lista = buscarContratos(contratosComStatus, busca);
-    if (filtroKpi === 'vigentes') lista = lista.filter((c) => c.diasRestantes > 90);
-    else if (filtroKpi === 'atencao') lista = lista.filter((c) => c.diasRestantes >= 0 && c.diasRestantes <= 90);
-    else if (filtroKpi === 'vencidos') lista = lista.filter((c) => c.diasRestantes < 0);
+    // Os cards de KPI (Vigentes/Atenção/Vencidos) só contam contratos em
+    // andamento — um concluído não entra em nenhum dos três, então filtrar
+    // por eles aqui também exclui concluídos, senão a lista da tabela não
+    // bateria com o número mostrado no card.
+    if (filtroKpi === 'vigentes') lista = lista.filter((c) => c.diasRestantes > 90 && !c.concluido);
+    else if (filtroKpi === 'atencao') {
+      lista = lista.filter((c) => c.diasRestantes >= 0 && c.diasRestantes <= 90 && !c.concluido);
+    } else if (filtroKpi === 'vencidos') lista = lista.filter((c) => c.diasRestantes < 0 && !c.concluido);
     if (filtroNatureza) lista = lista.filter((c) => c.naturezaDespesa === filtroNatureza);
     if (filtroFonte) lista = lista.filter((c) => c.fonteRecurso === filtroFonte);
     if (filtroSituacao === 'concluidos') lista = lista.filter((c) => c.concluido);
@@ -125,6 +132,39 @@ export default function GestaoContratos() {
       await updateContrato(contrato.id, { concluido: !contrato.concluido });
     } catch (erro) {
       alert('Não foi possível atualizar a situação do contrato: ' + (erro instanceof Error ? erro.message : String(erro)));
+    }
+  };
+
+  // Contratos já concluídos não entram no painel de alertas — não há mais
+  // nada a fazer, mesmo com vigência vencida ou saldo baixo.
+  const contratosEmAlerta = useMemo(
+    () => filtrados.filter((c) => c.diasRestantes <= 90 && !c.concluido),
+    [filtrados],
+  );
+
+  const handleReenviarEmailFiscal = async (contrato: ContratoComStatus) => {
+    const destinatario = contrato.fiscalEmail || contrato.contatoEmail;
+    if (!destinatario) return;
+    setEnviandoEmailId(contrato.id);
+    try {
+      await enviarEmail({
+        to: destinatario,
+        subject: `[ALERTA] Contrato ${contrato.numero} - Ações Necessárias`,
+        html: `
+          <h2>Alerta de Contrato - ${contrato.numero}</h2>
+          <p>Prezado Fiscal,</p>
+          <p>Este é um lembrete sobre o contrato <b>${contrato.numero}</b> (${contrato.empresa}):</p>
+          <p>Fim da Vigência: ${contrato.fimVigencia}<br/>
+          ${contrato.diasRestantes < 0
+            ? `Vencido há ${Math.abs(contrato.diasRestantes)} dias.`
+            : `Faltam ${contrato.diasRestantes} dias para o fim da vigência.`}</p>
+        `,
+      });
+      alert(`E-mail reenviado para ${destinatario}.`);
+    } catch (erro) {
+      alert('Não foi possível enviar o e-mail: ' + (erro instanceof Error ? erro.message : String(erro)));
+    } finally {
+      setEnviandoEmailId(null);
     }
   };
 
@@ -349,9 +389,9 @@ export default function GestaoContratos() {
               </h3>
             </div>
             <div className="space-y-4">
-              {filtrados
-                .filter((c) => c.diasRestantes <= 90)
-                .map((item) => (
+              {contratosEmAlerta.map((item) => {
+                const destinatario = item.fiscalEmail || item.contatoEmail;
+                return (
                   <div
                     key={item.id}
                     className={`p-4 rounded-lg border ${item.diasRestantes < 0 ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'} flex justify-between items-center`}
@@ -374,19 +414,23 @@ export default function GestaoContratos() {
                     </div>
                     <div>
                       <button
-                        className={`px-4 py-2 rounded text-sm font-medium border ${
+                        onClick={() => handleReenviarEmailFiscal(item)}
+                        disabled={!destinatario || enviandoEmailId === item.id}
+                        title={destinatario ? undefined : 'Contrato sem e-mail de fiscal cadastrado'}
+                        className={`px-4 py-2 rounded text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed ${
                           item.diasRestantes < 0
                             ? 'bg-red-600 text-white hover:bg-red-700 border-transparent'
                             : 'bg-white text-orange-700 border-orange-300 hover:bg-orange-100'
                         }`}
                       >
                         <Mail className="w-4 h-4 inline mr-2" />
-                        Reenviar E-mail ao Fiscal
+                        {enviandoEmailId === item.id ? 'Enviando...' : 'Reenviar E-mail ao Fiscal'}
                       </button>
                     </div>
                   </div>
-                ))}
-              {filtrados.filter((c) => c.diasRestantes <= 90).length === 0 && (
+                );
+              })}
+              {contratosEmAlerta.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   Nenhum contrato em período crítico de alerta.
                 </div>
