@@ -34,7 +34,7 @@ export function AlertasModal({ isOpen, onClose, contratos, execucoes = [] }: Ale
 
   // Guarda qual dos três marcos (90/60/30 dias) cada contrato alcançou,
   // pra mostrar/mencionar o marco certo no email e na lista.
-  const marcoPorContrato = new Map<string, 90 | 60 | 30>();
+  const marcoPorContrato = new Map<string, 180 | 90 | 60 | 30>();
 
   const alertasVencimento = contratosAtivos.filter(c => {
     if (!c.fimVigencia) return false;
@@ -128,7 +128,7 @@ export function AlertasModal({ isOpen, onClose, contratos, execucoes = [] }: Ale
 
         <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
           <p className="text-sm text-gray-500 mb-6">
-            O sistema envia alertas automáticos por e-mail para os fiscais informando sobre o <b>término próximo dos contratos (90, 60 e 30 dias antes do vencimento)</b>, o <b>prazo para envio de NF/Faturas e/ou recibos</b>, e quando o <b>nível do saldo for insatisfatório (≤ 20%)</b>.
+            O sistema envia alertas automáticos por e-mail para os fiscais informando sobre o <b>término próximo dos contratos (180, 90, 60 e 30 dias antes do vencimento)</b>, o <b>prazo para envio de NF/Faturas e/ou recibos</b>, e quando o <b>nível do saldo for insatisfatório (≤ 20%)</b>.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

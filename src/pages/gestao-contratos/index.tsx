@@ -136,9 +136,11 @@ export default function GestaoContratos() {
   };
 
   // Contratos já concluídos não entram no painel de alertas — não há mais
-  // nada a fazer, mesmo com vigência vencida ou saldo baixo.
+  // nada a fazer, mesmo com vigência vencida ou saldo baixo. A janela
+  // (180 dias) bate com os marcos de alerta automático (ver
+  // marcoAlertaVencimento), mais os já vencidos.
   const contratosEmAlerta = useMemo(
-    () => filtrados.filter((c) => c.diasRestantes <= 90 && !c.concluido),
+    () => filtrados.filter((c) => c.diasRestantes <= 180 && !c.concluido),
     [filtrados],
   );
 

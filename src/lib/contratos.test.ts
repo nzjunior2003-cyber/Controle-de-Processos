@@ -76,6 +76,8 @@ describe('calcularStatusContrato', () => {
 
 describe('marcoAlertaVencimento', () => {
   it('cai no marco mais apertado que o contrato já alcançou', () => {
+    expect(marcoAlertaVencimento(180)).toBe(180);
+    expect(marcoAlertaVencimento(150)).toBe(180);
     expect(marcoAlertaVencimento(90)).toBe(90);
     expect(marcoAlertaVencimento(75)).toBe(90);
     expect(marcoAlertaVencimento(60)).toBe(60);
@@ -84,8 +86,8 @@ describe('marcoAlertaVencimento', () => {
     expect(marcoAlertaVencimento(0)).toBe(30);
   });
 
-  it('devolve null pra mais de 90 dias ou já vencido', () => {
-    expect(marcoAlertaVencimento(91)).toBeNull();
+  it('devolve null pra mais de 180 dias ou já vencido', () => {
+    expect(marcoAlertaVencimento(181)).toBeNull();
     expect(marcoAlertaVencimento(-1)).toBeNull();
   });
 });
