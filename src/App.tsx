@@ -12,6 +12,7 @@ import DetalheProcesso from './pages/DetalheProcesso';
 import ContratosArps from './pages/contratos-arps';
 import GestaoContratos from './pages/gestao-contratos';
 import ContratoForm from './pages/gestao-contratos/ContratoForm';
+import RelatorioAuditoriaContrato from './pages/gestao-contratos/RelatorioAuditoria';
 import Usuarios from './pages/Usuarios';
 import ProtectedRoute from './components/ProtectedRoute';
 import FiscalContrato from './pages/fiscal-contrato';
@@ -26,6 +27,11 @@ export default function App() {
             <Route path="/" element={<PublicHome />} />
 
             <Route path="/sistema" element={<ProtectedRoute />}>
+              {/* Sem o Layout (sidebar/topo) — pensada pra impressão limpa. */}
+              <Route
+                path="gestao-contratos/:id/relatorio"
+                element={<RelatorioAuditoriaContrato />}
+              />
               <Route element={<Layout />}>
                 <Route index element={<SistemaHome />} />
                 <Route path="apoio" element={<Aquisicoes />} />

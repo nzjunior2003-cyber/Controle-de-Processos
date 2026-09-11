@@ -233,7 +233,7 @@ export default function ExecucaoModal({
           <div className="flex items-center space-x-2">
             <button
               type="button"
-              onClick={() => alert('Relatório gerado com sucesso!')}
+              onClick={() => window.open(`/sistema/gestao-contratos/${contrato.id}/relatorio`, '_blank')}
               className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border border-gray-300 flex items-center"
             >
               <FileText className="w-4 h-4 mr-1" />
