@@ -136,6 +136,16 @@ service cloud.firestore {
       allow write: if ativo() && perfilDoc().perfil in ['master', 'contratos'];
     }
 
+    // Índice mínimo e público de busca (número + objeto de processos,
+    // número + empresa + objeto de contratos) — mantido só por um script
+    // agendado (scripts/atualizar-busca-publica.mjs, via GitHub Actions),
+    // que usa a conta de serviço e por isso ignora estas regras. Nenhum
+    // cliente (nem autenticado) escreve aqui diretamente.
+    match /busca_publica/{documento} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Log de acesso (login bem-sucedido ou falho). Um login mal-sucedido
     // (senha incorreta, e-mail inexistente) acontece ANTES de qualquer
     // sessão válida — não há como exigir autenticação para essa escrita
