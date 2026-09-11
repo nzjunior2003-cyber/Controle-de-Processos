@@ -83,6 +83,25 @@ async function enviarParaDrive(conteudoJson, credenciais) {
   });
   const drive = google.drive({ version: 'v3', auth });
 
+  // Confirma que a conta de serviço enxerga a pasta ANTES de tentar
+  // gravar — devolve um erro muito mais claro (com o e-mail exato que
+  // precisa estar com acesso) do que deixar o create() falhar direto
+  // com um genérico "File not found".
+  try {
+    await drive.files.get({
+      fileId: PASTA_DRIVE_ID,
+      fields: 'id, name',
+      supportsAllDrives: true,
+    });
+  } catch (erro) {
+    throw new Error(
+      `Não consegui acessar a pasta do Drive (id "${PASTA_DRIVE_ID}"). Confirme que: ` +
+        `1) o ID está correto (é só o trecho final da URL da pasta, sem barras nem parâmetros); ` +
+        `2) a pasta foi compartilhada como Editor com a conta de serviço "${credenciais.client_email}". ` +
+        `Erro original: ${erro instanceof Error ? erro.message : String(erro)}`,
+    );
+  }
+
   const agora = new Date();
   const nomeArquivo = `backup-controle-processos-${agora.toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
 
@@ -97,6 +116,7 @@ async function enviarParaDrive(conteudoJson, credenciais) {
       body: conteudoJson,
     },
     fields: 'id, name',
+    supportsAllDrives: true,
   });
 
   return nomeArquivo;
@@ -107,6 +127,7 @@ async function main() {
 
   console.log('Exportando coleções do Firestore...');
   const { dados, totalDocumentos, credenciais } = await exportarFirestore();
+  console.log(`Conta de serviço em uso: ${credenciais.client_email}`);
 
   const backup = {
     geradoEm: new Date().toISOString(),
