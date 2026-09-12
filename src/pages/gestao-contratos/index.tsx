@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle, ArrowDownAZ, ArrowUpAZ, BellRing, Clock, FileText, Filter, Mail, PlusCircle,
-  RefreshCw, Search, ShieldAlert,
+  RefreshCw, Search, ShieldAlert, UserX,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
@@ -55,6 +55,7 @@ export default function GestaoContratos() {
     processos,
     pcas,
     usuarioAtual,
+    usuarios,
     contratos,
     updateContrato,
     syncContratosDaPlanilha,
@@ -68,7 +69,7 @@ export default function GestaoContratos() {
   const navigate = useNavigate();
 
   const [busca, setBusca] = useState('');
-  const [abaAtiva, setAbaAtiva] = useState<'geral' | 'alertas'>('geral');
+  const [abaAtiva, setAbaAtiva] = useState<'geral' | 'alertas' | 'vinculos'>('geral');
   const [contratoSelecionado, setContratoSelecionado] = useState<ContratoComStatus | null>(null);
   const [alertasModalOpen, setAlertasModalOpen] = useState(false);
   const [filtroKpi, setFiltroKpi] = useState<FiltroKpi>(null);
@@ -143,6 +144,29 @@ export default function GestaoContratos() {
     () => filtrados.filter((c) => c.diasRestantes <= 180 && !c.concluido),
     [filtrados],
   );
+
+  // Contratos com Fiscal Titular/Suplente cadastrado (nome ou e-mail
+  // preenchido) mas sem nenhum usuário Fiscal ativo com esse e-mail —
+  // sinal de que a pessoa não vai enxergar o contrato mesmo depois de
+  // ter acesso aprovado, geralmente por erro de digitação no e-mail.
+  const emailsFiscaisAtivos = useMemo(
+    () =>
+      new Set(
+        usuarios.filter((u) => u.perfil === 'fiscal' && u.ativo).map((u) => u.email.trim().toLowerCase()),
+      ),
+    [usuarios],
+  );
+  const contratosComFiscalSemUsuario = useMemo(() => {
+    const temUsuario = (email?: string) => !!email && emailsFiscaisAtivos.has(email.trim().toLowerCase());
+    return contratosComStatus
+      .filter((c) => !c.concluido)
+      .map((c) => ({
+        contrato: c,
+        titularSemUsuario: !!(c.fiscalTitular || c.fiscalEmail) && !temUsuario(c.fiscalEmail),
+        suplenteSemUsuario: !!(c.fiscalSuplente || c.fiscalSuplenteEmail) && !temUsuario(c.fiscalSuplenteEmail),
+      }))
+      .filter((item) => item.titularSemUsuario || item.suplenteSemUsuario);
+  }, [contratosComStatus, emailsFiscaisAtivos]);
 
   const handleReenviarEmailFiscal = async (contrato: ContratoComStatus) => {
     const destinatario = contrato.fiscalEmail || contrato.contatoEmail;
@@ -267,6 +291,24 @@ export default function GestaoContratos() {
             <ShieldAlert className="w-4 h-4 mr-2" />
             Notificações e Alertas
           </button>
+          {isMasterOrGestao && (
+            <button
+              onClick={() => setAbaAtiva('vinculos')}
+              className={`whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm flex items-center ${
+                abaAtiva === 'vinculos'
+                  ? 'border-red-700 text-red-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <UserX className="w-4 h-4 mr-2" />
+              Vínculo de Fiscais
+              {contratosComFiscalSemUsuario.length > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                  {contratosComFiscalSemUsuario.length}
+                </span>
+              )}
+            </button>
+          )}
         </nav>
       </div>
 
@@ -435,6 +477,56 @@ export default function GestaoContratos() {
               {contratosEmAlerta.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   Nenhum contrato em período crítico de alerta.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {abaAtiva === 'vinculos' && (
+          <div className="p-6 bg-slate-50">
+            <div className="mb-4 flex items-center gap-2">
+              <UserX className="w-5 h-5 text-red-600" />
+              <h3 className="text-lg font-medium text-gray-900">
+                Contratos com Fiscal sem Usuário Correspondente
+              </h3>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Estes contratos têm Fiscal Titular/Suplente cadastrado, mas o e-mail não bate com
+              nenhum usuário Fiscal já aprovado no sistema — a pessoa não vai ver este contrato em
+              "Fiscal do Contrato" até o e-mail ser corrigido (ou até ela solicitar/ter o acesso
+              aprovado).
+            </p>
+            <div className="space-y-3">
+              {contratosComFiscalSemUsuario.map(({ contrato, titularSemUsuario, suplenteSemUsuario }) => (
+                <div key={contrato.id} className="p-4 rounded-lg border bg-white border-gray-200 flex justify-between items-center">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900">
+                      Contrato {contrato.numero} — {contrato.empresa}
+                    </h4>
+                    {titularSemUsuario && (
+                      <p className="text-xs text-red-700 mt-1">
+                        Fiscal Titular: {contrato.fiscalTitular || '(sem nome)'} — {contrato.fiscalEmail || 'sem e-mail cadastrado'}
+                      </p>
+                    )}
+                    {suplenteSemUsuario && (
+                      <p className="text-xs text-red-700 mt-1">
+                        Fiscal Suplente: {contrato.fiscalSuplente || '(sem nome)'} — {contrato.fiscalSuplenteEmail || 'sem e-mail cadastrado'}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/sistema/gestao-contratos/${contrato.id}/editar`)}
+                    className="px-4 py-2 rounded text-sm font-medium border bg-white text-red-700 border-red-300 hover:bg-red-50 whitespace-nowrap"
+                  >
+                    Corrigir Contrato
+                  </button>
+                </div>
+              ))}
+              {contratosComFiscalSemUsuario.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  Todos os fiscais cadastrados nos contratos correspondem a um usuário ativo.
                 </div>
               )}
             </div>

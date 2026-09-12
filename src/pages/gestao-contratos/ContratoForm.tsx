@@ -148,7 +148,11 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
 export default function ContratoForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { contratos, addContrato, updateContrato } = useApp();
+  const { contratos, usuarios, addContrato, updateContrato } = useApp();
+  // Usuários com perfil Fiscal já aprovados — usados no seletor abaixo pra
+  // evitar digitar o e-mail manualmente (fonte mais comum de descasamento
+  // entre o cadastro do contrato e a conta que o fiscal realmente usa).
+  const fiscaisCadastrados = usuarios.filter((u) => u.perfil === 'fiscal' && u.ativo);
 
   const contrato = id ? contratos.find((c) => c.id === id) ?? null : null;
   const emEdicao = !!id;
@@ -676,6 +680,31 @@ export default function ContratoForm() {
               Fiscalização
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className={CLASSE_LABEL}>Selecionar Fiscal Titular já cadastrado</label>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const usuario = fiscaisCadastrados.find((u) => u.id === e.target.value);
+                    if (!usuario) return;
+                    setForm((anterior) => ({
+                      ...anterior,
+                      fiscalTitular: usuario.nome,
+                      fiscalEmail: usuario.email,
+                    }));
+                  }}
+                  className={`${CLASSE_INPUT} bg-white`}
+                >
+                  <option value="">Selecione um usuário Fiscal (ou preencha manualmente abaixo)...</option>
+                  {fiscaisCadastrados.map((u) => (
+                    <option key={u.id} value={u.id}>{u.nome} — {u.email}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Preenche Nome e E-mail automaticamente, evitando erro de digitação — sem isso, o e-mail
+                  precisa bater exatamente com o da conta do fiscal para ele conseguir ver este contrato.
+                </p>
+              </div>
               <div>
                 <label className={CLASSE_LABEL}>Fiscal Titular</label>
                 <input
@@ -702,6 +731,27 @@ export default function ContratoForm() {
                   onChange={(e) => handleChange('fiscalTitularContato', e.target.value)}
                   className={CLASSE_INPUT}
                 />
+              </div>
+              <div className="md:col-span-2">
+                <label className={CLASSE_LABEL}>Selecionar Fiscal Suplente já cadastrado</label>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const usuario = fiscaisCadastrados.find((u) => u.id === e.target.value);
+                    if (!usuario) return;
+                    setForm((anterior) => ({
+                      ...anterior,
+                      fiscalSuplente: usuario.nome,
+                      fiscalSuplenteEmail: usuario.email,
+                    }));
+                  }}
+                  className={`${CLASSE_INPUT} bg-white`}
+                >
+                  <option value="">Selecione um usuário Fiscal (ou preencha manualmente abaixo)...</option>
+                  {fiscaisCadastrados.map((u) => (
+                    <option key={u.id} value={u.id}>{u.nome} — {u.email}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className={CLASSE_LABEL}>Fiscal Suplente</label>
