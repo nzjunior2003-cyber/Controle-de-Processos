@@ -155,6 +155,7 @@ export default function RelatorioAuditoriaContrato() {
           {execucoesDoContrato.length === 0 ? (
             <p className="text-gray-500 italic">Nenhuma execução lançada até o momento.</p>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-gray-300 text-left text-xs text-gray-500 uppercase">
@@ -195,6 +196,7 @@ export default function RelatorioAuditoriaContrato() {
                 </tr>
               </tbody>
             </table>
+            </div>
           )}
         </section>
 
@@ -205,6 +207,7 @@ export default function RelatorioAuditoriaContrato() {
           {aditivosDoContrato.length === 0 ? (
             <p className="text-gray-500 italic">Nenhum aditivo registrado até o momento.</p>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-gray-300 text-left text-xs text-gray-500 uppercase">
@@ -243,6 +246,7 @@ export default function RelatorioAuditoriaContrato() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </section>
 

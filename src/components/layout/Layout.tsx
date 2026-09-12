@@ -4,7 +4,12 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 
 export default function Layout() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Começa aberta no desktop (como sempre foi) mas fechada no celular —
+  // do contrário, o primeiro carregamento num celular mostrava o menu
+  // ocupando a tela toda com overlay por cima do conteúdo.
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window === 'undefined' || window.innerWidth >= 768,
+  );
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-slate-950 font-sans">
