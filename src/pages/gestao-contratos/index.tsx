@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle, ArrowDownAZ, ArrowUpAZ, BellRing, Clock, FileText, Filter, Mail, PlusCircle,
-  RefreshCw, Search, ShieldAlert, UserX,
+  RefreshCw, Search, ShieldAlert, UserPlus, UserX,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
@@ -168,6 +168,25 @@ export default function GestaoContratos() {
       .filter((item) => item.titularSemUsuario || item.suplenteSemUsuario);
   }, [contratosComStatus, emailsFiscaisAtivos]);
 
+  // O sentido inverso: usuários Fiscal já ativados pelo master mas que
+  // ainda não foram digitados em nenhum contrato (Titular ou Suplente) —
+  // "novo fiscal cadastrado, aguardando vínculo".
+  const emailsVinculadosAContrato = useMemo(() => {
+    const set = new Set<string>();
+    contratos.forEach((c) => {
+      if (c.fiscalEmail) set.add(c.fiscalEmail.trim().toLowerCase());
+      if (c.fiscalSuplenteEmail) set.add(c.fiscalSuplenteEmail.trim().toLowerCase());
+    });
+    return set;
+  }, [contratos]);
+  const fiscaisSemContrato = useMemo(
+    () =>
+      usuarios.filter(
+        (u) => u.perfil === 'fiscal' && u.ativo && !emailsVinculadosAContrato.has(u.email.trim().toLowerCase()),
+      ),
+    [usuarios, emailsVinculadosAContrato],
+  );
+
   const handleReenviarEmailFiscal = async (contrato: ContratoComStatus) => {
     const destinatario = contrato.fiscalEmail || contrato.contatoEmail;
     if (!destinatario) return;
@@ -264,6 +283,31 @@ export default function GestaoContratos() {
         contratos={contratosComStatus}
         execucoes={execucoes}
       />
+
+      {isMasterOrGestao && fiscaisSemContrato.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <UserPlus className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">
+                {fiscaisSemContrato.length === 1
+                  ? '1 novo fiscal cadastrado, aguardando vínculo a um contrato'
+                  : `${fiscaisSemContrato.length} novos fiscais cadastrados, aguardando vínculo a um contrato`}
+              </p>
+              <p className="text-xs text-amber-800 mt-0.5">
+                {fiscaisSemContrato.map((f) => f.nome).join(', ')}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('vinculos')}
+            className="inline-flex items-center px-3 py-1.5 border border-amber-300 rounded-md text-sm font-medium text-amber-800 bg-white hover:bg-amber-100 whitespace-nowrap"
+          >
+            Ver detalhes
+          </button>
+        </div>
+      )}
 
       <KpisContratos contratos={contratosComStatus} filtro={filtroKpi} onFiltrar={setFiltroKpi} />
 
@@ -484,13 +528,41 @@ export default function GestaoContratos() {
         )}
 
         {abaAtiva === 'vinculos' && (
-          <div className="p-6 bg-slate-50">
-            <div className="mb-4 flex items-center gap-2">
-              <UserX className="w-5 h-5 text-red-600" />
-              <h3 className="text-lg font-medium text-gray-900">
-                Contratos com Fiscal sem Usuário Correspondente
-              </h3>
+          <div className="p-6 bg-slate-50 space-y-8">
+            <div>
+              <div className="mb-4 flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-amber-600" />
+                <h3 className="text-lg font-medium text-gray-900">
+                  Fiscais Aguardando Vínculo a um Contrato
+                </h3>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                Usuários com perfil Fiscal já ativados, mas cujo e-mail ainda não foi digitado em
+                nenhum contrato (Titular ou Suplente) — edite o contrato correspondente e selecione
+                esse fiscal em Fiscalização.
+              </p>
+              <div className="space-y-3">
+                {fiscaisSemContrato.map((f) => (
+                  <div key={f.id} className="p-4 rounded-lg border bg-white border-gray-200">
+                    <h4 className="text-sm font-bold text-gray-900">{f.nome}</h4>
+                    <p className="text-xs text-gray-600 mt-1">{f.email}{f.cargo ? ` — ${f.cargo}` : ''}</p>
+                  </div>
+                ))}
+                {fiscaisSemContrato.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    Nenhum fiscal ativo aguardando vínculo no momento.
+                  </div>
+                )}
+              </div>
             </div>
+
+            <div>
+              <div className="mb-4 flex items-center gap-2">
+                <UserX className="w-5 h-5 text-red-600" />
+                <h3 className="text-lg font-medium text-gray-900">
+                  Contratos com Fiscal sem Usuário Correspondente
+                </h3>
+              </div>
             <p className="text-sm text-gray-500 mb-4">
               Estes contratos têm Fiscal Titular/Suplente cadastrado, mas o e-mail não bate com
               nenhum usuário Fiscal já aprovado no sistema — a pessoa não vai ver este contrato em
@@ -529,6 +601,7 @@ export default function GestaoContratos() {
                   Todos os fiscais cadastrados nos contratos correspondem a um usuário ativo.
                 </div>
               )}
+            </div>
             </div>
           </div>
         )}
