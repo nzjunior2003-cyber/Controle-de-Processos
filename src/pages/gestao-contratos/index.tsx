@@ -19,7 +19,9 @@ import ExecucaoModal from '../../components/contratos/ExecucaoModal';
 import {
   buscarContratos,
   calcularStatusContrato,
+  normalizarNomeFiscal,
   ordenarContratosPorNumero,
+  pareceNomeDeFiscal,
   OPCOES_FONTE_RECURSO_CONTRATO,
   OPCOES_NATUREZA_DESPESA_CONTRATO,
   type ContratoComStatus,
@@ -149,18 +151,24 @@ export default function GestaoContratos() {
 
   // Diretório de fiscais/suplentes montado a partir dos próprios
   // contratos (não existe cadastro próprio de "fiscal" — é sempre texto
-  // livre em Fiscal Titular/Suplente de cada contrato).
+  // livre em Fiscal Titular/Suplente de cada contrato). Agrupa pelo NOME
+  // normalizado (não pelo e-mail): o e-mail nem sempre é preenchido de
+  // forma consistente entre contratos do mesmo militar, o que fazia a
+  // mesma pessoa aparecer em várias linhas separadas.
   const fiscaisDiretorio = useMemo(() => {
     const mapa = new Map<string, FiscalDiretorio>();
     const adicionar = (
-      nome: string | undefined,
+      nomeBruto: string | undefined,
       email: string | undefined,
       contrato: ContratoComStatus,
       papel: 'Titular' | 'Suplente',
     ) => {
-      const chave = (email || nome || '').trim().toLowerCase();
+      const nomeValido = nomeBruto && pareceNomeDeFiscal(nomeBruto) ? nomeBruto.trim() : '';
+      const chave = nomeValido ? normalizarNomeFiscal(nomeValido) : (email || '').trim().toLowerCase();
       if (!chave) return;
-      const atual = mapa.get(chave) ?? { chave, nome: nome || email || '(sem nome)', email, contratos: [] };
+      const atual =
+        mapa.get(chave) ?? { chave, nome: nomeValido || email || '(sem nome)', email, contratos: [] };
+      if (!atual.email && email) atual.email = email;
       atual.contratos.push({ contrato, papel });
       mapa.set(chave, atual);
     };

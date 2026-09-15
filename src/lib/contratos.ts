@@ -115,6 +115,33 @@ export function ordenarContratosPorNumero<T extends Contrato>(
   });
 }
 
+/**
+ * Reconhece se um texto parece mesmo um nome de fiscal (não um valor de
+ * outra coluna — moeda, número puro, data — sinal de que a linha da
+ * planilha caiu no offset errado, ver `planilhaContratos.ts`).
+ */
+export function pareceNomeDeFiscal(texto: string): boolean {
+  const valor = texto.trim();
+  if (!valor) return false;
+  if (/^r\$/i.test(valor)) return false;
+  if (/^-?\d+([.,]\d+)?$/.test(valor)) return false;
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(valor)) return false;
+  return /[a-zà-öø-ÿ]/i.test(valor);
+}
+
+/**
+ * Normaliza um nome de fiscal pra agrupar a mesma pessoa digitada de
+ * formas ligeiramente diferentes entre contratos: espaço extra, caixa
+ * diferente, ou um telefone anotado entre parênteses no final do nome.
+ */
+export function normalizarNomeFiscal(texto: string): string {
+  return texto
+    .replace(/\s*\([^)]*\)\s*$/, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
+}
+
 /** Restringe a lista aos contratos que um fiscal pode ver. */
 export function filtrarContratosDoFiscal<T extends Contrato>(
   contratos: T[],

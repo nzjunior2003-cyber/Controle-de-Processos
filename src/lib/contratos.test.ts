@@ -12,7 +12,9 @@ import {
   filtrarContratosDoFiscal,
   marcoAlertaVencimento,
   mesclarItensContrato,
+  normalizarNomeFiscal,
   ordenarContratosPorNumero,
+  pareceNomeDeFiscal,
   registrarTrocaFiscal,
   somaValorItens,
   validarLimiteFiscal,
@@ -135,6 +137,37 @@ describe('ordenarContratosPorNumero', () => {
     const copia = [...contratos];
     ordenarContratosPorNumero(contratos, 'asc');
     expect(contratos).toEqual(copia);
+  });
+});
+
+describe('pareceNomeDeFiscal', () => {
+  it('aceita nomes normais', () => {
+    expect(pareceNomeDeFiscal('TEN CEL QOBM RODRIGO OLIVEIRA')).toBe(true);
+  });
+
+  it('rejeita valores em R$ (offset errado da planilha)', () => {
+    expect(pareceNomeDeFiscal('R$ 22.420,00')).toBe(false);
+  });
+
+  it('rejeita número puro e data', () => {
+    expect(pareceNomeDeFiscal('12345')).toBe(false);
+    expect(pareceNomeDeFiscal('01/06/2026')).toBe(false);
+  });
+
+  it('rejeita vazio', () => {
+    expect(pareceNomeDeFiscal('   ')).toBe(false);
+  });
+});
+
+describe('normalizarNomeFiscal', () => {
+  it('remove telefone anotado entre parênteses no final', () => {
+    expect(normalizarNomeFiscal('RODRIGO MELO 57190103/1 (91 98025-9922)')).toBe('RODRIGO MELO 57190103/1');
+  });
+
+  it('ignora diferença de espaço e caixa', () => {
+    const a = normalizarNomeFiscal('  Rodrigo   Melo ');
+    const b = normalizarNomeFiscal('RODRIGO MELO');
+    expect(a).toBe(b);
   });
 });
 

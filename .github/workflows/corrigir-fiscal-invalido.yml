@@ -1,0 +1,39 @@
+name: Corrigir Fiscal/Suplente inválidos
+
+on:
+  workflow_dispatch:
+    inputs:
+      aplicar:
+        description: 'Gravar as correções de verdade (desmarcado = só lista o que seria corrigido)'
+        type: boolean
+        default: false
+
+jobs:
+  corrigir:
+    name: Limpar fiscalTitular/fiscalSuplente que não parecem nome
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gravar credenciais do Firebase
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/firebase-sa.json
+
+      - name: Corrigir
+        run: node scripts/corrigir-fiscal-invalido.mjs
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
+          FIREBASE_PROJECT_ID: controle-de-procesos
+          APLICAR: ${{ inputs.aplicar }}
+
+      - name: Remover credenciais temporárias
+        if: always()
+        run: rm -f /tmp/firebase-sa.json
