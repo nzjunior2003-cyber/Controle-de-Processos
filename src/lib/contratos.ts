@@ -265,7 +265,7 @@ export function devolverItens(
  */
 export function mesclarItensContrato(
   itensAntigos: ItemContrato[],
-  itensEditados: Array<Pick<ItemContrato, 'id' | 'descricao' | 'unidade' | 'quantidadeInicial'>>,
+  itensEditados: Array<Pick<ItemContrato, 'id' | 'descricao' | 'unidade' | 'quantidadeInicial' | 'valorUnitario'>>,
 ): ItemContrato[] {
   const antigosPorId = new Map(itensAntigos.map((item) => [item.id, item]));
   return itensEditados.map((item) => {
@@ -274,6 +274,11 @@ export function mesclarItensContrato(
     const consumido = antigo.quantidadeInicial - antigo.quantidadeAtual;
     return { ...item, quantidadeAtual: Math.max(0, item.quantidadeInicial - consumido) };
   });
+}
+
+/** Soma do valor total (quantidade × valor unitário) de todos os itens — comparado ao Valor Global do contrato no cadastro. */
+export function somaValorItens(itens: Array<Pick<ItemContrato, 'quantidadeInicial' | 'valorUnitario'>>): number {
+  return itens.reduce((total, item) => total + item.quantidadeInicial * (item.valorUnitario || 0), 0);
 }
 
 export type TipoOcorrencia = 'OCORRENCIA' | 'ADITIVO' | 'ESCLARECIMENTO';

@@ -333,8 +333,16 @@ export function mapLinhaContratoDaPlanilha(linha: string[]): ContratoDaPlanilha 
     saldoAtualFinanceiro: saldoTexto ? parseCurrencyBR(saldoTexto) : undefined,
     inicioVigencia: parseDataBR(linha[colunas.INICIO_VIGENCIA]),
     fimVigencia: parseDataBR(linha[colunas.FIM_VIGENCIA]),
-    fiscalTitular: (linha[colunas.FISCAL_TITULAR] ?? '').trim() || undefined,
-    fiscalSuplente: (linha[colunas.FISCAL_SUPLENTE] ?? '').trim() || undefined,
+    // Só aceita o texto como nome se não parecer um valor de outra coluna
+    // (ex.: "R$ 0,00") — sinal de que a linha caiu no offset errado (ver
+    // `detectarOffsetContrato`); nesse caso é melhor deixar em branco do
+    // que gravar um valor monetário como nome do fiscal.
+    fiscalTitular: pareceNomeDeEmpresa(linha[colunas.FISCAL_TITULAR] ?? '')
+      ? (linha[colunas.FISCAL_TITULAR] ?? '').trim()
+      : undefined,
+    fiscalSuplente: pareceNomeDeEmpresa(linha[colunas.FISCAL_SUPLENTE] ?? '')
+      ? (linha[colunas.FISCAL_SUPLENTE] ?? '').trim()
+      : undefined,
     unidadeDemandante: (linha[colunas.DEMANDANTE] ?? '').trim() || undefined,
     pcaCodigo: (linha[colunas.PCA] ?? '').trim() || undefined,
   };

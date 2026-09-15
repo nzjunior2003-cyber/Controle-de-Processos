@@ -14,6 +14,7 @@ import {
   mesclarItensContrato,
   ordenarContratosPorNumero,
   registrarTrocaFiscal,
+  somaValorItens,
   validarLimiteFiscal,
 } from './contratos';
 import type { Contrato, ItemContrato } from '../types';
@@ -214,8 +215,8 @@ describe('devolverSaldo', () => {
 
 describe('abaterItens', () => {
   const itens: ItemContrato[] = [
-    { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 100 },
-    { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50, quantidadeAtual: 50 },
+    { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 100, valorUnitario: 10 },
+    { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50, quantidadeAtual: 50, valorUnitario: 2 },
   ];
 
   it('abate a quantidade só dos itens informados em itensConsumidos', () => {
@@ -237,7 +238,7 @@ describe('abaterItens', () => {
 describe('devolverItens', () => {
   it('abater seguido de devolver volta ao saldo original de cada item', () => {
     const original: ItemContrato[] = [
-      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 100 },
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 100, valorUnitario: 10 },
     ];
     const consumo = [{ itemId: 'i1', quantidade: 40 }];
     const depoisDeAbater = abaterItens(original, consumo);
@@ -249,41 +250,55 @@ describe('devolverItens', () => {
 describe('mesclarItensContrato', () => {
   it('novo item nasce com quantidadeAtual = quantidadeInicial', () => {
     const resultado = mesclarItensContrato([], [
-      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100 },
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, valorUnitario: 10 },
     ]);
     expect(resultado).toEqual([
-      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 100 },
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, valorUnitario: 10, quantidadeAtual: 100 },
     ]);
   });
 
   it('preserva o consumo já registrado ao editar a quantidade inicial de um item existente', () => {
     const antigos: ItemContrato[] = [
-      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 70 },
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 70, valorUnitario: 10 },
     ];
     // Aditivo aumentou a quantidade inicial de 100 para 150 — os 30 já consumidos continuam valendo.
     const resultado = mesclarItensContrato(antigos, [
-      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 150 },
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 150, valorUnitario: 10 },
     ]);
     expect(resultado[0].quantidadeAtual).toBe(120);
   });
 
   it('remove itens que não estão mais na lista editada', () => {
     const antigos: ItemContrato[] = [
-      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 70 },
-      { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50, quantidadeAtual: 50 },
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 70, valorUnitario: 10 },
+      { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50, quantidadeAtual: 50, valorUnitario: 2 },
     ];
     const resultado = mesclarItensContrato(antigos, [
-      { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50 },
+      { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50, valorUnitario: 2 },
     ]);
     expect(resultado).toHaveLength(1);
     expect(resultado[0].id).toBe('i2');
   });
 });
 
+describe('somaValorItens', () => {
+  it('soma quantidade × valor unitário de cada item', () => {
+    const total = somaValorItens([
+      { quantidadeInicial: 10, valorUnitario: 5 },
+      { quantidadeInicial: 2, valorUnitario: 100 },
+    ]);
+    expect(total).toBe(250);
+  });
+
+  it('devolve 0 para lista vazia', () => {
+    expect(somaValorItens([])).toBe(0);
+  });
+});
+
 describe('aplicarAditivoQuantidade', () => {
   it('soma o acréscimo à quantidade inicial E à atual do item', () => {
     const itens: ItemContrato[] = [
-      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 60 },
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 60, valorUnitario: 10 },
     ];
     const resultado = aplicarAditivoQuantidade(itens, [{ itemId: 'i1', quantidade: 20 }]);
     expect(resultado?.[0]).toEqual({
@@ -291,13 +306,14 @@ describe('aplicarAditivoQuantidade', () => {
       descricao: 'Papel A4',
       quantidadeInicial: 120,
       quantidadeAtual: 80,
+      valorUnitario: 10,
     });
   });
 
   it('não altera itens que não foram acrescidos', () => {
     const itens: ItemContrato[] = [
-      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 60 },
-      { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50, quantidadeAtual: 50 },
+      { id: 'i1', descricao: 'Papel A4', quantidadeInicial: 100, quantidadeAtual: 60, valorUnitario: 10 },
+      { id: 'i2', descricao: 'Caneta', quantidadeInicial: 50, quantidadeAtual: 50, valorUnitario: 2 },
     ];
     const resultado = aplicarAditivoQuantidade(itens, [{ itemId: 'i1', quantidade: 20 }]);
     expect(resultado?.find((i) => i.id === 'i2')).toEqual(itens[1]);

@@ -159,12 +159,24 @@ export default function ExecucaoModal({
     ? ((valorExecutado / contrato.valorGlobal) * 100).toFixed(1)
     : '0.0';
 
+  // Quando o contrato tem itens com valor unitário e ao menos uma linha
+  // preenchida, o valor da execução é sempre calculado a partir da
+  // quantidade usada de cada item — a pessoa não digita o valor à mão.
+  const temLinhaItemValida = linhasItens.some((linha) => linha.itemId && Number(linha.quantidade) > 0);
+  const usaValorCalculadoPorItens = temItens && temLinhaItemValida;
+  const valorCalculadoItens = linhasItens.reduce((total, linha) => {
+    const item = itensContrato.find((i) => i.id === linha.itemId);
+    if (!item || !(Number(linha.quantidade) > 0)) return total;
+    return total + Number(linha.quantidade) * (item.valorUnitario || 0);
+  }, 0);
+
   const camposInvalidos =
     !novaExecucao.nf ||
     !novaExecucao.data ||
-    (comQuantidade && novaExecucao.tipoDeducao === 'quantidade'
-      ? !novaExecucao.quantidade
-      : !novaExecucao.valor);
+    (!usaValorCalculadoPorItens &&
+      (comQuantidade && novaExecucao.tipoDeducao === 'quantidade'
+        ? !novaExecucao.quantidade
+        : !novaExecucao.valor));
 
   const handleAddExecucao = async () => {
     if (camposInvalidos) return;
@@ -205,7 +217,7 @@ export default function ExecucaoModal({
         tipo: novaExecucao.tipo,
         nf: novaExecucao.nf,
         data: novaExecucao.data,
-        valor: Number(novaExecucao.valor) || 0,
+        valor: usaValorCalculadoPorItens ? valorCalculadoItens : Number(novaExecucao.valor) || 0,
         quantidade: Number(novaExecucao.quantidade) || 1,
         observacao: novaExecucao.observacao,
         arquivoLink,
@@ -465,18 +477,29 @@ export default function ExecucaoModal({
                         />
                       </div>
                     )}
-                    <div className={!comQuantidade || novaExecucao.tipoDeducao === 'valor' ? 'col-span-2' : ''}>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Valor (R$){' '}
-                        {comQuantidade && novaExecucao.tipoDeducao !== 'valor' ? '(Opcional)' : ''}
-                      </label>
-                      <input
-                        type="number"
-                        value={novaExecucao.valor}
-                        onChange={(e) => setNovaExecucao({ ...novaExecucao, valor: e.target.value })}
-                        className={CLASSE_INPUT}
-                      />
-                    </div>
+                    {usaValorCalculadoPorItens ? (
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Valor (calculado a partir dos itens)
+                        </label>
+                        <div className={`${CLASSE_INPUT} bg-gray-50 text-gray-700`}>
+                          {formatarMoeda(valorCalculadoItens)}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={!comQuantidade || novaExecucao.tipoDeducao === 'valor' ? 'col-span-2' : ''}>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Valor (R$){' '}
+                          {comQuantidade && novaExecucao.tipoDeducao !== 'valor' ? '(Opcional)' : ''}
+                        </label>
+                        <input
+                          type="number"
+                          value={novaExecucao.valor}
+                          onChange={(e) => setNovaExecucao({ ...novaExecucao, valor: e.target.value })}
+                          className={CLASSE_INPUT}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -490,10 +513,15 @@ export default function ExecucaoModal({
                   </div>
                   {temItens && (
                     <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Itens Recebidos/Consumidos</p>
+                      <p className="text-sm font-medium text-gray-700 mb-2">
+                        Itens Recebidos/Consumidos nesta NF
+                      </p>
                       <div className="space-y-2">
                         {linhasItens.map((linha, indice) => {
                           const item = itensContrato.find((i) => i.id === linha.itemId);
+                          const subtotal = item && Number(linha.quantidade) > 0
+                            ? Number(linha.quantidade) * (item.valorUnitario || 0)
+                            : 0;
                           return (
                             <div key={indice} className="flex items-center gap-2">
                               <select
@@ -503,7 +531,7 @@ export default function ExecucaoModal({
                               >
                                 {itensContrato.map((i) => (
                                   <option key={i.id} value={i.id}>
-                                    {i.descricao} (saldo: {i.quantidadeAtual}{i.unidade ? ` ${i.unidade}` : ''})
+                                    {i.descricao} (saldo: {i.quantidadeAtual}{i.unidade ? ` ${i.unidade}` : ''} — {formatarMoeda(i.valorUnitario || 0)}/un.)
                                   </option>
                                 ))}
                               </select>
@@ -524,6 +552,9 @@ export default function ExecucaoModal({
                               </button>
                               {item && Number(linha.quantidade) > item.quantidadeAtual && (
                                 <p className="text-xs text-amber-600">Acima do saldo</p>
+                              )}
+                              {subtotal > 0 && (
+                                <p className="text-xs text-gray-500 whitespace-nowrap">{formatarMoeda(subtotal)}</p>
                               )}
                             </div>
                           );

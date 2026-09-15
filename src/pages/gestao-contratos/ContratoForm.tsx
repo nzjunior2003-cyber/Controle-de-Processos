@@ -10,19 +10,22 @@ import { enviarEmail } from '../../lib/emailService';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
 import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
 import {
+  formatarMoeda,
   mesclarItensContrato,
+  somaValorItens,
   OPCOES_FONTE_RECURSO_CONTRATO,
   OPCOES_NATUREZA_DESPESA_CONTRATO,
 } from '../../lib/contratos';
 
-/** Naturezas de despesa em que faz sentido cadastrar itens com quantidade própria (bens). */
-const NATUREZAS_COM_ITENS = ['CONSUMO', 'PERMANENTE'];
+/** Unidades de medida mais comuns, oferecidas como sugestão no campo de item. */
+const OPCOES_UNIDADE_ITEM = ['UND', 'PCT', 'JG', 'CONJ', 'CX', 'KG', 'L', 'M', 'M²', 'M³'];
 
 interface ItemForm {
   id: string;
   descricao: string;
   unidade: string;
   quantidadeInicial: string;
+  valorUnitario: string;
 }
 
 function itensParaFormulario(itens?: ItemContrato[]): ItemForm[] {
@@ -31,6 +34,9 @@ function itensParaFormulario(itens?: ItemContrato[]): ItemForm[] {
     descricao: item.descricao,
     unidade: item.unidade ?? '',
     quantidadeInicial: String(item.quantidadeInicial),
+    // Itens cadastrados antes do valor unitário existir não têm esse
+    // campo salvo — cai pra vazio em vez da string "undefined".
+    valorUnitario: item.valorUnitario != null ? String(item.valorUnitario) : '',
   }));
 }
 
@@ -174,7 +180,7 @@ export default function ContratoForm() {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  const mostrarItens = NATUREZAS_COM_ITENS.includes(form.naturezaDespesa);
+  const mostrarItens = form.controlaQuantidade;
 
   const handleItemChange = (id: string, campo: keyof Omit<ItemForm, 'id'>, valor: string) => {
     setItensForm((anterior) =>
@@ -185,13 +191,30 @@ export default function ContratoForm() {
   const handleAddItem = () => {
     setItensForm((anterior) => [
       ...anterior,
-      { id: crypto.randomUUID(), descricao: '', unidade: '', quantidadeInicial: '' },
+      { id: crypto.randomUUID(), descricao: '', unidade: '', quantidadeInicial: '', valorUnitario: '' },
     ]);
   };
 
   const handleRemoveItem = (id: string) => {
     setItensForm((anterior) => anterior.filter((item) => item.id !== id));
   };
+
+  const itensValidos = itensForm.filter((item) => item.descricao.trim());
+  const totalItens = somaValorItens(
+    itensValidos.map((item) => ({
+      quantidadeInicial: Number(item.quantidadeInicial) || 0,
+      valorUnitario: Number(item.valorUnitario) || 0,
+    })),
+  );
+  const valorGlobalNumero = Number(form.valorGlobal) || 0;
+  // Poucos centavos de diferença por arredondamento não devem travar o
+  // cadastro — só sinaliza quando a diferença é de fato relevante.
+  const totalItensDivergente =
+    mostrarItens && itensValidos.length > 0 && Math.abs(totalItens - valorGlobalNumero) > 0.01;
+  const totalQuantidadeItens = itensValidos.reduce(
+    (acc, item) => acc + (Number(item.quantidadeInicial) || 0),
+    0,
+  );
 
   const camposInvalidos =
     !form.numero ||
@@ -200,7 +223,8 @@ export default function ContratoForm() {
     !form.valorGlobal ||
     !form.saldoInicialFinanceiro ||
     !form.inicioVigencia ||
-    !form.fimVigencia;
+    !form.fimVigencia ||
+    totalItensDivergente;
 
   const handleChange = (campo: keyof FormState, valor: string | boolean) => {
     setForm((anterior) => ({ ...anterior, [campo]: valor }));
@@ -275,11 +299,12 @@ export default function ContratoForm() {
           : Number(form.saldoInicialFinanceiro) || 0,
         ...(form.controlaQuantidade
           ? {
-              saldoInicialQuantitativo: Number(form.saldoInicialQuantitativo) || 0,
+              // O saldo quantitativo agregado agora vem da soma das
+              // quantidades dos itens, não de um número digitado à parte.
+              saldoInicialQuantitativo: totalQuantidadeItens,
               saldoAtualQuantitativo: emEdicao
-                ? (contrato?.saldoAtualQuantitativo ??
-                  (Number(form.saldoInicialQuantitativo) || 0))
-                : Number(form.saldoInicialQuantitativo) || 0,
+                ? (contrato?.saldoAtualQuantitativo ?? totalQuantidadeItens)
+                : totalQuantidadeItens,
             }
           : {}),
         inicioVigencia: form.inicioVigencia,
@@ -302,18 +327,17 @@ export default function ContratoForm() {
           ? {
               itens: mesclarItensContrato(
                 contrato?.itens ?? [],
-                itensForm
-                  .filter((item) => item.descricao.trim())
-                  .map((item) => ({
-                    id: item.id,
-                    descricao: item.descricao.trim(),
-                    // Não usar `unidade.trim() || undefined`: o Firestore
-                    // rejeita `undefined` em qualquer campo do update,
-                    // mesmo dentro de um array — omitir a chave em vez de
-                    // setá-la como undefined.
-                    ...(item.unidade.trim() ? { unidade: item.unidade.trim() } : {}),
-                    quantidadeInicial: Number(item.quantidadeInicial) || 0,
-                  })),
+                itensValidos.map((item) => ({
+                  id: item.id,
+                  descricao: item.descricao.trim(),
+                  // Não usar `unidade.trim() || undefined`: o Firestore
+                  // rejeita `undefined` em qualquer campo do update,
+                  // mesmo dentro de um array — omitir a chave em vez de
+                  // setá-la como undefined.
+                  ...(item.unidade.trim() ? { unidade: item.unidade.trim() } : {}),
+                  quantidadeInicial: Number(item.quantidadeInicial) || 0,
+                  valorUnitario: Number(item.valorUnitario) || 0,
+                })),
               ),
             }
           : {}),
@@ -549,61 +573,6 @@ export default function ContratoForm() {
             </div>
           </div>
 
-          {mostrarItens && (
-            <div>
-              <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
-                Itens do Contrato (Bens)
-              </h4>
-              <p className="text-sm text-gray-500 mb-4">
-                Cada item tem seu próprio saldo de quantidade, abatido a cada execução (NF) que
-                informar consumo/recebimento desse item — independente do saldo financeiro acima.
-              </p>
-              <div className="space-y-3">
-                {itensForm.map((item) => (
-                  <div key={item.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
-                    <input
-                      type="text"
-                      placeholder="Descrição do item"
-                      value={item.descricao}
-                      onChange={(e) => handleItemChange(item.id, 'descricao', e.target.value)}
-                      className={`${CLASSE_INPUT} sm:col-span-6`}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Unidade (ex.: UN, CX)"
-                      value={item.unidade}
-                      onChange={(e) => handleItemChange(item.id, 'unidade', e.target.value)}
-                      className={`${CLASSE_INPUT} sm:col-span-2`}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Quantidade"
-                      value={item.quantidadeInicial}
-                      onChange={(e) => handleItemChange(item.id, 'quantidadeInicial', e.target.value)}
-                      className={`${CLASSE_INPUT} sm:col-span-3`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveItem(item.id)}
-                      className="sm:col-span-1 flex items-center justify-center text-gray-400 hover:text-red-600 py-2"
-                      title="Remover item"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={handleAddItem}
-                  className="inline-flex items-center text-sm font-medium text-red-700 hover:text-red-800"
-                >
-                  <PlusCircle className="w-4 h-4 mr-1" />
-                  Adicionar item
-                </button>
-              </div>
-            </div>
-          )}
-
           <div>
             <h4 className="text-base font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">
               Vigência e Valores
@@ -664,16 +633,92 @@ export default function ContratoForm() {
                   Este contrato também tem controle de saldo por quantidade (bens/materiais)
                 </label>
               </div>
-              {form.controlaQuantidade && (
-                <div>
-                  <label className={CLASSE_LABEL}>Saldo Quantitativo Inicial</label>
-                  <input
-                    type="number"
-                    value={form.saldoInicialQuantitativo}
-                    onChange={(e) => handleChange('saldoInicialQuantitativo', e.target.value)}
-                    className={CLASSE_INPUT}
-                    disabled={controleQuantidadeJaEstabelecido}
-                  />
+              {mostrarItens && (
+                <div className="md:col-span-2">
+                  <p className="text-sm text-gray-500 mb-3">
+                    Informe os itens do contrato — o saldo de quantidade é abatido item a item a
+                    cada execução (NF) que informar consumo/recebimento.
+                  </p>
+                  <div className="space-y-3">
+                    {itensForm.map((item) => {
+                      const totalItem = (Number(item.quantidadeInicial) || 0) * (Number(item.valorUnitario) || 0);
+                      return (
+                        <div key={item.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
+                          <input
+                            type="text"
+                            placeholder="Item (nome do objeto)"
+                            value={item.descricao}
+                            onChange={(e) => handleItemChange(item.id, 'descricao', e.target.value)}
+                            className={`${CLASSE_INPUT} sm:col-span-4`}
+                          />
+                          <input
+                            type="text"
+                            list="opcoes-unidade-item"
+                            placeholder="Unidade"
+                            value={item.unidade}
+                            onChange={(e) => handleItemChange(item.id, 'unidade', e.target.value)}
+                            className={`${CLASSE_INPUT} sm:col-span-1`}
+                          />
+                          <input
+                            type="number"
+                            placeholder="Quantidade"
+                            value={item.quantidadeInicial}
+                            onChange={(e) => handleItemChange(item.id, 'quantidadeInicial', e.target.value)}
+                            className={`${CLASSE_INPUT} sm:col-span-2`}
+                          />
+                          <input
+                            type="number"
+                            placeholder="Valor Unitário (R$)"
+                            value={item.valorUnitario}
+                            onChange={(e) => handleItemChange(item.id, 'valorUnitario', e.target.value)}
+                            className={`${CLASSE_INPUT} sm:col-span-2`}
+                          />
+                          <div className={`${CLASSE_INPUT} sm:col-span-2 bg-gray-50 text-gray-700 flex items-center`}>
+                            {formatarMoeda(totalItem)}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(item.id)}
+                            className="sm:col-span-1 flex items-center justify-center text-gray-400 hover:text-red-600 py-2"
+                            title="Remover item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                    <datalist id="opcoes-unidade-item">
+                      {OPCOES_UNIDADE_ITEM.map((opcao) => (
+                        <option key={opcao} value={opcao} />
+                      ))}
+                    </datalist>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="inline-flex items-center text-sm font-medium text-red-700 hover:text-red-800"
+                    >
+                      <PlusCircle className="w-4 h-4 mr-1" />
+                      Adicionar item
+                    </button>
+                  </div>
+
+                  {itensValidos.length > 0 && (
+                    <div
+                      className={`mt-3 text-sm font-medium flex justify-between rounded-md p-3 ${
+                        totalItensDivergente
+                          ? 'bg-red-50 text-red-700 border border-red-200'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      }`}
+                    >
+                      <span>Total dos itens: {formatarMoeda(totalItens)}</span>
+                      <span>Valor Global do contrato: {formatarMoeda(valorGlobalNumero)}</span>
+                    </div>
+                  )}
+                  {totalItensDivergente && (
+                    <p className="mt-1 text-xs text-red-600">
+                      O total dos itens precisa bater com o Valor Global do contrato antes de salvar.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

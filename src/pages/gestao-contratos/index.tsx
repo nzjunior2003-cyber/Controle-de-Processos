@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  AlertCircle, ArrowDownAZ, ArrowUpAZ, BellRing, Clock, FileText, Filter, Mail, PlusCircle,
-  RefreshCw, Search, ShieldAlert, UserPlus, UserX,
+  AlertCircle, ArrowDownAZ, ArrowUpAZ, BellRing, ChevronRight, Clock, FileText, Filter, Mail,
+  PlusCircle, RefreshCw, Search, ShieldAlert, Users, UserPlus, UserX,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
@@ -79,6 +79,7 @@ export default function GestaoContratos() {
   const [filtroSituacao, setFiltroSituacao] = useState<'todos' | 'ativos' | 'concluidos'>('todos');
   const [direcaoOrdenacao, setDirecaoOrdenacao] = useState<'asc' | 'desc'>('asc');
   const [enviandoEmailId, setEnviandoEmailId] = useState<string | null>(null);
+  const [fiscalSelecionado, setFiscalSelecionado] = useState<string | null>(null);
 
   useEffect(() => {
     const cancelar = initAuth();
@@ -137,6 +138,38 @@ export default function GestaoContratos() {
     () => filtrados.filter((c) => c.diasRestantes <= 180 && !c.concluido),
     [filtrados],
   );
+
+  /** Um fiscal/suplente único (agrupado por e-mail, ou pelo nome quando não há e-mail) e os contratos sob sua responsabilidade. */
+  interface FiscalDiretorio {
+    chave: string;
+    nome: string;
+    email?: string;
+    contratos: Array<{ contrato: ContratoComStatus; papel: 'Titular' | 'Suplente' }>;
+  }
+
+  // Diretório de fiscais/suplentes montado a partir dos próprios
+  // contratos (não existe cadastro próprio de "fiscal" — é sempre texto
+  // livre em Fiscal Titular/Suplente de cada contrato).
+  const fiscaisDiretorio = useMemo(() => {
+    const mapa = new Map<string, FiscalDiretorio>();
+    const adicionar = (
+      nome: string | undefined,
+      email: string | undefined,
+      contrato: ContratoComStatus,
+      papel: 'Titular' | 'Suplente',
+    ) => {
+      const chave = (email || nome || '').trim().toLowerCase();
+      if (!chave) return;
+      const atual = mapa.get(chave) ?? { chave, nome: nome || email || '(sem nome)', email, contratos: [] };
+      atual.contratos.push({ contrato, papel });
+      mapa.set(chave, atual);
+    };
+    contratosComStatus.forEach((c) => {
+      adicionar(c.fiscalTitular, c.fiscalEmail, c, 'Titular');
+      adicionar(c.fiscalSuplente, c.fiscalSuplenteEmail, c, 'Suplente');
+    });
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [contratosComStatus]);
 
   // Contratos com Fiscal Titular/Suplente cadastrado (nome ou e-mail
   // preenchido) mas sem nenhum usuário Fiscal ativo com esse e-mail —
@@ -337,8 +370,8 @@ export default function GestaoContratos() {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              <UserX className="w-4 h-4 mr-2" />
-              Vínculo de Fiscais
+              <Users className="w-4 h-4 mr-2" />
+              Fiscais e Suplentes
               {contratosComFiscalSemUsuario.length > 0 && (
                 <span className="ml-2 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
                   {contratosComFiscalSemUsuario.length}
@@ -522,6 +555,76 @@ export default function GestaoContratos() {
 
         {abaAtiva === 'vinculos' && (
           <div className="p-6 bg-slate-50 space-y-8">
+            <div>
+              <div className="mb-4 flex items-center gap-2">
+                <Users className="w-5 h-5 text-red-700" />
+                <h3 className="text-lg font-medium text-gray-900">Fiscais e Suplentes</h3>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                Clique num fiscal ou suplente para ver quais contratos estão sob a responsabilidade
+                dele e abrir qualquer um deles.
+              </p>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-1 bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 max-h-[28rem] overflow-y-auto">
+                  {fiscaisDiretorio.map((f) => (
+                    <button
+                      key={f.chave}
+                      type="button"
+                      onClick={() => setFiscalSelecionado(f.chave)}
+                      className={`w-full text-left px-4 py-3 flex items-center justify-between hover:bg-gray-50 ${
+                        fiscalSelecionado === f.chave ? 'bg-red-50' : ''
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{f.nome}</p>
+                        {f.email && <p className="text-xs text-gray-500">{f.email}</p>}
+                      </div>
+                      <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
+                        {f.contratos.length} contrato{f.contratos.length === 1 ? '' : 's'}
+                      </span>
+                    </button>
+                  ))}
+                  {fiscaisDiretorio.length === 0 && (
+                    <div className="p-4 text-sm text-gray-500 text-center">
+                      Nenhum fiscal/suplente cadastrado em contratos ainda.
+                    </div>
+                  )}
+                </div>
+
+                <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-4">
+                  {!fiscalSelecionado ? (
+                    <div className="text-sm text-gray-500 text-center py-8">
+                      Selecione um fiscal/suplente na lista ao lado.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {fiscaisDiretorio
+                        .find((f) => f.chave === fiscalSelecionado)
+                        ?.contratos.map(({ contrato, papel }) => (
+                          <button
+                            key={`${contrato.id}-${papel}`}
+                            type="button"
+                            onClick={() => navigate(`/sistema/gestao-contratos/${contrato.id}/editar`)}
+                            className="w-full text-left px-4 py-3 rounded-md border border-gray-200 hover:border-red-300 hover:bg-red-50 flex items-center justify-between"
+                          >
+                            <div>
+                              <p className="text-sm font-bold text-gray-900">
+                                Contrato {contrato.numero} — {contrato.empresa}
+                              </p>
+                              <p className="text-xs text-gray-500 line-clamp-1">{contrato.objeto}</p>
+                              <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                                {papel}
+                              </span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          </button>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div>
               <div className="mb-4 flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-amber-600" />

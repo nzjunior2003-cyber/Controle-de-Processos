@@ -316,6 +316,8 @@ export interface ItemContrato {
   unidade?: string;
   quantidadeInicial: number;
   quantidadeAtual: number;
+  /** Valor unitário do item — usado pra calcular o valor total do item e, na execução (NF), o valor abatido a partir da quantidade usada. */
+  valorUnitario: number;
 }
 
 /** Um período fechado (`desde` até `ate`) em que alguém foi Fiscal Titular/Suplente de um contrato, antes de ser substituído. */
