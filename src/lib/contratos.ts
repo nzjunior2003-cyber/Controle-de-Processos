@@ -130,34 +130,6 @@ export function filtrarContratosDoFiscal<T extends Contrato>(
   );
 }
 
-/**
- * Id do Gestor "raiz" responsável por um usuário: ele mesmo, se for raiz
- * (sem `gestorResponsavelId`), ou o `gestorResponsavelId`, se for
- * Auxiliar de outro Gestor.
- */
-export function gestorRaizDe(
-  usuario: { id: string; gestorResponsavelId?: string } | null | undefined,
-): string | undefined {
-  if (!usuario) return undefined;
-  return usuario.gestorResponsavelId || usuario.id;
-}
-
-/**
- * Qualquer usuário do perfil Gestão de Contratos (Gestor "raiz" ou
- * Auxiliar) vê e gerencia todos os contratos, sem distinção — a
- * restrição por `gestorGeralId`/`gestorResponsavelId` foi removida a
- * pedido: um Auxiliar não deve ficar travado sem enxergar contratos só
- * porque a hierarquia de Gestores não bate. A função continua existindo
- * (sem filtrar nada) pra não exigir mudar os dois lugares que já a
- * chamam (GestaoContratos e seu dashboard).
- */
-export function filtrarContratosPorGestor<T extends Contrato>(
-  contratos: T[],
-  _usuario?: { gestorResponsavelId?: string } | null,
-): T[] {
-  return contratos;
-}
-
 /** Máximo de contratos ativos que um mesmo Fiscal Titular pode acumular. */
 export const LIMITE_CONTRATOS_FISCAL = 3;
 

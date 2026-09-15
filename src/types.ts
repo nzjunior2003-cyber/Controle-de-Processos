@@ -16,12 +16,6 @@ export interface Usuario {
   perfil: Perfil;
   ativo: boolean;
   cargo?: string;
-  /**
-   * Id do documento `usuarios` do Gestor que este usuário auxilia. Só se
-   * aplica a perfis 'contratos'/'gestao'; quando ausente, o usuário é um
-   * Gestor "raiz" (vê todos os contratos, não só os do seu próprio grupo).
-   */
-  gestorResponsavelId?: string;
 }
 
 export interface Setor {
@@ -293,13 +287,6 @@ export interface Contrato {
   empenho?: string;
   dotacao?: string;
   linkContrato?: string | null;
-  /**
-   * Id do documento `usuarios` do Gestor "raiz" ao qual este contrato está
-   * amarrado — gravado automaticamente no cadastro (mesmo quando quem
-   * digitou é um Auxiliar), e usado para restringir a visão do Auxiliar
-   * aos contratos do seu Gestor responsável.
-   */
-  gestorGeralId?: string;
   /** Unidade demandante do contrato (só vem da sincronização com a planilha — sem campo próprio no cadastro ainda). */
   unidadeDemandante?: string;
   /** Código do PCA vinculado, como texto livre (só vem da sincronização com a planilha). */

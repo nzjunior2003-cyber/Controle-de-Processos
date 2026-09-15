@@ -62,7 +62,6 @@ import {
   aplicarAditivoQuantidade,
   devolverItens,
   devolverSaldo,
-  gestorRaizDe,
   registrarTrocaFiscal,
   validarLimiteFiscal,
   type Aditivo,
@@ -1036,22 +1035,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // O saldo atual sempre nasce igual ao saldo inicial informado pelo
-      // Gestor no cadastro, e o contrato sempre fica amarrado ao Gestor
-      // "raiz" correto — independente do que vier em `dados` ou de quem
-      // efetivamente preencheu o cadastro (Gestor ou seu Auxiliar).
+      // Gestor no cadastro, independente do que vier em `dados`.
       const contratoCompleto: Omit<Contrato, 'id'> = {
         ...dados,
         saldoAtualFinanceiro: dados.saldoInicialFinanceiro,
         ...(typeof dados.saldoInicialQuantitativo === 'number'
           ? { saldoAtualQuantitativo: dados.saldoInicialQuantitativo }
           : {}),
-        ...(gestorRaizDe(usuarioAtual) ? { gestorGeralId: gestorRaizDe(usuarioAtual) } : {}),
       };
       const id = await criarEm('contratos', contratoCompleto);
       await registrarAuditoria('contratos', id, 'CREATE', contratoCompleto);
       return id;
     },
-    [criarEm, contratos, usuarioAtual, registrarAuditoria],
+    [criarEm, contratos, registrarAuditoria],
   );
   const updateContrato = useCallback(
     async (id: string, dados: Partial<Contrato>) => {

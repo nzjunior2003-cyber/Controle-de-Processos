@@ -10,8 +10,6 @@ import {
   devolverSaldo,
   extrairAnoNumeroContrato,
   filtrarContratosDoFiscal,
-  filtrarContratosPorGestor,
-  gestorRaizDe,
   marcoAlertaVencimento,
   mesclarItensContrato,
   ordenarContratosPorNumero,
@@ -419,35 +417,6 @@ describe('validarLimiteFiscal', () => {
     const resultado = validarLimiteFiscal(contratos, fiscalEmail);
     expect(resultado.valido).toBe(true);
     expect(resultado.contratosAtivos).toBe(1);
-  });
-});
-
-describe('gestorRaizDe', () => {
-  it('devolve o próprio id quando o usuário é Gestor raiz (sem gestorResponsavelId)', () => {
-    expect(gestorRaizDe({ id: 'g1' })).toBe('g1');
-  });
-
-  it('devolve o gestorResponsavelId quando o usuário é Auxiliar', () => {
-    expect(gestorRaizDe({ id: 'aux1', gestorResponsavelId: 'g1' })).toBe('g1');
-  });
-
-  it('devolve undefined sem usuário', () => {
-    expect(gestorRaizDe(null)).toBeUndefined();
-  });
-});
-
-describe('filtrarContratosPorGestor', () => {
-  // Não filtra mais por hierarquia de Gestor — qualquer usuário do
-  // perfil Gestão de Contratos vê e gerencia todos os contratos.
-  const doGestor1 = { ...base, id: 'c1', gestorGeralId: 'g1' };
-  const doGestor2 = { ...base, id: 'c2', gestorGeralId: 'g2' };
-  const semGestor = { ...base, id: 'c3', gestorGeralId: undefined };
-  const contratos = [doGestor1, doGestor2, semGestor];
-
-  it('devolve todos os contratos, independente do Gestor responsável do usuário', () => {
-    expect(filtrarContratosPorGestor(contratos, {})).toEqual(contratos);
-    expect(filtrarContratosPorGestor(contratos, { gestorResponsavelId: 'g1' })).toEqual(contratos);
-    expect(filtrarContratosPorGestor(contratos, null)).toEqual(contratos);
   });
 });
 

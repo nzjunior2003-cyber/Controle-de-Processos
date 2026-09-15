@@ -19,7 +19,6 @@ import ExecucaoModal from '../../components/contratos/ExecucaoModal';
 import {
   buscarContratos,
   calcularStatusContrato,
-  filtrarContratosPorGestor,
   ordenarContratosPorNumero,
   OPCOES_FONTE_RECURSO_CONTRATO,
   OPCOES_NATUREZA_DESPESA_CONTRATO,
@@ -94,15 +93,9 @@ export default function GestaoContratos() {
     return null;
   };
 
-  /** Qualquer usuário do perfil Gestão de Contratos (Gestor "raiz" ou Auxiliar) vê todos os contratos. */
-  const contratosDoEscopo = useMemo(
-    () => filtrarContratosPorGestor(contratos, usuarioAtual),
-    [contratos, usuarioAtual],
-  );
-
   const contratosComStatus = useMemo(
-    () => contratosDoEscopo.map((contrato) => calcularStatusContrato(contrato)),
-    [contratosDoEscopo],
+    () => contratos.map((contrato) => calcularStatusContrato(contrato)),
+    [contratos],
   );
 
   const filtrados = useMemo(() => {
