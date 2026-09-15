@@ -47,3 +47,33 @@ export function buscarMilitares(militares: Militar[], termo: string, limite = 8)
     )
     .slice(0, limite);
 }
+
+/** Busca exata por MF — usada na validação de matrícula do "Buscar meu acesso". */
+export function buscarMilitarPorMf(militares: Militar[], mf: string): Militar | undefined {
+  const alvo = mf.trim().toLowerCase();
+  if (!alvo) return undefined;
+  return militares.find((m) => m.mf.trim().toLowerCase() === alvo);
+}
+
+/**
+ * Baixa e interpreta a planilha "Militares e matrícula BM" (pública, sem
+ * autenticação) — usada tanto no buscador de Fiscal/Suplente do contrato
+ * (`BuscaMilitarInput`) quanto na validação de MF do "Buscar meu acesso"
+ * (`LoginModal`, antes mesmo de haver login).
+ */
+export async function carregarMilitares(): Promise<Militar[]> {
+  const resposta = await fetch(
+    `https://docs.google.com/spreadsheets/d/${ID_PLANILHA_MILITARES}/gviz/tq?tqx=out:csv`,
+  );
+  if (!resposta.ok) return [];
+  const csv = await resposta.text();
+  const Papa = (await import('papaparse')).default;
+  const linhas = await new Promise<LinhaPlanilha[]>((resolve) => {
+    Papa.parse<LinhaPlanilha>(csv, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (resultado) => resolve(resultado.data),
+    });
+  });
+  return linhas.map(mapLinhaMilitar).filter((m): m is Militar => m !== null);
+}

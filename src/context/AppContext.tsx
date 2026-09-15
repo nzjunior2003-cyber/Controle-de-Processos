@@ -223,6 +223,11 @@ function useColecao<T extends { id: string }>(nome: string, ativo: boolean): T[]
   return dados;
 }
 
+/** Normaliza uma MF pra usar como id de documento em `matriculas/{mf}` (sem espaço/caixa divergente virando "matrículas diferentes"). */
+function normalizarMf(mf: string): string {
+  return mf.trim().toLowerCase().replace(/\s+/g, '');
+}
+
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
   const [perfil, setPerfil] = useState<Usuario | null>(null);
@@ -325,10 +330,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback(
     async (email: string, senha?: string) => {
       let userIdParaLog: string | null = null;
+      let emailParaEntrar = email;
       try {
         const auth = requireFirebaseAuth();
         const db = requireDb();
-        const credencial = await signInWithEmailAndPassword(auth, email, senha ?? '');
+
+        // Quem digitou algo sem "@" está tentando entrar pela MF, não pelo
+        // e-mail — resolve pra o e-mail real via a coleção pública
+        // `matriculas` (MF -> e-mail), gravada no primeiro acesso por
+        // matrícula (ver solicitarAcesso).
+        if (email && !email.includes('@')) {
+          const matriculaSnap = await getDoc(doc(db, 'matriculas', normalizarMf(email)));
+          if (!matriculaSnap.exists()) {
+            throw new Error('Matrícula não encontrada. Verifique o número ou entre com seu e-mail.');
+          }
+          emailParaEntrar = (matriculaSnap.data() as { email: string }).email;
+        }
+
+        const credencial = await signInWithEmailAndPassword(auth, emailParaEntrar, senha ?? '');
         userIdParaLog = credencial.user.uid;
         const perfilSnap = await getDoc(doc(db, 'usuarios', credencial.user.uid));
 
@@ -395,6 +414,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           ativo: false,
           ...(mf ? { mf } : {}),
         });
+
+        // Reivindica a MF (índice público mínimo MF -> e-mail, "primeiro a
+        // registrar" e imutável depois — ver firestore.rules) pra permitir
+        // login por matrícula depois. Não bloqueia o cadastro se falhar
+        // (ex.: essa MF já foi reivindicada por outra conta antes).
+        if (mf) {
+          try {
+            await setDoc(doc(db, 'matriculas', normalizarMf(mf)), { email });
+          } catch (erroMatricula) {
+            console.error('Erro ao reivindicar a matrícula:', erroMatricula);
+          }
+        }
 
         // Avisa todo master por e-mail — sem isso, uma solicitação podia
         // ficar esquecida em Usuários por dias até alguém notar. Best

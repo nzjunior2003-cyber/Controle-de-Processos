@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Lock, Mail, User, Briefcase, Hash } from 'lucide-react';
+import { X, Lock, Mail, User, Briefcase, Hash, Search, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { buscarMilitares, carregarMilitares, formatarNomeMilitar, type Militar } from '../lib/militares';
 import FormField from './ui/FormField';
 
-type ModalView = 'login' | 'solicitar' | 'esqueci';
+type ModalView = 'login' | 'buscarAcesso' | 'completarCadastro' | 'solicitar' | 'esqueci';
 
 export default function LoginModal({ onClose }: { onClose: () => void }) {
   const { login, solicitarAcesso, enviarResetSenha, firebaseConfigurado } = useApp();
@@ -25,9 +26,42 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   const [newSenha, setNewSenha] = useState('');
   const [confirmSenha, setConfirmSenha] = useState('');
 
+  // Buscar meu acesso (validação de MF/nome contra a planilha de militares)
+  const [termoBusca, setTermoBusca] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [resultadosBusca, setResultadosBusca] = useState<Militar[] | null>(null);
+  const [militarConfirmado, setMilitarConfirmado] = useState<Militar | null>(null);
+
   const trocarView = (nova: ModalView) => {
     setErro(null);
     setView(nova);
+  };
+
+  const handleBuscarAcesso = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErro(null);
+    setBuscando(true);
+    try {
+      const militares = await carregarMilitares();
+      const encontrados = buscarMilitares(militares, termoBusca, 6);
+      setResultadosBusca(encontrados);
+    } catch (error) {
+      setErro(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível consultar a planilha de militares agora.',
+      );
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const handleConfirmarMilitar = (militar: Militar) => {
+    setMilitarConfirmado(militar);
+    setNome(militar.nome);
+    setCargo(militar.cargo);
+    setMf(militar.mf);
+    trocarView('completarCadastro');
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -62,8 +96,14 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
     try {
       await solicitarAcesso({ nome, email, senha: newSenha, cargo, mf: mf.trim() || undefined });
       alert('Solicitação enviada com sucesso! Aguarde a aprovação pelo administrador.');
+      setNome('');
+      setCargo('');
+      setMf('');
       setNewSenha('');
       setConfirmSenha('');
+      setMilitarConfirmado(null);
+      setResultadosBusca(null);
+      setTermoBusca('');
       trocarView('login');
     } catch (error) {
       setErro(
@@ -102,6 +142,8 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">
             {view === 'login' && 'Acesso ao Sistema'}
+            {view === 'buscarAcesso' && 'Buscar meu Acesso'}
+            {view === 'completarCadastro' && 'Completar Cadastro'}
             {view === 'solicitar' && 'Solicitar Acesso'}
             {view === 'esqueci' && 'Recuperar Senha'}
           </h2>
@@ -133,13 +175,13 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
         {view === 'login' && (
           <form onSubmit={handleLogin} className="p-6 space-y-6">
             <FormField
-              label="Email"
+              label="Email ou MF"
               icon={Mail}
-              type="email"
+              type="text"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="usuario@email.com"
+              placeholder="usuario@email.com ou sua matrícula"
             />
 
             <div>
@@ -171,12 +213,151 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
               <p className="text-sm text-gray-600">Não possui conta?</p>
               <button
                 type="button"
-                onClick={() => trocarView('solicitar')}
+                onClick={() => {
+                  setResultadosBusca(null);
+                  setTermoBusca('');
+                  trocarView('buscarAcesso');
+                }}
                 className="mt-2 w-full flex justify-center py-2 px-4 border border-red-200 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
               >
                 Solicitar Acesso
               </button>
             </div>
+          </form>
+        )}
+
+        {view === 'buscarAcesso' && (
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-gray-600">
+              Digite seu nome ou sua MF (matrícula) — se você já é Fiscal Titular ou Suplente de
+              algum contrato, isso faz esses contratos aparecerem automaticamente pra você assim
+              que o acesso for aprovado.
+            </p>
+            <form onSubmit={handleBuscarAcesso} className="flex gap-2">
+              <div className="flex-1">
+                <FormField
+                  label="Nome ou MF"
+                  icon={Search}
+                  type="text"
+                  required
+                  value={termoBusca}
+                  onChange={(e) => setTermoBusca(e.target.value)}
+                  placeholder="Seu nome completo ou sua matrícula"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={buscando}
+                className="mt-6 h-fit px-4 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 disabled:opacity-50"
+              >
+                {buscando ? 'Buscando...' : 'Buscar'}
+              </button>
+            </form>
+
+            {resultadosBusca && resultadosBusca.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700">Selecione o seu registro:</p>
+                {resultadosBusca.map((militar, indice) => (
+                  <button
+                    key={indice}
+                    type="button"
+                    onClick={() => handleConfirmarMilitar(militar)}
+                    className="w-full text-left px-4 py-3 rounded-md border border-gray-200 hover:border-red-300 hover:bg-red-50"
+                  >
+                    <p className="text-sm font-medium text-gray-900">{formatarNomeMilitar(militar)}</p>
+                    <p className="text-xs text-gray-500">MF: {militar.mf || '—'} · UBM: {militar.ubm || '—'}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {resultadosBusca && resultadosBusca.length === 0 && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Não encontramos ninguém com esse nome/matrícula na planilha de efetivo. Você pode
+                preencher seus dados manualmente — um master vai revisar antes de aprovar.
+              </div>
+            )}
+
+            <div className="text-center pt-2 space-y-2">
+              {resultadosBusca && resultadosBusca.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => trocarView('solicitar')}
+                  className="w-full flex justify-center py-2 px-4 border border-red-200 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100"
+                >
+                  Preencher manualmente
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => trocarView('login')}
+                className="text-sm font-medium text-gray-600 hover:text-gray-900"
+              >
+                Voltar para o Login
+              </button>
+            </div>
+          </div>
+        )}
+
+        {view === 'completarCadastro' && militarConfirmado && (
+          <form onSubmit={handleSolicitar} className="p-6 space-y-4">
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 flex items-start gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-emerald-800">Matrícula encontrada no efetivo do CBMPA</p>
+                <p className="text-sm text-emerald-700">{formatarNomeMilitar(militarConfirmado)}</p>
+                <p className="text-xs text-emerald-700">MF: {militarConfirmado.mf || '—'}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMilitarConfirmado(null);
+                trocarView('buscarAcesso');
+              }}
+              className="text-sm font-medium text-red-600 hover:text-red-500"
+            >
+              Não é você? Buscar novamente
+            </button>
+            <FormField
+              label="Email"
+              icon={Mail}
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="usuario@email.com"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                label="Senha (mín. 6)"
+                icon={Lock}
+                type="password"
+                required
+                minLength={6}
+                value={newSenha}
+                onChange={(e) => setNewSenha(e.target.value)}
+                placeholder="••••••"
+              />
+              <FormField
+                label="Confirmar Senha"
+                icon={Lock}
+                type="password"
+                required
+                minLength={6}
+                value={confirmSenha}
+                onChange={(e) => setConfirmSenha(e.target.value)}
+                placeholder="••••••"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={aguardando}
+              className={`${classeBotaoPrimario} mt-2`}
+            >
+              {aguardando ? 'Enviando...' : 'Enviar Solicitação'}
+            </button>
           </form>
         )}
 

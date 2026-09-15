@@ -65,6 +65,19 @@ service cloud.firestore {
         && !('senha' in request.resource.data);
     }
 
+    // Índice público mínimo MF -> e-mail, pra permitir login por matrícula
+    // (ver AppContext.tsx `login`/`solicitarAcesso`). "Primeiro a
+    // registrar" (create) e imutável depois — nem o próprio usuário nem um
+    // admin conseguem sobrescrever uma matrícula já vinculada a outra
+    // conta; só quem está autenticado com aquele e-mail pode reivindicá-la.
+    match /matriculas/{matricula} {
+      allow read: if true;
+      allow create: if autenticado()
+        && request.auth.token.email == request.resource.data.email
+        && request.resource.data.keys().hasOnly(['email']);
+      allow update, delete: if false;
+    }
+
     // Demais coleções operacionais: leitura e escrita para usuários ativos.
     match /processos/{documento} {
       allow read, write: if ativo();

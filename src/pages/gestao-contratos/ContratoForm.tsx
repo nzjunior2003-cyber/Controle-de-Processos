@@ -3,14 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, FileText, PlusCircle, Save, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Contrato, ItemContrato } from '../../types';
-import { ID_PLANILHA_CONTRATOS, type LinhaPlanilha } from '../../lib/csv';
+import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
 import { uploadArquivoContrato } from '../../lib/driveUploadService';
 import { enviarEmail } from '../../lib/emailService';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
 import { sincronizarContratoInstitucional } from '../../lib/sheetsInstitucionalService';
 import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
-import { ID_PLANILHA_MILITARES, mapLinhaMilitar, type Militar } from '../../lib/militares';
+import { carregarMilitares, type Militar } from '../../lib/militares';
 import BuscaMilitarInput from '../../components/contratos/BuscaMilitarInput';
 import {
   formatarMoeda,
@@ -197,27 +197,11 @@ export default function ContratoForm() {
   const [militares, setMilitares] = useState<Militar[]>([]);
   useEffect(() => {
     let cancelado = false;
-    (async () => {
-      try {
-        const resposta = await fetch(
-          `https://docs.google.com/spreadsheets/d/${ID_PLANILHA_MILITARES}/gviz/tq?tqx=out:csv`,
-        );
-        if (!resposta.ok) return;
-        const csv = await resposta.text();
-        const Papa = (await import('papaparse')).default;
-        const linhas = await new Promise<LinhaPlanilha[]>((resolve) => {
-          Papa.parse<LinhaPlanilha>(csv, {
-            header: true,
-            skipEmptyLines: true,
-            complete: (resultado) => resolve(resultado.data),
-          });
-        });
-        if (cancelado) return;
-        setMilitares(linhas.map(mapLinhaMilitar).filter((m): m is Militar => m !== null));
-      } catch (erro) {
-        console.error('Erro ao carregar a planilha de militares:', erro);
-      }
-    })();
+    carregarMilitares()
+      .then((lista) => {
+        if (!cancelado) setMilitares(lista);
+      })
+      .catch((erro) => console.error('Erro ao carregar a planilha de militares:', erro));
     return () => {
       cancelado = true;
     };

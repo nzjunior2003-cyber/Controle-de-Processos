@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buscarMilitares, formatarNomeMilitar, mapLinhaMilitar, type Militar } from './militares';
+import {
+  buscarMilitares,
+  buscarMilitarPorMf,
+  formatarNomeMilitar,
+  mapLinhaMilitar,
+  type Militar,
+} from './militares';
 
 describe('mapLinhaMilitar', () => {
   it('mapeia uma linha com cabeçalho pros campos de Militar', () => {
@@ -55,5 +61,25 @@ describe('buscarMilitares', () => {
 
   it('respeita o limite de resultados', () => {
     expect(buscarMilitares(militares, 'souto', 1)).toHaveLength(1);
+  });
+});
+
+describe('buscarMilitarPorMf', () => {
+  const militares: Militar[] = [
+    { cargo: '1º TEN QOABM', nome: 'JOELMIR', mf: '111', ubm: 'CSMV' },
+    { cargo: 'CB BM', nome: 'SOUTO', mf: '222', ubm: 'QCG' },
+  ];
+
+  it('acha por MF exata, ignorando caixa/espaço', () => {
+    expect(buscarMilitarPorMf(militares, ' 222 ')).toEqual(militares[1]);
+  });
+
+  it('não acha por substring (diferente de buscarMilitares)', () => {
+    expect(buscarMilitarPorMf(militares, '22')).toBeUndefined();
+  });
+
+  it('devolve undefined pra MF vazia ou não encontrada', () => {
+    expect(buscarMilitarPorMf(militares, '')).toBeUndefined();
+    expect(buscarMilitarPorMf(militares, '999')).toBeUndefined();
   });
 });
