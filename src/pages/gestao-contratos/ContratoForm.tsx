@@ -307,7 +307,11 @@ export default function ContratoForm() {
                   .map((item) => ({
                     id: item.id,
                     descricao: item.descricao.trim(),
-                    unidade: item.unidade.trim() || undefined,
+                    // Não usar `unidade.trim() || undefined`: o Firestore
+                    // rejeita `undefined` em qualquer campo do update,
+                    // mesmo dentro de um array — omitir a chave em vez de
+                    // setá-la como undefined.
+                    ...(item.unidade.trim() ? { unidade: item.unidade.trim() } : {}),
                     quantidadeInicial: Number(item.quantidadeInicial) || 0,
                   })),
               ),

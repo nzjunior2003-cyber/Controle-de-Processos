@@ -1023,7 +1023,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const campos: Record<string, unknown> = { ...dados };
     delete campos.id;
     campos.atualizado_em = new Date().toISOString();
-    await updateDoc(doc(db, colecao, id), campos);
+    // O Firestore rejeita `undefined` em qualquer campo do update — tira
+    // esses campos em vez de deixar o updateDoc() lançar um erro genérico
+    // (já aconteceu por causa de um campo opcional montado como
+    // `valor || undefined` em vez de omitido).
+    const camposValidos = Object.fromEntries(
+      Object.entries(campos).filter(([, valor]) => valor !== undefined),
+    );
+    await updateDoc(doc(db, colecao, id), camposValidos);
   }, []);
 
   const addContrato = useCallback(

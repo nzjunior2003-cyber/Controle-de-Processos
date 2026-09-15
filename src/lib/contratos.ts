@@ -405,14 +405,19 @@ export function registrarTrocaFiscal(
 
   const historicoAnterior = contrato.historicoFiscal ?? [];
   const ultimaAte = historicoAnterior[historicoAnterior.length - 1]?.ate;
+  // O Firestore rejeita `undefined` em qualquer campo (mesmo dentro de um
+  // array) — vários contratos antigos nunca tiveram contato do fiscal
+  // preenchido, então cada campo opcional só entra no objeto quando tem
+  // valor de fato, em vez de sempre copiar `contrato.campo` (que pode ser
+  // `undefined`).
   const entradaFechada: HistoricoFiscalContrato = {
     id: crypto.randomUUID(),
-    fiscalTitular: contrato.fiscalTitular,
-    fiscalEmail: contrato.fiscalEmail,
-    fiscalTitularContato: contrato.fiscalTitularContato,
-    fiscalSuplente: contrato.fiscalSuplente,
-    fiscalSuplenteEmail: contrato.fiscalSuplenteEmail,
-    fiscalSuplenteContato: contrato.fiscalSuplenteContato,
+    ...(contrato.fiscalTitular ? { fiscalTitular: contrato.fiscalTitular } : {}),
+    ...(contrato.fiscalEmail ? { fiscalEmail: contrato.fiscalEmail } : {}),
+    ...(contrato.fiscalTitularContato ? { fiscalTitularContato: contrato.fiscalTitularContato } : {}),
+    ...(contrato.fiscalSuplente ? { fiscalSuplente: contrato.fiscalSuplente } : {}),
+    ...(contrato.fiscalSuplenteEmail ? { fiscalSuplenteEmail: contrato.fiscalSuplenteEmail } : {}),
+    ...(contrato.fiscalSuplenteContato ? { fiscalSuplenteContato: contrato.fiscalSuplenteContato } : {}),
     desde: ultimaAte ?? contrato.criado_em ?? agora,
     ate: agora,
   };

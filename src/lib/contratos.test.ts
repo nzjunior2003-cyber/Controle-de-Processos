@@ -356,6 +356,24 @@ describe('registrarTrocaFiscal', () => {
       ate: '2026-09-01T00:00:00.000Z',
     });
   });
+
+  it('nunca inclui um campo com valor undefined (o Firestore rejeita isso em updateDoc)', () => {
+    // Contrato real sem contato/suplente preenchidos: em vez de string
+    // vazia, esses campos simplesmente não existem no documento (undefined).
+    const contratoSemContato = {
+      fiscalTitular: 'Fiscal A',
+      fiscalEmail: 'a@cbmpa.gov.br',
+      fiscalTitularContato: undefined,
+      fiscalSuplente: undefined,
+      fiscalSuplenteEmail: undefined,
+      fiscalSuplenteContato: undefined,
+      historicoFiscal: undefined,
+      criado_em: '2026-01-01T00:00:00.000Z',
+    };
+    const resultado = registrarTrocaFiscal(contratoSemContato, { fiscalTitular: 'Fiscal B' });
+    expect(resultado).toHaveLength(1);
+    expect(Object.values(resultado![0])).not.toContain(undefined);
+  });
 });
 
 describe('validarLimiteFiscal', () => {
