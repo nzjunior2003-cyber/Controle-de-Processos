@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Lock, Mail, User, Briefcase } from 'lucide-react';
+import { X, Lock, Mail, User, Briefcase, Hash } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import FormField from './ui/FormField';
 
@@ -21,6 +21,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   // Solicitar acesso
   const [nome, setNome] = useState('');
   const [cargo, setCargo] = useState('');
+  const [mf, setMf] = useState('');
   const [newSenha, setNewSenha] = useState('');
   const [confirmSenha, setConfirmSenha] = useState('');
 
@@ -59,7 +60,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
 
     setAguardando(true);
     try {
-      await solicitarAcesso({ nome, email, senha: newSenha, cargo });
+      await solicitarAcesso({ nome, email, senha: newSenha, cargo, mf: mf.trim() || undefined });
       alert('Solicitação enviada com sucesso! Aguarde a aprovação pelo administrador.');
       setNewSenha('');
       setConfirmSenha('');
@@ -199,6 +200,18 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
               onChange={(e) => setCargo(e.target.value)}
               placeholder="Ex: 1º TEN QOABM"
             />
+            <FormField
+              label="MF (matrícula)"
+              icon={Hash}
+              type="text"
+              value={mf}
+              onChange={(e) => setMf(e.target.value)}
+              placeholder="Sua matrícula funcional"
+            />
+            <p className="-mt-2 text-xs text-gray-500">
+              Se você já é Fiscal Titular ou Suplente de algum contrato, informar a MF faz esses
+              contratos aparecerem automaticamente pra você assim que o acesso for aprovado.
+            </p>
             <FormField
               label="Email"
               icon={Mail}

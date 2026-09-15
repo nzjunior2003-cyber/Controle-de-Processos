@@ -17,6 +17,7 @@ export default function Usuarios() {
     perfil: Perfil;
     setor_id: string;
     ativo: boolean;
+    mf: string;
   }>({
     nome: '',
     email: '',
@@ -24,6 +25,7 @@ export default function Usuarios() {
     perfil: 'fiscal',
     setor_id: setores[0]?.id || '1',
     ativo: true,
+    mf: '',
   });
 
   const [usuarioExcluindo, setUsuarioExcluindo] = useState<string | null>(null);
@@ -60,6 +62,7 @@ export default function Usuarios() {
       await updateUsuario(usuarioEditando.id, {
         perfil: usuarioEditando.perfil,
         ativo: usuarioEditando.ativo,
+        mf: usuarioEditando.mf || '',
       });
       setUsuarioEditando(null);
     } catch (erro) {
@@ -69,7 +72,7 @@ export default function Usuarios() {
 
   const handleCriarUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { nome, email, senha, perfil, setor_id, ativo } = novoUsuarioForm;
+    const { nome, email, senha, perfil, setor_id, ativo, mf } = novoUsuarioForm;
     if (!nome || !email || !senha) {
       alert("Preencha todos os campos obrigatórios.");
       return;
@@ -87,6 +90,7 @@ export default function Usuarios() {
         setor_id,
         cargo: 'Não Especificado',
         ativo,
+        ...(mf ? { mf } : {}),
       });
 
       setIsNovoUsuarioOpen(false);
@@ -97,6 +101,7 @@ export default function Usuarios() {
         perfil: 'fiscal' as Perfil,
         setor_id: setores[0]?.id || '1',
         ativo: true,
+        mf: '',
       });
     } catch (erro) {
       alert(erro instanceof Error ? erro.message : 'Não foi possível criar o usuário.');
@@ -243,6 +248,21 @@ export default function Usuarios() {
                 </p>
               </div>
 
+              {usuarioEditando.perfil === 'fiscal' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">MF (matrícula)</label>
+                  <input
+                    type="text"
+                    value={usuarioEditando.mf ?? ''}
+                    onChange={(e) => setUsuarioEditando({ ...usuarioEditando, mf: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                  />
+                  <p className="mt-2 text-xs text-gray-500">
+                    Reconhece automaticamente os contratos em que esse militar é Fiscal Titular/Suplente, sem precisar bater e-mail/nome.
+                  </p>
+                </div>
+              )}
+
               <div className="flex items-center mt-4">
                 <input
                   id="ativo"
@@ -349,6 +369,18 @@ export default function Usuarios() {
                   ))}
                 </select>
               </div>
+
+              {novoUsuarioForm.perfil === 'fiscal' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">MF (matrícula)</label>
+                  <input
+                    type="text"
+                    value={novoUsuarioForm.mf}
+                    onChange={(e) => setNovoUsuarioForm({ ...novoUsuarioForm, mf: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                  />
+                </div>
+              )}
 
               <div className="flex items-center mt-4">
                 <input

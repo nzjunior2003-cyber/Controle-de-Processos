@@ -145,11 +145,15 @@ export function normalizarNomeFiscal(texto: string): string {
 /** Restringe a lista aos contratos que um fiscal pode ver. */
 export function filtrarContratosDoFiscal<T extends Contrato>(
   contratos: T[],
-  usuario: { email: string; nome: string } | null,
+  usuario: { email: string; nome: string; mf?: string } | null,
 ): T[] {
   if (!usuario) return [];
   return contratos.filter(
     (c) =>
+      // MF é a chave preferencial (única e imutável); e-mail/nome
+      // continuam valendo como alternativa pros contratos que ainda não
+      // tiverem a MF do fiscal/suplente preenchida.
+      (!!usuario.mf && (c.fiscalTitularMf === usuario.mf || c.fiscalSuplenteMf === usuario.mf)) ||
       c.fiscalEmail === usuario.email ||
       c.fiscalSuplenteEmail === usuario.email ||
       (!!c.fiscalTitular && !!usuario.nome && c.fiscalTitular.includes(usuario.nome)) ||

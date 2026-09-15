@@ -198,6 +198,31 @@ describe('filtrarContratosDoFiscal', () => {
   it('devolve lista vazia sem usuário', () => {
     expect(filtrarContratosDoFiscal([base, outro], null)).toEqual([]);
   });
+
+  it('encontra pela MF (titular ou suplente), mesmo sem bater e-mail/nome', () => {
+    const comMf: Contrato = {
+      ...base,
+      id: 'c3',
+      fiscalEmail: 'outro-email@cbmpa.gov.br',
+      fiscalTitular: 'NOME DIGITADO DIFERENTE',
+      fiscalTitularMf: '123456',
+    };
+    const resultado = filtrarContratosDoFiscal([base, outro, comMf], {
+      email: 'nao-bate@cbmpa.gov.br',
+      nome: 'ninguém',
+      mf: '123456',
+    });
+    expect(resultado.map((c) => c.id)).toEqual(['c3']);
+  });
+
+  it('MF é só mais um critério: e-mail/nome continuam valendo pra contratos sem MF preenchida', () => {
+    const resultado = filtrarContratosDoFiscal([base, outro], {
+      email: 'fiscal@cbmpa.gov.br',
+      nome: 'JOELMIR',
+      mf: '999999',
+    });
+    expect(resultado.map((c) => c.id)).toEqual(['c1']);
+  });
 });
 
 describe('abaterSaldo', () => {

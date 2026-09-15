@@ -60,7 +60,9 @@ export default function BuscaMilitarInput({
             <li
               key={indice}
               onClick={() => {
-                onChange(formatarNomeMilitar(militar));
+                // Só o nome vai pro campo Fiscal/Suplente — cargo e MF têm
+                // campos próprios (preenchidos via onSelecionar).
+                onChange(militar.nome);
                 onSelecionar?.(militar);
                 setSugestoesVisiveis(false);
               }}

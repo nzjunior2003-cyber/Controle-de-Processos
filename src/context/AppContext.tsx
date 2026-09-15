@@ -124,6 +124,7 @@ interface AppContextData {
     email: string;
     senha: string;
     cargo?: string;
+    mf?: string;
   }) => Promise<void>;
   enviarResetSenha: (email: string) => Promise<void>;
   addProcesso: (
@@ -371,11 +372,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       email,
       senha,
       cargo,
+      mf,
     }: {
       nome: string;
       email: string;
       senha: string;
       cargo?: string;
+      mf?: string;
     }) => {
       try {
         const auth = requireFirebaseAuth();
@@ -390,6 +393,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           perfil: 'fiscal',
           setor_id: '1',
           ativo: false,
+          ...(mf ? { mf } : {}),
         });
 
         // Avisa todo master por e-mail — sem isso, uma solicitação podia

@@ -16,6 +16,14 @@ export interface Usuario {
   perfil: Perfil;
   ativo: boolean;
   cargo?: string;
+  /**
+   * MF (matrícula funcional) informada no primeiro acesso — usada pra
+   * reconhecer automaticamente, sem precisar bater e-mail/nome, quais
+   * contratos já cadastrados por um Gestor têm esse militar como Fiscal
+   * Titular/Suplente (ver `filtrarContratosDoFiscal`). Única e imutável,
+   * diferente de e-mail/nome.
+   */
+  mf?: string;
 }
 
 export interface Setor {
