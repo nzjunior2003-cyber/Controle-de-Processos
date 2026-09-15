@@ -65,9 +65,15 @@ interface FormState {
   fiscalTitular: string;
   fiscalEmail: string;
   fiscalTitularContato: string;
+  fiscalTitularCargo: string;
+  fiscalTitularMf: string;
+  fiscalTitularUbm: string;
   fiscalSuplente: string;
   fiscalSuplenteEmail: string;
   fiscalSuplenteContato: string;
+  fiscalSuplenteCargo: string;
+  fiscalSuplenteMf: string;
+  fiscalSuplenteUbm: string;
   portaria: string;
   fonteRecurso: string;
   naturezaDespesa: string;
@@ -97,9 +103,15 @@ const estadoVazio: FormState = {
   fiscalTitular: '',
   fiscalEmail: '',
   fiscalTitularContato: '',
+  fiscalTitularCargo: '',
+  fiscalTitularMf: '',
+  fiscalTitularUbm: '',
   fiscalSuplente: '',
   fiscalSuplenteEmail: '',
   fiscalSuplenteContato: '',
+  fiscalSuplenteCargo: '',
+  fiscalSuplenteMf: '',
+  fiscalSuplenteUbm: '',
   portaria: '',
   fonteRecurso: '',
   naturezaDespesa: '',
@@ -136,9 +148,15 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
     fiscalTitular: contrato.fiscalTitular ?? '',
     fiscalEmail: contrato.fiscalEmail ?? '',
     fiscalTitularContato: contrato.fiscalTitularContato ?? '',
+    fiscalTitularCargo: contrato.fiscalTitularCargo ?? '',
+    fiscalTitularMf: contrato.fiscalTitularMf ?? '',
+    fiscalTitularUbm: contrato.fiscalTitularUbm ?? '',
     fiscalSuplente: contrato.fiscalSuplente ?? '',
     fiscalSuplenteEmail: contrato.fiscalSuplenteEmail ?? '',
     fiscalSuplenteContato: contrato.fiscalSuplenteContato ?? '',
+    fiscalSuplenteCargo: contrato.fiscalSuplenteCargo ?? '',
+    fiscalSuplenteMf: contrato.fiscalSuplenteMf ?? '',
+    fiscalSuplenteUbm: contrato.fiscalSuplenteUbm ?? '',
     portaria: contrato.portaria ?? '',
     fonteRecurso: contrato.fonteRecurso ?? '',
     naturezaDespesa: contrato.naturezaDespesa ?? '',
@@ -369,9 +387,15 @@ export default function ContratoForm() {
         fiscalTitular: form.fiscalTitular || '',
         fiscalEmail: form.fiscalEmail || '',
         fiscalTitularContato: form.fiscalTitularContato || '',
+        fiscalTitularCargo: form.fiscalTitularCargo || '',
+        fiscalTitularMf: form.fiscalTitularMf || '',
+        fiscalTitularUbm: form.fiscalTitularUbm || '',
         fiscalSuplente: form.fiscalSuplente || '',
         fiscalSuplenteEmail: form.fiscalSuplenteEmail || '',
         fiscalSuplenteContato: form.fiscalSuplenteContato || '',
+        fiscalSuplenteCargo: form.fiscalSuplenteCargo || '',
+        fiscalSuplenteMf: form.fiscalSuplenteMf || '',
+        fiscalSuplenteUbm: form.fiscalSuplenteUbm || '',
         portaria: form.portaria || '',
         fonteRecurso: form.fonteRecurso || '',
         naturezaDespesa: form.naturezaDespesa || '',
@@ -563,6 +587,15 @@ export default function ContratoForm() {
                   type="text"
                   value={form.numero}
                   onChange={(e) => handleChange('numero', e.target.value)}
+                  className={CLASSE_INPUT}
+                />
+              </div>
+              <div>
+                <label className={CLASSE_LABEL}>Nº do DOE (Diário Oficial de publicação)</label>
+                <input
+                  type="text"
+                  value={form.doe}
+                  onChange={(e) => handleChange('doe', e.target.value)}
                   className={CLASSE_INPUT}
                 />
               </div>
@@ -839,6 +872,14 @@ export default function ContratoForm() {
                   militares={militares}
                   value={form.fiscalTitular}
                   onChange={(valor) => handleChange('fiscalTitular', valor)}
+                  onSelecionar={(militar) =>
+                    setForm((anterior) => ({
+                      ...anterior,
+                      fiscalTitularCargo: militar.cargo,
+                      fiscalTitularMf: militar.mf,
+                      fiscalTitularUbm: militar.ubm || anterior.fiscalTitularUbm,
+                    }))
+                  }
                   className={CLASSE_INPUT}
                 />
               </div>
@@ -857,6 +898,33 @@ export default function ContratoForm() {
                   type="text"
                   value={form.fiscalTitularContato}
                   onChange={(e) => handleChange('fiscalTitularContato', e.target.value)}
+                  className={CLASSE_INPUT}
+                />
+              </div>
+              <div>
+                <label className={CLASSE_LABEL}>Cargo do Fiscal Titular</label>
+                <input
+                  type="text"
+                  value={form.fiscalTitularCargo}
+                  onChange={(e) => handleChange('fiscalTitularCargo', e.target.value)}
+                  className={CLASSE_INPUT}
+                />
+              </div>
+              <div>
+                <label className={CLASSE_LABEL}>MF do Fiscal Titular</label>
+                <input
+                  type="text"
+                  value={form.fiscalTitularMf}
+                  onChange={(e) => handleChange('fiscalTitularMf', e.target.value)}
+                  className={CLASSE_INPUT}
+                />
+              </div>
+              <div>
+                <label className={CLASSE_LABEL}>UBM do Fiscal Titular</label>
+                <input
+                  type="text"
+                  value={form.fiscalTitularUbm}
+                  onChange={(e) => handleChange('fiscalTitularUbm', e.target.value)}
                   className={CLASSE_INPUT}
                 />
               </div>
@@ -887,6 +955,14 @@ export default function ContratoForm() {
                   militares={militares}
                   value={form.fiscalSuplente}
                   onChange={(valor) => handleChange('fiscalSuplente', valor)}
+                  onSelecionar={(militar) =>
+                    setForm((anterior) => ({
+                      ...anterior,
+                      fiscalSuplenteCargo: militar.cargo,
+                      fiscalSuplenteMf: militar.mf,
+                      fiscalSuplenteUbm: militar.ubm || anterior.fiscalSuplenteUbm,
+                    }))
+                  }
                   className={CLASSE_INPUT}
                 />
               </div>
@@ -905,6 +981,33 @@ export default function ContratoForm() {
                   type="text"
                   value={form.fiscalSuplenteContato}
                   onChange={(e) => handleChange('fiscalSuplenteContato', e.target.value)}
+                  className={CLASSE_INPUT}
+                />
+              </div>
+              <div>
+                <label className={CLASSE_LABEL}>Cargo do Fiscal Suplente</label>
+                <input
+                  type="text"
+                  value={form.fiscalSuplenteCargo}
+                  onChange={(e) => handleChange('fiscalSuplenteCargo', e.target.value)}
+                  className={CLASSE_INPUT}
+                />
+              </div>
+              <div>
+                <label className={CLASSE_LABEL}>MF do Fiscal Suplente</label>
+                <input
+                  type="text"
+                  value={form.fiscalSuplenteMf}
+                  onChange={(e) => handleChange('fiscalSuplenteMf', e.target.value)}
+                  className={CLASSE_INPUT}
+                />
+              </div>
+              <div>
+                <label className={CLASSE_LABEL}>UBM do Fiscal Suplente</label>
+                <input
+                  type="text"
+                  value={form.fiscalSuplenteUbm}
+                  onChange={(e) => handleChange('fiscalSuplenteUbm', e.target.value)}
                   className={CLASSE_INPUT}
                 />
               </div>
@@ -1003,15 +1106,6 @@ export default function ContratoForm() {
                   type="text"
                   value={form.dotacao}
                   onChange={(e) => handleChange('dotacao', e.target.value)}
-                  className={CLASSE_INPUT}
-                />
-              </div>
-              <div>
-                <label className={CLASSE_LABEL}>Nº do DOE (Diário Oficial de publicação)</label>
-                <input
-                  type="text"
-                  value={form.doe}
-                  onChange={(e) => handleChange('doe', e.target.value)}
                   className={CLASSE_INPUT}
                 />
               </div>

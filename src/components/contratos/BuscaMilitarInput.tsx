@@ -7,6 +7,8 @@ interface Props {
   onChange: (valor: string) => void;
   className: string;
   placeholder?: string;
+  /** Chamado (além de onChange) quando a pessoa clica numa sugestão — usado pra também preencher Cargo/MF/UBM. */
+  onSelecionar?: (militar: Militar) => void;
 }
 
 /**
@@ -15,7 +17,14 @@ interface Props {
  * travar a digitação: o Gestor pode sempre digitar manualmente, a lista
  * de sugestões é só um atalho.
  */
-export default function BuscaMilitarInput({ militares, value, onChange, className, placeholder }: Props) {
+export default function BuscaMilitarInput({
+  militares,
+  value,
+  onChange,
+  className,
+  placeholder,
+  onSelecionar,
+}: Props) {
   const [sugestoesVisiveis, setSugestoesVisiveis] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -52,6 +61,7 @@ export default function BuscaMilitarInput({ militares, value, onChange, classNam
               key={indice}
               onClick={() => {
                 onChange(formatarNomeMilitar(militar));
+                onSelecionar?.(militar);
                 setSugestoesVisiveis(false);
               }}
               className="px-3 py-2 hover:bg-red-50 cursor-pointer border-b border-gray-100 last:border-0"

@@ -265,9 +265,21 @@ export interface Contrato {
   fiscalTitular?: string;
   fiscalEmail?: string;
   fiscalTitularContato?: string;
+  /** Cargo/posto do Fiscal Titular (ex.: "1º TEN QOABM") — preenchido junto com o nome ao selecionar no buscador de militares, mas editável direto. */
+  fiscalTitularCargo?: string;
+  /** MF (matrícula funcional) do Fiscal Titular. */
+  fiscalTitularMf?: string;
+  /** UBM (unidade) do Fiscal Titular — inserida direto no sistema, não vem do buscador de militares. */
+  fiscalTitularUbm?: string;
   fiscalSuplente?: string;
   fiscalSuplenteEmail?: string;
   fiscalSuplenteContato?: string;
+  /** Cargo/posto do Fiscal Suplente. */
+  fiscalSuplenteCargo?: string;
+  /** MF (matrícula funcional) do Fiscal Suplente. */
+  fiscalSuplenteMf?: string;
+  /** UBM (unidade) do Fiscal Suplente. */
+  fiscalSuplenteUbm?: string;
   /**
    * Períodos anteriores de Fiscal Titular/Suplente deste contrato,
    * fechados automaticamente toda vez que esses campos são alterados na
