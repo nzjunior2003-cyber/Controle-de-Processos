@@ -1,10 +1,58 @@
 import express from "express";
 import path from "path";
+import { Readable } from "stream";
 import { createServer as createViteServer } from "vite";
 import nodemailer from "nodemailer";
+import multer from "multer";
+import { google } from "googleapis";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+const uploadMemoria = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+/**
+ * Cliente do Drive autenticado como a conta institucional fixa
+ * (ggc.cbmpa@gmail.com) via refresh token — os documentos de contrato
+ * (PDF do contrato, Nota de Empenho, NFs) sempre caem no Drive dela, não
+ * no de quem estiver logado no app no momento. `null` quando as
+ * credenciais não estão configuradas no servidor.
+ */
+function getDriveClient() {
+  const { GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, DRIVE_CONTRATOS_REFRESH_TOKEN } = process.env;
+  if (!GOOGLE_OAUTH_CLIENT_ID || !GOOGLE_OAUTH_CLIENT_SECRET || !DRIVE_CONTRATOS_REFRESH_TOKEN) {
+    return null;
+  }
+  const oauth2Client = new google.auth.OAuth2(GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET);
+  oauth2Client.setCredentials({ refresh_token: DRIVE_CONTRATOS_REFRESH_TOKEN });
+  return google.drive({ version: "v3", auth: oauth2Client });
+}
+
+/** Acha (ou cria) uma pasta pelo nome dentro de `parentId` (raiz do Drive quando ausente). */
+async function getOrCreateFolder(
+  drive: ReturnType<typeof google.drive>,
+  nome: string,
+  parentId?: string,
+): Promise<string> {
+  const nomeEscapado = nome.replace(/'/g, "\\'");
+  const q =
+    `mimeType='application/vnd.google-apps.folder' and name='${nomeEscapado}' and trashed=false` +
+    (parentId ? ` and '${parentId}' in parents` : "");
+  const lista = await drive.files.list({ q, fields: "files(id)" });
+  const existente = lista.data.files?.[0]?.id;
+  if (existente) return existente;
+
+  const criada = await drive.files.create({
+    requestBody: {
+      name: nome,
+      mimeType: "application/vnd.google-apps.folder",
+      parents: parentId ? [parentId] : undefined,
+    },
+    fields: "id",
+  });
+  if (!criada.data.id) throw new Error("Não foi possível criar a pasta no Drive.");
+  return criada.data.id;
+}
 
 // Create default transpoter if env variables exist
 const getTransporter = () => {
@@ -104,6 +152,45 @@ async function startServer() {
     } catch (error) {
       console.error("Error sending email:", error);
       res.status(500).json({ error: "Failed to send email" });
+    }
+  });
+
+  // Upload de documentos de contrato (PDF do contrato, Nota de Empenho,
+  // NF) pro Drive institucional (conta fixa, ver getDriveClient) — usado
+  // por ContratoForm.tsx e ExecucaoModal.tsx via src/lib/driveUploadService.ts.
+  app.post("/api/upload-drive", uploadMemoria.single("arquivo"), async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization ?? "";
+      const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+      if (!(await idTokenValido(idToken))) {
+        return res.status(401).json({ error: "Não autenticado." });
+      }
+
+      const pasta = typeof req.body?.pasta === "string" ? req.body.pasta.trim() : "";
+      if (!pasta || !req.file) {
+        return res.status(400).json({ error: "Campos obrigatórios: pasta, arquivo." });
+      }
+
+      const drive = getDriveClient();
+      if (!drive) {
+        return res.status(500).json({
+          error: "Upload para o Drive não está configurado no servidor (faltam credenciais).",
+        });
+      }
+
+      const pastaRaiz = await getOrCreateFolder(drive, "Documentos de Contratos");
+      const pastaContrato = await getOrCreateFolder(drive, pasta, pastaRaiz);
+
+      const criado = await drive.files.create({
+        requestBody: { name: req.file.originalname, parents: [pastaContrato] },
+        media: { mimeType: req.file.mimetype, body: Readable.from(req.file.buffer) },
+        fields: "id, webViewLink",
+      });
+
+      return res.json({ link: criado.data.webViewLink || criado.data.id });
+    } catch (error) {
+      console.error("Error uploading to Drive:", error);
+      res.status(500).json({ error: "Falha ao enviar o arquivo para o Drive." });
     }
   });
 

@@ -5,7 +5,7 @@ import { useApp } from '../../context/AppContext';
 import type { Contrato, ItemContrato } from '../../types';
 import { ID_PLANILHA_CONTRATOS, type LinhaPlanilha } from '../../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
-import { getOrCreateFolder, uploadFileToDrive } from '../../lib/driveService';
+import { uploadArquivoContrato } from '../../lib/driveUploadService';
 import { enviarEmail } from '../../lib/emailService';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
 import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
@@ -297,50 +297,43 @@ export default function ContratoForm() {
         erroGoogle = erroAuth;
       }
 
+      // O upload vai sempre pro Drive institucional (conta fixa ggc.cbmpa@gmail.com,
+      // configurada no servidor) — não depende de qual conta Google a
+      // pessoa logada autenticou, então todo documento do contrato cai
+      // sempre na mesma pasta, não espalhado pelo Drive de cada um.
       let contratoPdfLink: string | null | undefined;
       let empenhoPdfLink: string | null | undefined;
-      if (arquivoContrato || arquivoEmpenho) {
-        if (!googleToken) {
-          alert('Não foi possível conectar ao Google para anexar os documentos do contrato — tente novamente.');
-        } else {
-          const pastaRaiz = await getOrCreateFolder(googleToken, 'Documentos de Contratos');
-          const pastaContrato = await getOrCreateFolder(
-            googleToken,
-            `Contrato ${form.numero} - ${form.empresa}`,
-            pastaRaiz,
+      const pastaContrato = `Contrato ${form.numero} - ${form.empresa}`;
+      if (arquivoContrato) {
+        try {
+          const arquivo = new File(
+            [arquivoContrato],
+            `Contrato_${form.numero.replace(/\//g, '-')}.pdf`,
+            { type: arquivoContrato.type || 'application/pdf' },
           );
-          if (arquivoContrato) {
-            try {
-              const arquivo = new File(
-                [arquivoContrato],
-                `Contrato_${form.numero.replace(/\//g, '-')}.pdf`,
-                { type: arquivoContrato.type || 'application/pdf' },
-              );
-              contratoPdfLink = await uploadFileToDrive(googleToken, arquivo, pastaContrato);
-            } catch (erroUpload) {
-              console.error('Erro ao anexar o PDF do contrato:', erroUpload);
-              alert(
-                'Não foi possível anexar o PDF do contrato: ' +
-                  (erroUpload instanceof Error ? erroUpload.message : String(erroUpload)),
-              );
-            }
-          }
-          if (arquivoEmpenho) {
-            try {
-              const arquivo = new File(
-                [arquivoEmpenho],
-                `Empenho_${form.numero.replace(/\//g, '-')}.pdf`,
-                { type: arquivoEmpenho.type || 'application/pdf' },
-              );
-              empenhoPdfLink = await uploadFileToDrive(googleToken, arquivo, pastaContrato);
-            } catch (erroUpload) {
-              console.error('Erro ao anexar a Nota de Empenho:', erroUpload);
-              alert(
-                'Não foi possível anexar a Nota de Empenho: ' +
-                  (erroUpload instanceof Error ? erroUpload.message : String(erroUpload)),
-              );
-            }
-          }
+          contratoPdfLink = await uploadArquivoContrato(pastaContrato, arquivo);
+        } catch (erroUpload) {
+          console.error('Erro ao anexar o PDF do contrato:', erroUpload);
+          alert(
+            'Não foi possível anexar o PDF do contrato: ' +
+              (erroUpload instanceof Error ? erroUpload.message : String(erroUpload)),
+          );
+        }
+      }
+      if (arquivoEmpenho) {
+        try {
+          const arquivo = new File(
+            [arquivoEmpenho],
+            `Empenho_${form.numero.replace(/\//g, '-')}.pdf`,
+            { type: arquivoEmpenho.type || 'application/pdf' },
+          );
+          empenhoPdfLink = await uploadArquivoContrato(pastaContrato, arquivo);
+        } catch (erroUpload) {
+          console.error('Erro ao anexar a Nota de Empenho:', erroUpload);
+          alert(
+            'Não foi possível anexar a Nota de Empenho: ' +
+              (erroUpload instanceof Error ? erroUpload.message : String(erroUpload)),
+          );
         }
       }
 

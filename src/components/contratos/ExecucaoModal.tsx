@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { FileText, PlusCircle, Trash2, Upload, X } from 'lucide-react';
 import { format } from 'date-fns';
-import { getAccessToken, googleSignIn } from '../../lib/googleAuth';
-import { getOrCreateFolder, uploadFileToDrive } from '../../lib/driveService';
+import { uploadArquivoContrato } from '../../lib/driveUploadService';
 import {
   formatarMoeda,
   TIPO_ADITIVO_LABELS,
@@ -186,26 +185,12 @@ export default function ExecucaoModal({
       let arquivoLink: string | null = null;
 
       if (novaExecucao.arquivo) {
-        let token = await getAccessToken();
-        if (!token) {
-          const resultado = await googleSignIn();
-          token = resultado?.accessToken ?? null;
-        }
-
-        if (token) {
-          const arquivo = new File(
-            [novaExecucao.arquivo],
-            `NF_${novaExecucao.nf}.pdf`,
-            { type: novaExecucao.arquivo.type || 'application/pdf' },
-          );
-          const pastaRaiz = await getOrCreateFolder(token, 'Documentos de Contratos');
-          const pastaContrato = await getOrCreateFolder(
-            token,
-            `Contrato ${contrato.numero} - ${contrato.empresa}`,
-            pastaRaiz,
-          );
-          arquivoLink = await uploadFileToDrive(token, arquivo, pastaContrato);
-        }
+        const arquivo = new File(
+          [novaExecucao.arquivo],
+          `NF_${novaExecucao.nf}.pdf`,
+          { type: novaExecucao.arquivo.type || 'application/pdf' },
+        );
+        arquivoLink = await uploadArquivoContrato(`Contrato ${contrato.numero} - ${contrato.empresa}`, arquivo);
       }
 
       const itensConsumidos: ConsumoItemExecucao[] = linhasItens
