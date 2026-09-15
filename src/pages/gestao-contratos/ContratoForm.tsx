@@ -8,6 +8,7 @@ import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
 import { uploadArquivoContrato } from '../../lib/driveUploadService';
 import { enviarEmail } from '../../lib/emailService';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
+import { sincronizarContratoInstitucional } from '../../lib/sheetsInstitucionalService';
 import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
 import { ID_PLANILHA_MILITARES, mapLinhaMilitar, type Militar } from '../../lib/militares';
 import BuscaMilitarInput from '../../components/contratos/BuscaMilitarInput';
@@ -435,6 +436,18 @@ export default function ContratoForm() {
               (erroPlanilha instanceof Error ? erroPlanilha.message : String(erroPlanilha)),
           );
         }
+      }
+
+      // Espelha o mesmo contrato na planilha institucional (Drive fixo,
+      // ver server.ts) — best-effort, nunca bloqueia o cadastro.
+      try {
+        await sincronizarContratoInstitucional(contratoParaDadosPlanilha(dados));
+      } catch (erroInstitucional) {
+        console.error('Erro ao sincronizar a planilha institucional:', erroInstitucional);
+        alert(
+          'O contrato foi salvo no sistema, mas não foi possível atualizar a planilha institucional: ' +
+            (erroInstitucional instanceof Error ? erroInstitucional.message : String(erroInstitucional)),
+        );
       }
 
       // Avisa por e-mail sempre que um fiscal/suplente é definido ou
