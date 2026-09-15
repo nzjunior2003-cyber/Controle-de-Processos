@@ -309,6 +309,17 @@ export default function ExecucaoModal({
                 Ver PDF do Contrato
               </a>
             )}
+            {contrato.empenhoPdfLink && (
+              <a
+                href={contrato.empenhoPdfLink}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border border-gray-300 flex items-center"
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                Ver Nota de Empenho
+              </a>
+            )}
             <button
               type="button"
               onClick={() => window.open(`/sistema/gestao-contratos/${contrato.id}/relatorio`, '_blank')}

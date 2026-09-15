@@ -3,12 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, FileText, PlusCircle, Save, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Contrato, ItemContrato } from '../../types';
-import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
+import { ID_PLANILHA_CONTRATOS, type LinhaPlanilha } from '../../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
 import { getOrCreateFolder, uploadFileToDrive } from '../../lib/driveService';
 import { enviarEmail } from '../../lib/emailService';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
 import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
+import { ID_PLANILHA_MILITARES, mapLinhaMilitar, type Militar } from '../../lib/militares';
+import BuscaMilitarInput from '../../components/contratos/BuscaMilitarInput';
 import {
   formatarMoeda,
   mesclarItensContrato,
@@ -72,6 +74,7 @@ interface FormState {
   valorPRD: string;
   empenho: string;
   dotacao: string;
+  doe: string;
   linkContrato: string;
 }
 
@@ -103,6 +106,7 @@ const estadoVazio: FormState = {
   valorPRD: '',
   empenho: '',
   dotacao: '',
+  doe: '',
   linkContrato: '',
 };
 
@@ -141,6 +145,7 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
     valorPRD: contrato.valorPRD != null ? String(contrato.valorPRD) : '',
     empenho: contrato.empenho ?? '',
     dotacao: contrato.dotacao ?? '',
+    doe: contrato.doe ?? '',
     linkContrato: contrato.linkContrato ?? '',
   };
 }
@@ -174,9 +179,39 @@ export default function ContratoForm() {
     return () => cancelar();
   }, []);
 
+  const [militares, setMilitares] = useState<Militar[]>([]);
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const resposta = await fetch(
+          `https://docs.google.com/spreadsheets/d/${ID_PLANILHA_MILITARES}/gviz/tq?tqx=out:csv`,
+        );
+        if (!resposta.ok) return;
+        const csv = await resposta.text();
+        const Papa = (await import('papaparse')).default;
+        const linhas = await new Promise<LinhaPlanilha[]>((resolve) => {
+          Papa.parse<LinhaPlanilha>(csv, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (resultado) => resolve(resultado.data),
+          });
+        });
+        if (cancelado) return;
+        setMilitares(linhas.map(mapLinhaMilitar).filter((m): m is Militar => m !== null));
+      } catch (erro) {
+        console.error('Erro ao carregar a planilha de militares:', erro);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
   const [form, setForm] = useState<FormState>(() => contratoParaFormulario(contrato));
   const [itensForm, setItensForm] = useState<ItemForm[]>(() => itensParaFormulario(contrato?.itens));
   const [arquivoContrato, setArquivoContrato] = useState<File | null>(null);
+  const [arquivoEmpenho, setArquivoEmpenho] = useState<File | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -207,10 +242,19 @@ export default function ContratoForm() {
     })),
   );
   const valorGlobalNumero = Number(form.valorGlobal) || 0;
+  // Itens antigos (de antes do valor unitário existir) ficam com
+  // valorUnitario zerado — não dá pra validar contra o Valor Global
+  // nesse caso, ou qualquer edição nesse contrato (mesmo sem relação
+  // com itens) ficaria travada sem explicação nenhuma. Só bloqueia
+  // quando os itens têm de fato um preço lançado.
+  const itensSemPreco = itensValidos.some((item) => !(Number(item.valorUnitario) > 0));
   // Poucos centavos de diferença por arredondamento não devem travar o
   // cadastro — só sinaliza quando a diferença é de fato relevante.
   const totalItensDivergente =
-    mostrarItens && itensValidos.length > 0 && Math.abs(totalItens - valorGlobalNumero) > 0.01;
+    mostrarItens &&
+    itensValidos.length > 0 &&
+    !itensSemPreco &&
+    Math.abs(totalItens - valorGlobalNumero) > 0.01;
   const totalQuantidadeItens = itensValidos.reduce(
     (acc, item) => acc + (Number(item.quantidadeInicial) || 0),
     0,
@@ -254,29 +298,48 @@ export default function ContratoForm() {
       }
 
       let contratoPdfLink: string | null | undefined;
-      if (arquivoContrato) {
+      let empenhoPdfLink: string | null | undefined;
+      if (arquivoContrato || arquivoEmpenho) {
         if (!googleToken) {
-          alert('Não foi possível conectar ao Google para anexar o PDF do contrato — tente novamente.');
+          alert('Não foi possível conectar ao Google para anexar os documentos do contrato — tente novamente.');
         } else {
-          try {
-            const arquivo = new File(
-              [arquivoContrato],
-              `Contrato_${form.numero.replace(/\//g, '-')}.pdf`,
-              { type: arquivoContrato.type || 'application/pdf' },
-            );
-            const pastaRaiz = await getOrCreateFolder(googleToken, 'Documentos de Contratos');
-            const pastaContrato = await getOrCreateFolder(
-              googleToken,
-              `Contrato ${form.numero} - ${form.empresa}`,
-              pastaRaiz,
-            );
-            contratoPdfLink = await uploadFileToDrive(googleToken, arquivo, pastaContrato);
-          } catch (erroUpload) {
-            console.error('Erro ao anexar o PDF do contrato:', erroUpload);
-            alert(
-              'Não foi possível anexar o PDF do contrato: ' +
-                (erroUpload instanceof Error ? erroUpload.message : String(erroUpload)),
-            );
+          const pastaRaiz = await getOrCreateFolder(googleToken, 'Documentos de Contratos');
+          const pastaContrato = await getOrCreateFolder(
+            googleToken,
+            `Contrato ${form.numero} - ${form.empresa}`,
+            pastaRaiz,
+          );
+          if (arquivoContrato) {
+            try {
+              const arquivo = new File(
+                [arquivoContrato],
+                `Contrato_${form.numero.replace(/\//g, '-')}.pdf`,
+                { type: arquivoContrato.type || 'application/pdf' },
+              );
+              contratoPdfLink = await uploadFileToDrive(googleToken, arquivo, pastaContrato);
+            } catch (erroUpload) {
+              console.error('Erro ao anexar o PDF do contrato:', erroUpload);
+              alert(
+                'Não foi possível anexar o PDF do contrato: ' +
+                  (erroUpload instanceof Error ? erroUpload.message : String(erroUpload)),
+              );
+            }
+          }
+          if (arquivoEmpenho) {
+            try {
+              const arquivo = new File(
+                [arquivoEmpenho],
+                `Empenho_${form.numero.replace(/\//g, '-')}.pdf`,
+                { type: arquivoEmpenho.type || 'application/pdf' },
+              );
+              empenhoPdfLink = await uploadFileToDrive(googleToken, arquivo, pastaContrato);
+            } catch (erroUpload) {
+              console.error('Erro ao anexar a Nota de Empenho:', erroUpload);
+              alert(
+                'Não foi possível anexar a Nota de Empenho: ' +
+                  (erroUpload instanceof Error ? erroUpload.message : String(erroUpload)),
+              );
+            }
           }
         }
       }
@@ -322,6 +385,7 @@ export default function ContratoForm() {
         ...(form.valorPRD ? { valorPRD: Number(form.valorPRD.replace(',', '.')) } : {}),
         empenho: form.empenho || '',
         dotacao: form.dotacao || '',
+        doe: form.doe || '',
         linkContrato: form.linkContrato || null,
         ...(mostrarItens
           ? {
@@ -342,6 +406,7 @@ export default function ContratoForm() {
             }
           : {}),
         ...(contratoPdfLink !== undefined ? { contratoPdfLink } : {}),
+        ...(empenhoPdfLink !== undefined ? { empenhoPdfLink } : {}),
       };
 
       let contratoId: string;
@@ -461,6 +526,14 @@ export default function ContratoForm() {
           {erro && (
             <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-md p-3">
               {erro}
+            </div>
+          )}
+
+          {totalItensDivergente && (
+            <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-md p-3">
+              Não é possível salvar: o total dos itens do contrato (mais abaixo, em "Vigência e
+              Valores") não bate com o Valor Global. Ajuste os valores dos itens ou o Valor Global
+              antes de salvar.
             </div>
           )}
 
@@ -756,10 +829,10 @@ export default function ContratoForm() {
               </div>
               <div>
                 <label className={CLASSE_LABEL}>Fiscal Titular</label>
-                <input
-                  type="text"
+                <BuscaMilitarInput
+                  militares={militares}
                   value={form.fiscalTitular}
-                  onChange={(e) => handleChange('fiscalTitular', e.target.value)}
+                  onChange={(valor) => handleChange('fiscalTitular', valor)}
                   className={CLASSE_INPUT}
                 />
               </div>
@@ -804,10 +877,10 @@ export default function ContratoForm() {
               </div>
               <div>
                 <label className={CLASSE_LABEL}>Fiscal Suplente</label>
-                <input
-                  type="text"
+                <BuscaMilitarInput
+                  militares={militares}
                   value={form.fiscalSuplente}
-                  onChange={(e) => handleChange('fiscalSuplente', e.target.value)}
+                  onChange={(valor) => handleChange('fiscalSuplente', valor)}
                   className={CLASSE_INPUT}
                 />
               </div>
@@ -926,6 +999,35 @@ export default function ContratoForm() {
                   onChange={(e) => handleChange('dotacao', e.target.value)}
                   className={CLASSE_INPUT}
                 />
+              </div>
+              <div>
+                <label className={CLASSE_LABEL}>Nº do DOE (Diário Oficial de publicação)</label>
+                <input
+                  type="text"
+                  value={form.doe}
+                  onChange={(e) => handleChange('doe', e.target.value)}
+                  className={CLASSE_INPUT}
+                />
+              </div>
+              <div>
+                <label className={CLASSE_LABEL}>PDF da Nota de Empenho</label>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => setArquivoEmpenho(e.target.files ? e.target.files[0] : null)}
+                  className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100"
+                />
+                {contrato?.empenhoPdfLink && !arquivoEmpenho && (
+                  <a
+                    href={contrato.empenhoPdfLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 inline-flex items-center text-xs text-red-600 hover:text-red-800 font-medium"
+                  >
+                    <FileText className="w-3 h-3 mr-1" />
+                    Ver Nota de Empenho já anexada (escolher outro arquivo substitui)
+                  </a>
+                )}
               </div>
             </div>
           </div>

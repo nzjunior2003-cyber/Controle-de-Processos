@@ -94,7 +94,7 @@ export function parseDataBR(entrada: unknown): string | undefined {
 }
 
 /** Lê uma célula da linha por nome de coluna, tolerando espaços extras no cabeçalho. */
-function celula(linha: LinhaPlanilha, nomeColuna: string): string {
+export function celula(linha: LinhaPlanilha, nomeColuna: string): string {
   const normalizado = nomeColuna.trim().toLowerCase();
   const chave = Object.keys(linha).find((k) => k.trim().toLowerCase() === normalizado);
   return chave ? (linha[chave] ?? '').toString().trim() : '';

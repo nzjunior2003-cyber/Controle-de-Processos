@@ -286,6 +286,8 @@ export interface Contrato {
   valorPRD?: number;
   empenho?: string;
   dotacao?: string;
+  /** Nº do Diário Oficial (DOE) em que o contrato foi publicado. */
+  doe?: string;
   linkContrato?: string | null;
   /** Unidade demandante do contrato (só vem da sincronização com a planilha — sem campo próprio no cadastro ainda). */
   unidadeDemandante?: string;
@@ -306,6 +308,8 @@ export interface Contrato {
    * pra links externos como SEI/PAE).
    */
   contratoPdfLink?: string | null;
+  /** Link do PDF da Nota de Empenho anexado (Google Drive, mesma pasta do contrato). */
+  empenhoPdfLink?: string | null;
   criado_em?: string;
   atualizado_em?: string;
 }
