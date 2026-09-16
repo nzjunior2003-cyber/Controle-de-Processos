@@ -23,6 +23,20 @@ describe('mapLinhaMilitar', () => {
     expect(resultado).toEqual({ cargo: '1º TEN', nome: 'JOELMIR', mf: '', ubm: '' });
   });
 
+  it('lê a MF da coluna "matricula" — o nome real da coluna na planilha (não "MF")', () => {
+    const resultado = mapLinhaMilitar({
+      nome: 'ABDIAS DO NASCIMENTO NETO',
+      matricula: '57189387',
+      cargo: '2 SARGENTO / BM',
+    });
+    expect(resultado).toEqual({
+      cargo: '2 SARGENTO / BM',
+      nome: 'ABDIAS DO NASCIMENTO NETO',
+      mf: '57189387',
+      ubm: '',
+    });
+  });
+
   it('devolve null quando não há nome (linha em branco/título de seção)', () => {
     expect(mapLinhaMilitar({ CARGO: '1º TEN' })).toBeNull();
   });

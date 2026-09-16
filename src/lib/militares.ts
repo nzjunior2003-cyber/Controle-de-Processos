@@ -26,14 +26,21 @@ export interface Militar {
   ubm: string;
 }
 
-/** Mapeia uma linha (com cabeçalho) da planilha de militares. Devolve null quando não há nome (linha em branco/título de seção). */
+/**
+ * Mapeia uma linha (com cabeçalho) da planilha de militares. Devolve
+ * null quando não há nome (linha em branco/título de seção).
+ *
+ * A coluna da matrícula na planilha real se chama "matricula", não
+ * "MF" — tenta os dois nomes (tolerante a uma futura renomeação/cópia
+ * da planilha com outro cabeçalho).
+ */
 export function mapLinhaMilitar(linha: LinhaPlanilha): Militar | null {
   const nome = celula(linha, 'NOME');
   if (!nome) return null;
   return {
     cargo: celula(linha, 'CARGO'),
     nome,
-    mf: celula(linha, 'MF'),
+    mf: celula(linha, 'MATRICULA') || celula(linha, 'MF'),
     ubm: celula(linha, 'UBM'),
   };
 }

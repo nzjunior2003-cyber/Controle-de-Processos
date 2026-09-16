@@ -34,6 +34,9 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
 
   // Confirmação de identidade (validação de MF contra a planilha de militares)
   const [militarConfirmado, setMilitarConfirmado] = useState<Militar | null>(null);
+  // true quando chegou em "solicitar" porque a MF digitada não foi achada
+  // na planilha (pra mostrar um aviso, em vez de parecer uma tela vazia).
+  const [mfNaoEncontrada, setMfNaoEncontrada] = useState(false);
 
   const trocarView = (nova: ModalView) => {
     setErro(null);
@@ -77,10 +80,13 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
           }
           setMf(email.trim());
           setEmail('');
+          setMfNaoEncontrada(true);
           trocarView('solicitar');
           return;
         } catch (erroBusca) {
           console.error('Erro ao consultar a planilha de militares:', erroBusca);
+          setErro('Não foi possível consultar a planilha de militares agora. Tente novamente.');
+          return;
         }
       }
       setErro(mensagem);
@@ -112,6 +118,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
       setNewSenha('');
       setConfirmSenha('');
       setMilitarConfirmado(null);
+      setMfNaoEncontrada(false);
       setEmail('');
       setSenha('');
       trocarView('login');
@@ -232,6 +239,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                   setCargo('');
                   setMf('');
                   setEmail('');
+                  setMfNaoEncontrada(false);
                   trocarView('solicitar');
                 }}
                 className="mt-2 w-full flex justify-center py-2 px-4 border border-red-200 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
@@ -310,6 +318,12 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
 
         {view === 'solicitar' && (
           <form onSubmit={handleSolicitar} className="p-6 space-y-4">
+            {mfNaoEncontrada && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Não encontramos essa matrícula na planilha de efetivo do CBMPA. Preencha seus
+                dados manualmente — um master vai revisar antes de aprovar o acesso.
+              </div>
+            )}
             <FormField
               label="Nome Completo"
               icon={User}
