@@ -126,6 +126,8 @@ interface AppContextData {
     senha: string;
     cargo?: string;
     mf?: string;
+    nomeGuerra?: string;
+    ubm?: string;
   }) => Promise<void>;
   enviarResetSenha: (email: string) => Promise<void>;
   addProcesso: (
@@ -393,12 +395,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       senha,
       cargo,
       mf,
+      nomeGuerra,
+      ubm,
     }: {
       nome: string;
       email: string;
       senha: string;
       cargo?: string;
       mf?: string;
+      nomeGuerra?: string;
+      ubm?: string;
     }) => {
       try {
         const auth = requireFirebaseAuth();
@@ -414,6 +420,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           setor_id: '1',
           ativo: false,
           ...(mf ? { mf } : {}),
+          ...(nomeGuerra ? { nomeGuerra } : {}),
+          ...(ubm ? { ubm } : {}),
         });
 
         // Reivindica a MF (índice público mínimo MF -> e-mail, "primeiro a

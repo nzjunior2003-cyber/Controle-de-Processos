@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Lock, Mail, User, Briefcase, Hash, CheckCircle2 } from 'lucide-react';
+import { X, Lock, Mail, User, Briefcase, Hash, CheckCircle2, Building2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import {
   buscarMilitarPorMf,
@@ -29,6 +29,8 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   const [nome, setNome] = useState('');
   const [cargo, setCargo] = useState('');
   const [mf, setMf] = useState('');
+  const [nomeGuerra, setNomeGuerra] = useState('');
+  const [ubm, setUbm] = useState('');
   const [newSenha, setNewSenha] = useState('');
   const [confirmSenha, setConfirmSenha] = useState('');
 
@@ -110,11 +112,21 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
 
     setAguardando(true);
     try {
-      await solicitarAcesso({ nome, email, senha: newSenha, cargo, mf: mf.trim() || undefined });
+      await solicitarAcesso({
+        nome,
+        email,
+        senha: newSenha,
+        cargo,
+        mf: mf.trim() || undefined,
+        nomeGuerra: nomeGuerra.trim() || undefined,
+        ubm: ubm.trim() || undefined,
+      });
       alert('Solicitação enviada com sucesso! Aguarde a aprovação pelo administrador.');
       setNome('');
       setCargo('');
       setMf('');
+      setNomeGuerra('');
+      setUbm('');
       setNewSenha('');
       setConfirmSenha('');
       setMilitarConfirmado(null);
@@ -238,6 +250,8 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                   setNome('');
                   setCargo('');
                   setMf('');
+                  setNomeGuerra('');
+                  setUbm('');
                   setEmail('');
                   setMfNaoEncontrada(false);
                   trocarView('solicitar');
@@ -267,6 +281,8 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
                 setNome('');
                 setCargo('');
                 setMf('');
+                setNomeGuerra('');
+                setUbm('');
                 setSenha('');
                 trocarView('login');
               }}
@@ -274,6 +290,24 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
             >
               Não é você? Buscar novamente
             </button>
+            <FormField
+              label="Nome de Guerra"
+              icon={User}
+              type="text"
+              required
+              value={nomeGuerra}
+              onChange={(e) => setNomeGuerra(e.target.value)}
+              placeholder="Como você é chamado no dia a dia"
+            />
+            <FormField
+              label="UBM"
+              icon={Building2}
+              type="text"
+              required
+              value={ubm}
+              onChange={(e) => setUbm(e.target.value)}
+              placeholder="Sua Unidade Bombeiro Militar"
+            />
             <FormField
               label="Email"
               icon={Mail}
@@ -354,6 +388,24 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
               Se você já é Fiscal Titular ou Suplente de algum contrato, informar a MF faz esses
               contratos aparecerem automaticamente pra você assim que o acesso for aprovado.
             </p>
+            <FormField
+              label="Nome de Guerra"
+              icon={User}
+              type="text"
+              required
+              value={nomeGuerra}
+              onChange={(e) => setNomeGuerra(e.target.value)}
+              placeholder="Como você é chamado no dia a dia"
+            />
+            <FormField
+              label="UBM"
+              icon={Building2}
+              type="text"
+              required
+              value={ubm}
+              onChange={(e) => setUbm(e.target.value)}
+              placeholder="Sua Unidade Bombeiro Militar"
+            />
             <FormField
               label="Email"
               icon={Mail}

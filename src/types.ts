@@ -24,6 +24,10 @@ export interface Usuario {
    * diferente de e-mail/nome.
    */
   mf?: string;
+  /** Nome de guerra (como a pessoa é chamada no dia a dia) — distinto do nome completo. */
+  nomeGuerra?: string;
+  /** UBM (Unidade Bombeiro Militar) informada no primeiro acesso — texto livre por enquanto. */
+  ubm?: string;
 }
 
 export interface Setor {
