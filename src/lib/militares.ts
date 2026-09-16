@@ -9,6 +9,16 @@ import { celula } from './csv';
 
 export const ID_PLANILHA_MILITARES = '1Ja9mQVJ4KWkFtjNBjuoSONnKoj2GIT7ltUYAByLetrg';
 
+/**
+ * Mensagem lançada por `login` (AppContext) quando o valor digitado
+ * parece uma MF mas não há `matriculas/{mf}` gravada ainda — sinal de
+ * "primeiro acesso", não de senha errada. `LoginModal` reconhece esse
+ * texto pra decidir se tenta a busca ao vivo na planilha de militares
+ * em vez de só mostrar o erro de login.
+ */
+export const ERRO_MATRICULA_NAO_ENCONTRADA =
+  'Matrícula não encontrada. Verifique o número ou entre com seu e-mail.';
+
 export interface Militar {
   cargo: string;
   nome: string;

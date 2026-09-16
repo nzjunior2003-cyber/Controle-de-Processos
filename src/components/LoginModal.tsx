@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Lock, Mail, User, Briefcase, Hash, Search, CheckCircle2 } from 'lucide-react';
+import { X, Lock, Mail, User, Briefcase, Hash, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { buscarMilitares, carregarMilitares, formatarNomeMilitar, type Militar } from '../lib/militares';
+import {
+  buscarMilitarPorMf,
+  carregarMilitares,
+  ERRO_MATRICULA_NAO_ENCONTRADA,
+  formatarNomeMilitar,
+  type Militar,
+} from '../lib/militares';
 import FormField from './ui/FormField';
 
-type ModalView = 'login' | 'buscarAcesso' | 'completarCadastro' | 'solicitar' | 'esqueci';
+type ModalView = 'login' | 'completarCadastro' | 'solicitar' | 'esqueci';
 
 export default function LoginModal({ onClose }: { onClose: () => void }) {
   const { login, solicitarAcesso, enviarResetSenha, firebaseConfigurado } = useApp();
@@ -26,10 +32,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   const [newSenha, setNewSenha] = useState('');
   const [confirmSenha, setConfirmSenha] = useState('');
 
-  // Buscar meu acesso (validação de MF/nome contra a planilha de militares)
-  const [termoBusca, setTermoBusca] = useState('');
-  const [buscando, setBuscando] = useState(false);
-  const [resultadosBusca, setResultadosBusca] = useState<Militar[] | null>(null);
+  // Confirmação de identidade (validação de MF contra a planilha de militares)
   const [militarConfirmado, setMilitarConfirmado] = useState<Militar | null>(null);
 
   const trocarView = (nova: ModalView) => {
@@ -37,33 +40,23 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
     setView(nova);
   };
 
-  const handleBuscarAcesso = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErro(null);
-    setBuscando(true);
-    try {
-      const militares = await carregarMilitares();
-      const encontrados = buscarMilitares(militares, termoBusca, 6);
-      setResultadosBusca(encontrados);
-    } catch (error) {
-      setErro(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível consultar a planilha de militares agora.',
-      );
-    } finally {
-      setBuscando(false);
-    }
-  };
-
   const handleConfirmarMilitar = (militar: Militar) => {
     setMilitarConfirmado(militar);
     setNome(militar.nome);
     setCargo(militar.cargo);
     setMf(militar.mf);
+    setEmail(''); // limpa o que foi digitado no campo de login (a MF) — aqui é pro e-mail de verdade.
     trocarView('completarCadastro');
   };
 
+  /**
+   * Mesmo campo serve pra login normal e pra primeiro acesso: tenta
+   * entrar; se falhar porque a MF digitada ainda não tem conta
+   * (`ERRO_MATRICULA_NAO_ENCONTRADA`, ver AppContext `login`), busca ao
+   * vivo na planilha de militares — achando, já vai direto pra completar
+   * o cadastro; não achando, abre o preenchimento manual. Erro de senha
+   * errada (ou e-mail) continua mostrando o erro normal.
+   */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro(null);
@@ -73,7 +66,24 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
       onClose();
       navigate('/sistema');
     } catch (error) {
-      setErro(error instanceof Error ? error.message : 'Não foi possível entrar.');
+      const mensagem = error instanceof Error ? error.message : 'Não foi possível entrar.';
+      if (mensagem === ERRO_MATRICULA_NAO_ENCONTRADA) {
+        try {
+          const militares = await carregarMilitares();
+          const encontrado = buscarMilitarPorMf(militares, email);
+          if (encontrado) {
+            handleConfirmarMilitar(encontrado);
+            return;
+          }
+          setMf(email.trim());
+          setEmail('');
+          trocarView('solicitar');
+          return;
+        } catch (erroBusca) {
+          console.error('Erro ao consultar a planilha de militares:', erroBusca);
+        }
+      }
+      setErro(mensagem);
     } finally {
       setAguardando(false);
     }
@@ -102,8 +112,8 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
       setNewSenha('');
       setConfirmSenha('');
       setMilitarConfirmado(null);
-      setResultadosBusca(null);
-      setTermoBusca('');
+      setEmail('');
+      setSenha('');
       trocarView('login');
     } catch (error) {
       setErro(
@@ -142,7 +152,6 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">
             {view === 'login' && 'Acesso ao Sistema'}
-            {view === 'buscarAcesso' && 'Buscar meu Acesso'}
             {view === 'completarCadastro' && 'Completar Cadastro'}
             {view === 'solicitar' && 'Solicitar Acesso'}
             {view === 'esqueci' && 'Recuperar Senha'}
@@ -183,6 +192,11 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="usuario@email.com ou sua matrícula"
             />
+            <p className="-mt-4 text-xs text-gray-500">
+              Primeiro acesso? Digite sua matrícula, uma senha qualquer (mín. 6 caracteres) e
+              clique em Entrar — se encontrarmos sua matrícula no efetivo, você vai direto pra
+              completar o cadastro.
+            </p>
 
             <div>
               <FormField
@@ -214,89 +228,18 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 onClick={() => {
-                  setResultadosBusca(null);
-                  setTermoBusca('');
-                  trocarView('buscarAcesso');
+                  setNome('');
+                  setCargo('');
+                  setMf('');
+                  setEmail('');
+                  trocarView('solicitar');
                 }}
                 className="mt-2 w-full flex justify-center py-2 px-4 border border-red-200 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
               >
-                Solicitar Acesso
+                Preencher meus dados manualmente
               </button>
             </div>
           </form>
-        )}
-
-        {view === 'buscarAcesso' && (
-          <div className="p-6 space-y-4">
-            <p className="text-sm text-gray-600">
-              Digite seu nome ou sua MF (matrícula) — se você já é Fiscal Titular ou Suplente de
-              algum contrato, isso faz esses contratos aparecerem automaticamente pra você assim
-              que o acesso for aprovado.
-            </p>
-            <form onSubmit={handleBuscarAcesso} className="flex gap-2">
-              <div className="flex-1">
-                <FormField
-                  label="Nome ou MF"
-                  icon={Search}
-                  type="text"
-                  required
-                  value={termoBusca}
-                  onChange={(e) => setTermoBusca(e.target.value)}
-                  placeholder="Seu nome completo ou sua matrícula"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={buscando}
-                className="mt-6 h-fit px-4 py-2.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 disabled:opacity-50"
-              >
-                {buscando ? 'Buscando...' : 'Buscar'}
-              </button>
-            </form>
-
-            {resultadosBusca && resultadosBusca.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">Selecione o seu registro:</p>
-                {resultadosBusca.map((militar, indice) => (
-                  <button
-                    key={indice}
-                    type="button"
-                    onClick={() => handleConfirmarMilitar(militar)}
-                    className="w-full text-left px-4 py-3 rounded-md border border-gray-200 hover:border-red-300 hover:bg-red-50"
-                  >
-                    <p className="text-sm font-medium text-gray-900">{formatarNomeMilitar(militar)}</p>
-                    <p className="text-xs text-gray-500">MF: {militar.mf || '—'} · UBM: {militar.ubm || '—'}</p>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {resultadosBusca && resultadosBusca.length === 0 && (
-              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                Não encontramos ninguém com esse nome/matrícula na planilha de efetivo. Você pode
-                preencher seus dados manualmente — um master vai revisar antes de aprovar.
-              </div>
-            )}
-
-            <div className="text-center pt-2 space-y-2">
-              {resultadosBusca && resultadosBusca.length === 0 && (
-                <button
-                  type="button"
-                  onClick={() => trocarView('solicitar')}
-                  className="w-full flex justify-center py-2 px-4 border border-red-200 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100"
-                >
-                  Preencher manualmente
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => trocarView('login')}
-                className="text-sm font-medium text-gray-600 hover:text-gray-900"
-              >
-                Voltar para o Login
-              </button>
-            </div>
-          </div>
         )}
 
         {view === 'completarCadastro' && militarConfirmado && (
@@ -313,7 +256,11 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
               type="button"
               onClick={() => {
                 setMilitarConfirmado(null);
-                trocarView('buscarAcesso');
+                setNome('');
+                setCargo('');
+                setMf('');
+                setSenha('');
+                trocarView('login');
               }}
               className="text-sm font-medium text-red-600 hover:text-red-500"
             >

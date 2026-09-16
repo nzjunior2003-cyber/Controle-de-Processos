@@ -74,6 +74,7 @@ import {
   type LogAcesso,
   type LogAuditoria,
 } from '../lib/auditoria';
+import { ERRO_MATRICULA_NAO_ENCONTRADA } from '../lib/militares';
 import {
   Processo,
   Setor,
@@ -342,7 +343,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if (email && !email.includes('@')) {
           const matriculaSnap = await getDoc(doc(db, 'matriculas', normalizarMf(email)));
           if (!matriculaSnap.exists()) {
-            throw new Error('Matrícula não encontrada. Verifique o número ou entre com seu e-mail.');
+            throw new Error(ERRO_MATRICULA_NAO_ENCONTRADA);
           }
           emailParaEntrar = (matriculaSnap.data() as { email: string }).email;
         }
