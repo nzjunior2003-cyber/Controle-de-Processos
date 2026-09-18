@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, PlusCircle, Trash2, Upload, X } from 'lucide-react';
+import { ArrowLeft, FileText, PlusCircle, Trash2, Upload, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { uploadArquivoContrato } from '../../lib/driveUploadService';
 import {
@@ -89,6 +89,8 @@ interface Props {
   tiposOcorrenciaPermitidos?: TipoOcorrencia[];
   /** Exibe os campos de abatimento por quantidade (módulo Fiscal). */
   comQuantidade?: boolean;
+  /** Renderiza como página normal (sem overlay/popup) — usado no Fiscal do Contrato. */
+  modoPagina?: boolean;
   onFechar: () => void;
 }
 
@@ -108,6 +110,7 @@ export default function ExecucaoModal({
   comAditivos = false,
   tiposOcorrenciaPermitidos = TIPOS_OCORRENCIA_PADRAO,
   comQuantidade = false,
+  modoPagina = false,
   onFechar,
 }: Props) {
   const [aba, setAba] = useState<'execucao' | 'ocorrencias' | 'aditivos'>('execucao');
@@ -269,15 +272,8 @@ export default function ExecucaoModal({
     }
   };
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-gray-500 bg-opacity-75 overflow-hidden"
-      onClick={onFechar}
-    >
-      <div
-        className="relative bg-white rounded-lg shadow-xl w-full max-w-5xl h-full max-h-[95vh] p-4 sm:p-6 text-left transform transition-all flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+  const conteudo = (
+    <>
         <div className="flex justify-between items-center mb-4 flex-shrink-0">
           <h3 className="text-lg font-bold text-gray-900 border-l-4 border-red-600 pl-3">
             Gestão do Contrato nº {contrato.numero}
@@ -313,14 +309,25 @@ export default function ExecucaoModal({
               <FileText className="w-4 h-4 mr-1" />
               Gerar Relatório
             </button>
-            <button
-              type="button"
-              className="text-gray-400 hover:text-gray-500 focus:outline-none ml-2"
-              onClick={onFechar}
-            >
-              <span className="sr-only">Fechar</span>
-              <X className="h-6 w-6" aria-hidden="true" />
-            </button>
+            {modoPagina ? (
+              <button
+                type="button"
+                onClick={onFechar}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border border-gray-300 flex items-center"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Voltar
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="text-gray-400 hover:text-gray-500 focus:outline-none ml-2"
+                onClick={onFechar}
+              >
+                <span className="sr-only">Fechar</span>
+                <X className="h-6 w-6" aria-hidden="true" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -432,7 +439,10 @@ export default function ExecucaoModal({
                           className={CLASSE_INPUT}
                         >
                           <option value="NF/Fatura">NF/Fatura</option>
-                          <option value="Recibo">Recibo do Fornecedor</option>
+                          <option value="Recibo de Pagamento">Recibo de Pagamento</option>
+                          <option value="Recebimento da NE pelo Fornecedor">
+                            Recebimento da NE pelo Fornecedor
+                          </option>
                         </select>
                       </div>
                     </>
@@ -982,6 +992,27 @@ export default function ExecucaoModal({
             </div>
           )}
         </div>
+    </>
+  );
+
+  if (modoPagina) {
+    return (
+      <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        {conteudo}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-gray-500 bg-opacity-75 overflow-hidden"
+      onClick={onFechar}
+    >
+      <div
+        className="relative bg-white rounded-lg shadow-xl w-full max-w-5xl h-full max-h-[95vh] p-4 sm:p-6 text-left transform transition-all flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {conteudo}
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import RelatorioAuditoriaContrato from './pages/gestao-contratos/RelatorioAudito
 import Usuarios from './pages/Usuarios';
 import ProtectedRoute from './components/ProtectedRoute';
 import FiscalContrato from './pages/fiscal-contrato';
+import GerenciarExecucaoFiscal from './pages/fiscal-contrato/GerenciarExecucao';
 import Auditoria from './pages/auditoria';
 
 export default function App() {
@@ -40,6 +41,7 @@ export default function App() {
                 <Route path="gestao-contratos/novo" element={<ContratoForm />} />
                 <Route path="gestao-contratos/:id/editar" element={<ContratoForm />} />
                 <Route path="fiscal-contrato" element={<FiscalContrato />} />
+                <Route path="fiscal-contrato/:id/gerenciar" element={<GerenciarExecucaoFiscal />} />
                 <Route path="aquisicoes" element={<Aquisicoes />} />
                 <Route path="processos/novo" element={<NovoProcesso />} />
                 <Route path="processos/:id/editar" element={<NovoProcesso />} />
