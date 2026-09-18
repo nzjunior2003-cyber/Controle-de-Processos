@@ -176,7 +176,7 @@ export default function Usuarios() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {setor?.sigla} - {setor?.nome}
+                        {u.ubm || `${setor?.sigla ?? ''} - ${setor?.nome ?? ''}`}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
