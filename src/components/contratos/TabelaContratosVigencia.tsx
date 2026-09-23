@@ -50,7 +50,8 @@ export default function TabelaContratosVigencia({
         <thead className="bg-gray-50">
           <tr>
             <th scope="col" className="pl-4 pr-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">PAE / Contrato</th>
-            <th scope="col" className="pl-2 pr-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Empresa / Objeto</th>
+            <th scope="col" className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
+            <th scope="col" className="pl-2 pr-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Objeto</th>
             <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vigência</th>
             <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor Global</th>
             <th scope="col" className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Situação</th>
@@ -88,9 +89,14 @@ export default function TabelaContratosVigencia({
                       </div>
                     )}
                   </td>
-                  <td className="pl-2 pr-4 py-2 max-w-xs">
+                  <td className="px-2 py-2 max-w-xs">
                     <div className="text-sm font-medium text-gray-900 truncate" title={item.empresa}>{item.empresa}</div>
-                    <div className="text-xs text-gray-500 line-clamp-2" title={item.objeto}>{item.objeto}</div>
+                    <div className="text-xs text-gray-500">{item.cnpj}</div>
+                    <div className="text-xs text-gray-500">{item.contatoEmail}</div>
+                    <div className="text-xs text-gray-500">{item.contatoTelefone ?? item.contatosFornecedor}</div>
+                  </td>
+                  <td className="pl-2 pr-4 py-2 max-w-xs">
+                    <div className="text-sm text-gray-700 line-clamp-3" title={item.objeto}>{item.objeto}</div>
                   </td>
                   <td className="px-4 py-2 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{formatarData(item.fimVigencia)}</div>
@@ -113,7 +119,7 @@ export default function TabelaContratosVigencia({
 
                 {isExpanded && (
                   <tr className="bg-blue-50/10">
-                    <td colSpan={5} className="px-4 py-3 border-b border-blue-100">
+                    <td colSpan={6} className="px-4 py-3 border-b border-blue-100">
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm bg-white p-4 rounded-lg border border-blue-100 shadow-sm">
                         <div className="space-y-4">
                           <div>
@@ -258,7 +264,7 @@ export default function TabelaContratosVigencia({
           })}
           {dados.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">
+              <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">
                 Nenhum contrato encontrado.
               </td>
             </tr>
