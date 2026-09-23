@@ -236,7 +236,7 @@ export default function ContratosArps() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Contratos e ARP&apos;s</h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -302,7 +302,7 @@ export default function ContratosArps() {
               placeholder="Pesquisar..."
             />
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {abaAtiva === 'contratos' ? (
               <FiltroAno anos={anosDisponiveis} valor={filtroAno} onChange={setFiltroAno} />
             ) : (

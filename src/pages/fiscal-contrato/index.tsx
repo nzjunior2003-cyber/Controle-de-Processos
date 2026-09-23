@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FileCheck, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { initAuth } from '../../lib/googleAuth';
-import KpisContratos from '../../components/contratos/KpisContratos';
+import KpisContratos, { type FiltroKpi } from '../../components/contratos/KpisContratos';
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
 import FiltroAno from '../../components/contratos/FiltroAno';
 import {
@@ -20,6 +20,7 @@ export default function FiscalContrato() {
 
   const [busca, setBusca] = useState('');
   const [filtroAno, setFiltroAno] = useState<number | null>(null);
+  const [filtroKpi, setFiltroKpi] = useState<FiltroKpi>(null);
 
   useEffect(() => {
     const cancelar = initAuth();
@@ -48,10 +49,14 @@ export default function FiscalContrato() {
     [contratosComStatus, usuarioAtual],
   );
 
-  const filtrados = useMemo(
-    () => filtrarContratosPorAno(buscarContratos(contratosPermitidos, busca), filtroAno),
-    [contratosPermitidos, busca, filtroAno],
-  );
+  const filtrados = useMemo(() => {
+    let lista = filtrarContratosPorAno(buscarContratos(contratosPermitidos, busca), filtroAno);
+    if (filtroKpi === 'vigentes') lista = lista.filter((c) => c.diasRestantes > 90 && !c.concluido);
+    else if (filtroKpi === 'atencao') {
+      lista = lista.filter((c) => c.diasRestantes >= 0 && c.diasRestantes <= 90 && !c.concluido);
+    } else if (filtroKpi === 'vencidos') lista = lista.filter((c) => c.diasRestantes < 0 && !c.concluido);
+    return lista;
+  }, [contratosPermitidos, busca, filtroAno, filtroKpi]);
 
   const anosDisponiveis = useMemo(() => extrairAnosDisponiveis(contratos), [contratos]);
 
@@ -60,10 +65,10 @@ export default function FiscalContrato() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-            <FileCheck className="w-6 h-6 mr-2 text-indigo-600" />
+            <FileCheck className="w-6 h-6 mr-2 text-indigo-600 flex-shrink-0" />
             Módulo Fiscal do Contrato
           </h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -73,7 +78,7 @@ export default function FiscalContrato() {
         </div>
       </div>
 
-      <KpisContratos contratos={contratosPermitidos} />
+      <KpisContratos contratos={contratosPermitidos} filtro={filtroKpi} onFiltrar={setFiltroKpi} />
 
       <div className="bg-white p-4 shadow-sm rounded-lg border border-gray-200 flex flex-col sm:flex-row gap-4 justify-between items-center">
         <div className="relative flex-1 w-full max-w-lg">

@@ -275,11 +275,11 @@ export default function ExecucaoModal({
 
   const conteudo = (
     <>
-        <div className="flex justify-between items-center mb-4 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 flex-shrink-0">
           <h3 className="text-lg font-bold text-gray-900 border-l-4 border-red-600 pl-3">
             Gestão do Contrato nº {contrato.numero}
           </h3>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             {contrato.contratoPdfLink && (
               <a
                 href={contrato.contratoPdfLink}

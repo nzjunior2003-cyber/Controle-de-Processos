@@ -271,6 +271,16 @@ async function startServer() {
         fields: "id, webViewLink",
       });
 
+      // Sem isso, o arquivo fica visível só pra conta institucional dona
+      // dele — qualquer fiscal que abrisse o link caía numa tela do Google
+      // pedindo pra "solicitar acesso" em vez de ver o PDF direto.
+      if (criado.data.id) {
+        await drive.permissions.create({
+          fileId: criado.data.id,
+          requestBody: { role: "reader", type: "anyone" },
+        });
+      }
+
       return res.json({ link: criado.data.webViewLink || criado.data.id });
     } catch (error) {
       console.error("Error uploading to Drive:", error);

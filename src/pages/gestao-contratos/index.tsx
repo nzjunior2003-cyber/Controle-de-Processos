@@ -280,14 +280,14 @@ export default function GestaoContratos() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gestão de Contratos</h1>
           <p className="mt-1 text-sm text-gray-500">
             Acompanhamento e fiscalização dos contratos em vigor e vigências.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isMasterOrGestao && (
             <button
               type="button"
