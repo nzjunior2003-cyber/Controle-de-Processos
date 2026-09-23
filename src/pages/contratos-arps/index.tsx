@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Filter, PlusCircle, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useMilitares } from '../../hooks/useMilitares';
-import { buscarContratos } from '../../lib/contratos';
+import FiltroAno from '../../components/contratos/FiltroAno';
+import { buscarContratos, extrairAnosDisponiveis, filtrarContratosPorAno } from '../../lib/contratos';
 import type {
   PortariaFiscal,
   ProcedimentoLicitatorio,
@@ -40,8 +42,10 @@ export default function ContratosArps() {
     updatePortaria,
   } = useApp();
   const { militares } = useMilitares();
+  const navigate = useNavigate();
 
   const [busca, setBusca] = useState('');
+  const [filtroAno, setFiltroAno] = useState<number | null>(null);
   const [abaAtiva, setAbaAtiva] = useState<AbaContratos>('contratos');
   const [modalOpen, setModalOpen] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -117,7 +121,8 @@ export default function ContratosArps() {
     );
   };
 
-  const contratosFiltrados = buscarContratos(contratos, busca);
+  const contratosFiltrados = filtrarContratosPorAno(buscarContratos(contratos, busca), filtroAno);
+  const anosDisponiveis = useMemo(() => extrairAnosDisponiveis(contratos), [contratos]);
   const pregoesFiltrados = filtrarProcedimentos('Pregão');
   const inexigibilidadesFiltradas = filtrarProcedimentos('Inexigibilidade');
   const dispensasFiltradas = filtrarProcedimentos('Dispensa');
@@ -235,12 +240,21 @@ export default function ContratosArps() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Contratos e ARP&apos;s</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Gestão de pregões, dispensas, inexigibilidades e portarias.
+            Gestão de contratos, atas de registro de preços e partícipes.
           </p>
         </div>
+        {abaAtiva === 'contratos' && isMasterOrContratos && (
+          <button
+            onClick={() => navigate('/sistema/gestao-contratos/novo')}
+            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800"
+          >
+            <PlusCircle className="-ml-1 mr-2 h-5 w-5" />
+            Novo Contrato
+          </button>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {MENU_ABAS.map((item) => {
           const Icone = item.icone;
           const isAtivo = abaAtiva === item.id;
@@ -289,10 +303,14 @@ export default function ContratosArps() {
             />
           </div>
           <div className="flex items-center gap-3">
-            <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-              <Filter className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
-              Filtros
-            </button>
+            {abaAtiva === 'contratos' ? (
+              <FiltroAno anos={anosDisponiveis} valor={filtroAno} onChange={setFiltroAno} />
+            ) : (
+              <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                <Filter className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
+                Filtros
+              </button>
+            )}
             {abaAtiva !== 'contratos' && isMasterOrContratos && (
               <button
                 onClick={abrirNovoRegistro}

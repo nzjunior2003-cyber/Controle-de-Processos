@@ -19,7 +19,8 @@ export default function TabelaContratos({ dados }: { dados: Contrato[] }) {
         <thead className="bg-gray-50">
           <tr>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PAE / Contrato</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Empresa / Objeto</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fornecedor</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Objeto</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vigência</th>
             <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Global</th>
             <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acesso ao Contrato</th>
@@ -45,7 +46,12 @@ export default function TabelaContratos({ dados }: { dados: Contrato[] }) {
                   </td>
                   <td className="px-6 py-4 max-w-xs">
                     <div className="text-sm font-medium text-gray-900 truncate" title={item.empresa}>{item.empresa}</div>
-                    <div className="text-xs text-gray-500 mt-1 line-clamp-2" title={item.objeto}>{item.objeto}</div>
+                    <div className="text-xs text-gray-500 mt-1">{item.cnpj}</div>
+                    <div className="text-xs text-gray-500">{item.contatoEmail}</div>
+                    <div className="text-xs text-gray-500">{item.contatoTelefone ?? item.contatosFornecedor}</div>
+                  </td>
+                  <td className="px-6 py-4 max-w-xs">
+                    <div className="text-sm text-gray-700 line-clamp-3" title={item.objeto}>{item.objeto}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div>{formatarData(item.inicioVigencia)} a</div>
@@ -66,38 +72,24 @@ export default function TabelaContratos({ dados }: { dados: Contrato[] }) {
                 </tr>
                 {isExpanded && (
                   <tr className="bg-emerald-50/10">
-                    <td colSpan={5} className="px-6 py-4 border-b border-emerald-100">
+                    <td colSpan={6} className="px-6 py-4 border-b border-emerald-100">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm bg-white p-4 rounded-lg border border-emerald-100 shadow-sm">
-                        <div className="space-y-4">
-                          <div>
-                            <span className="font-semibold text-gray-900 block mb-1">Fornecedor / CNPJ</span>
-                            <div className="text-gray-700">{item.empresa}</div>
-                            <div className="text-gray-500 text-xs">{item.cnpj}</div>
+                        <div>
+                          <span className="font-semibold text-gray-900 block mb-1">Fiscalização</span>
+                          <div className="text-gray-700 block mb-2">
+                            Titular: <span className="font-medium">{item.fiscalTitular}</span>
+                            <br />
+                            <span className="text-xs text-gray-500">{item.fiscalTitularContato ?? item.fiscalEmail}</span>
                           </div>
-                          <div>
-                            <span className="font-semibold text-gray-900 block mb-1">Contatos Fornecedor</span>
-                            <div className="text-gray-700">{item.contatoEmail}</div>
-                            <div className="text-gray-700">{item.contatoTelefone ?? item.contatosFornecedor}</div>
+                          <div className="text-gray-700">
+                            Suplente: <span className="font-medium">{item.fiscalSuplente}</span>
+                            <br />
+                            <span className="text-xs text-gray-500">{item.fiscalSuplenteContato ?? item.fiscalSuplenteEmail}</span>
                           </div>
                         </div>
-                        <div className="space-y-4">
-                          <div>
-                            <span className="font-semibold text-gray-900 block mb-1">Fiscalização</span>
-                            <div className="text-gray-700 block mb-2">
-                              Titular: <span className="font-medium">{item.fiscalTitular}</span>
-                              <br />
-                              <span className="text-xs text-gray-500">{item.fiscalTitularContato ?? item.fiscalEmail}</span>
-                            </div>
-                            <div className="text-gray-700">
-                              Suplente: <span className="font-medium">{item.fiscalSuplente}</span>
-                              <br />
-                              <span className="text-xs text-gray-500">{item.fiscalSuplenteContato ?? item.fiscalSuplenteEmail}</span>
-                            </div>
-                          </div>
-                          <div>
-                            <span className="font-semibold text-gray-900 block mb-1">Dados Orçamentários</span>
-                            <div className="text-gray-700">Fonte: {item.fonteRecurso}</div>
-                          </div>
+                        <div>
+                          <span className="font-semibold text-gray-900 block mb-1">Dados Orçamentários</span>
+                          <div className="text-gray-700">Fonte: {item.fonteRecurso}</div>
                         </div>
                       </div>
                     </td>
@@ -108,7 +100,7 @@ export default function TabelaContratos({ dados }: { dados: Contrato[] }) {
           })}
           {dados.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">Nenhum contrato encontrado.</td>
+              <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">Nenhum contrato encontrado.</td>
             </tr>
           )}
         </tbody>

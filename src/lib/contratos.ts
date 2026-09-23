@@ -94,6 +94,22 @@ export function extrairAnoNumeroContrato(numero: string): { ano: number; numero:
   return { numero: Number(ultima[1]), ano: Number(ultima[2]) };
 }
 
+/** Anos distintos presentes nos números dos contratos, do mais recente pro mais antigo — alimenta o filtro "Ano". */
+export function extrairAnosDisponiveis(contratos: Contrato[]): number[] {
+  const anos = new Set<number>();
+  for (const contrato of contratos) {
+    const chave = extrairAnoNumeroContrato(contrato.numero ?? '');
+    if (chave) anos.add(chave.ano);
+  }
+  return [...anos].sort((a, b) => b - a);
+}
+
+/** Filtra contratos pelo ano extraído do número — `null`/`undefined` devolve todos. */
+export function filtrarContratosPorAno<T extends Contrato>(contratos: T[], ano: number | null): T[] {
+  if (!ano) return contratos;
+  return contratos.filter((c) => extrairAnoNumeroContrato(c.numero ?? '')?.ano === ano);
+}
+
 /**
  * Ordena contratos por ano e número (extraídos de `numero` via
  * `extrairAnoNumeroContrato`); contratos sem um número reconhecível vão

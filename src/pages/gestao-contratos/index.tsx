@@ -19,6 +19,8 @@ import ExecucaoModal from '../../components/contratos/ExecucaoModal';
 import {
   buscarContratos,
   calcularStatusContrato,
+  extrairAnosDisponiveis,
+  filtrarContratosPorAno,
   normalizarNomeFiscal,
   ordenarContratosPorNumero,
   pareceNomeDeFiscal,
@@ -79,6 +81,7 @@ export default function GestaoContratos() {
   const [filtroNatureza, setFiltroNatureza] = useState('');
   const [filtroFonte, setFiltroFonte] = useState('');
   const [filtroSituacao, setFiltroSituacao] = useState<'todos' | 'ativos' | 'concluidos'>('todos');
+  const [filtroAno, setFiltroAno] = useState<number | null>(null);
   const [direcaoOrdenacao, setDirecaoOrdenacao] = useState<'asc' | 'desc'>('asc');
   const [enviandoEmailId, setEnviandoEmailId] = useState<string | null>(null);
   const [fiscalSelecionado, setFiscalSelecionado] = useState<string | null>(null);
@@ -115,11 +118,16 @@ export default function GestaoContratos() {
     if (filtroFonte) lista = lista.filter((c) => c.fonteRecurso === filtroFonte);
     if (filtroSituacao === 'concluidos') lista = lista.filter((c) => c.concluido);
     else if (filtroSituacao === 'ativos') lista = lista.filter((c) => !c.concluido);
+    lista = filtrarContratosPorAno(lista, filtroAno);
     return ordenarContratosPorNumero(lista, direcaoOrdenacao);
-  }, [contratosComStatus, busca, filtroKpi, filtroNatureza, filtroFonte, filtroSituacao, direcaoOrdenacao]);
+  }, [contratosComStatus, busca, filtroKpi, filtroNatureza, filtroFonte, filtroSituacao, filtroAno, direcaoOrdenacao]);
+
+  const anosDisponiveis = useMemo(() => extrairAnosDisponiveis(contratos), [contratos]);
 
   const filtrosAtivos =
-    [filtroNatureza, filtroFonte].filter(Boolean).length + (filtroSituacao !== 'todos' ? 1 : 0);
+    [filtroNatureza, filtroFonte].filter(Boolean).length +
+    (filtroSituacao !== 'todos' ? 1 : 0) +
+    (filtroAno ? 1 : 0);
 
   const isMasterOrGestao =
     usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'gestao';
@@ -466,6 +474,17 @@ export default function GestaoContratos() {
               <option value="concluidos">Concluídos</option>
             </select>
           </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Ano</label>
+            <select
+              value={filtroAno ?? ''}
+              onChange={(e) => setFiltroAno(e.target.value ? Number(e.target.value) : null)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
+            >
+              <option value="">Todos</option>
+              {anosDisponiveis.map((ano) => <option key={ano} value={ano}>{ano}</option>)}
+            </select>
+          </div>
           {filtrosAtivos > 0 && (
             <div className="sm:col-span-2 lg:col-span-3">
               <button
@@ -474,6 +493,7 @@ export default function GestaoContratos() {
                   setFiltroNatureza('');
                   setFiltroFonte('');
                   setFiltroSituacao('todos');
+                  setFiltroAno(null);
                 }}
                 className="text-sm text-red-600 hover:text-red-800 font-medium"
               >

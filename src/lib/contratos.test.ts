@@ -9,7 +9,9 @@ import {
   devolverItens,
   devolverSaldo,
   extrairAnoNumeroContrato,
+  extrairAnosDisponiveis,
   filtrarContratosDoFiscal,
+  filtrarContratosPorAno,
   marcoAlertaVencimento,
   mesclarItensContrato,
   normalizarNomeFiscal,
@@ -545,6 +547,23 @@ describe('buscarContratos', () => {
 
   it('devolve tudo quando a busca está vazia', () => {
     expect(buscarContratos([base], '   ')).toHaveLength(1);
+  });
+});
+
+describe('extrairAnosDisponiveis e filtrarContratosPorAno', () => {
+  const contrato2020 = { ...base, id: 'c2020', numero: '053/2020' };
+  const contrato2022 = { ...base, id: 'c2022', numero: '021/2022' };
+
+  it('lista os anos distintos, do mais recente pro mais antigo', () => {
+    expect(extrairAnosDisponiveis([contrato2020, contrato2022])).toEqual([2022, 2020]);
+  });
+
+  it('filtra pelo ano do número do contrato', () => {
+    expect(filtrarContratosPorAno([contrato2020, contrato2022], 2020)).toEqual([contrato2020]);
+  });
+
+  it('devolve tudo quando o ano é null', () => {
+    expect(filtrarContratosPorAno([contrato2020, contrato2022], null)).toHaveLength(2);
   });
 });
 

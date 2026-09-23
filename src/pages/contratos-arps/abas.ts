@@ -1,13 +1,4 @@
-import {
-  BadgeCheck,
-  BookOpen,
-  Building,
-  FilePlus,
-  FileText,
-  FileWarning,
-  Users,
-  type LucideIcon,
-} from 'lucide-react';
+import { FilePlus, FileText, Users, type LucideIcon } from 'lucide-react';
 
 export type AbaContratos =
   | 'contratos'
@@ -47,10 +38,16 @@ export interface DefinicaoAba {
   textNumClass: string;
 }
 
+/**
+ * Só 3 cards ficam visíveis (Contratos, ARP's e Partícipes) — os demais
+ * tipos (pregões, inexigibilidades, dispensas, sancionatórios, portarias)
+ * continuam com seus dados/telas no código (nada foi apagado do
+ * Firestore), só não têm mais card de acesso nesta tela.
+ */
 export const MENU_ABAS: DefinicaoAba[] = [
   {
     id: 'contratos',
-    nome: 'Contratos e ARPs',
+    nome: 'Contratos',
     icone: FileText,
     color: 'emerald-500',
     bgClass: 'bg-emerald-50/50',
@@ -62,47 +59,8 @@ export const MENU_ABAS: DefinicaoAba[] = [
     textNumClass: 'text-emerald-900',
   },
   {
-    id: 'pregoes',
-    nome: 'Pregões',
-    icone: FileText,
-    color: 'red-600',
-    bgClass: 'bg-red-50/50',
-    borderLClass: 'border-l-red-600',
-    ringClass: 'ring-red-600',
-    borderClass: 'border-red-200',
-    textClass: 'text-red-600',
-    textThemeClass: 'text-red-800',
-    textNumClass: 'text-red-900',
-  },
-  {
-    id: 'inexigibilidades',
-    nome: 'Inexigibilidades',
-    icone: BadgeCheck,
-    color: 'blue-500',
-    bgClass: 'bg-blue-50/50',
-    borderLClass: 'border-l-blue-500',
-    ringClass: 'ring-blue-500',
-    borderClass: 'border-blue-200',
-    textClass: 'text-blue-500',
-    textThemeClass: 'text-blue-800',
-    textNumClass: 'text-blue-900',
-  },
-  {
-    id: 'dispensas',
-    nome: 'Dispensas',
-    icone: Building,
-    color: 'amber-500',
-    bgClass: 'bg-amber-50/50',
-    borderLClass: 'border-l-amber-500',
-    ringClass: 'ring-amber-500',
-    borderClass: 'border-amber-200',
-    textClass: 'text-amber-500',
-    textThemeClass: 'text-amber-800',
-    textNumClass: 'text-amber-900',
-  },
-  {
     id: 'adesoes',
-    nome: 'Adesões',
+    nome: "ARP's",
     icone: FilePlus,
     color: 'teal-500',
     bgClass: 'bg-teal-50/50',
@@ -115,7 +73,7 @@ export const MENU_ABAS: DefinicaoAba[] = [
   },
   {
     id: 'participe',
-    nome: 'Partícipe',
+    nome: 'Partícipes',
     icone: Users,
     color: 'indigo-500',
     bgClass: 'bg-indigo-50/50',
@@ -125,32 +83,6 @@ export const MENU_ABAS: DefinicaoAba[] = [
     textClass: 'text-indigo-500',
     textThemeClass: 'text-indigo-800',
     textNumClass: 'text-indigo-900',
-  },
-  {
-    id: 'sancionatorios',
-    nome: 'Sancionatórios',
-    icone: FileWarning,
-    color: 'purple-500',
-    bgClass: 'bg-purple-50/50',
-    borderLClass: 'border-l-purple-500',
-    ringClass: 'ring-purple-500',
-    borderClass: 'border-purple-200',
-    textClass: 'text-purple-500',
-    textThemeClass: 'text-purple-800',
-    textNumClass: 'text-purple-900',
-  },
-  {
-    id: 'portarias',
-    nome: 'Portarias de Fiscais',
-    icone: BookOpen,
-    color: 'gray-500',
-    bgClass: 'bg-gray-50/50',
-    borderLClass: 'border-l-gray-500',
-    ringClass: 'ring-gray-500',
-    borderClass: 'border-gray-200',
-    textClass: 'text-gray-500',
-    textThemeClass: 'text-gray-800',
-    textNumClass: 'text-gray-900',
   },
 ];
 

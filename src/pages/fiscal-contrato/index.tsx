@@ -1,17 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileCheck, Filter, Search } from 'lucide-react';
+import { FileCheck, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { initAuth } from '../../lib/googleAuth';
 import KpisContratos from '../../components/contratos/KpisContratos';
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
-import { buscarContratos, calcularStatusContrato, filtrarContratosDoFiscal } from '../../lib/contratos';
+import FiltroAno from '../../components/contratos/FiltroAno';
+import {
+  buscarContratos,
+  calcularStatusContrato,
+  extrairAnosDisponiveis,
+  filtrarContratosDoFiscal,
+  filtrarContratosPorAno,
+} from '../../lib/contratos';
 
 export default function FiscalContrato() {
   const { processos, pcas, usuarioAtual, contratos, execucoes, ocorrencias } = useApp();
   const navigate = useNavigate();
 
   const [busca, setBusca] = useState('');
+  const [filtroAno, setFiltroAno] = useState<number | null>(null);
 
   useEffect(() => {
     const cancelar = initAuth();
@@ -41,9 +49,11 @@ export default function FiscalContrato() {
   );
 
   const filtrados = useMemo(
-    () => buscarContratos(contratosPermitidos, busca),
-    [contratosPermitidos, busca],
+    () => filtrarContratosPorAno(buscarContratos(contratosPermitidos, busca), filtroAno),
+    [contratosPermitidos, busca, filtroAno],
   );
+
+  const anosDisponiveis = useMemo(() => extrairAnosDisponiveis(contratos), [contratos]);
 
   const isMasterOrFiscal =
     usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'fiscal';
@@ -78,10 +88,7 @@ export default function FiscalContrato() {
             placeholder="Buscar por PAE, Contrato, Empresa ou Objeto..."
           />
         </div>
-        <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-          <Filter className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
-          Filtros Avançados
-        </button>
+        <FiltroAno anos={anosDisponiveis} valor={filtroAno} onChange={setFiltroAno} />
       </div>
 
       <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
