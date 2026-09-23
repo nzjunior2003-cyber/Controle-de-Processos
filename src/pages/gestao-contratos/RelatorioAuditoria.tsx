@@ -275,6 +275,13 @@ export default function RelatorioAuditoriaContrato() {
           )}
         </section>
 
+        <section className="mt-12 mb-6 text-center">
+          <p className="font-medium">
+            {[contrato.fiscalTitular, contrato.fiscalTitularCargo].filter(Boolean).join(' - ') || '-'}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">Fiscal Titular do Contrato</p>
+        </section>
+
         <p className="text-[10px] text-gray-400 border-t border-gray-200 pt-3 mt-8">
           Relatório gerado automaticamente pelo sistema de Controle de Processos do CBMPA, com base
           nos dados cadastrados até {format(agora, 'dd/MM/yyyy HH:mm')}. Alterações lançadas após

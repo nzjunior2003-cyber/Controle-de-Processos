@@ -815,13 +815,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             idsCriadosNestaSincronizacao.get(numero);
 
           if (idExistente) {
+            // saldoAtualFinanceiro NÃO é resincronizado aqui: uma vez que o
+            // contrato existe no app, esse saldo passa a ser controlado
+            // pelas execuções/aditivos lançados nele (ou por uma correção
+            // manual do master) — o valor da planilha oficial fica
+            // desatualizado assim que a primeira execução é lançada, e
+            // sobrescrever com ele a cada sincronização reverte o saldo
+            // vigente pro valor errado da planilha.
             lote.set(
               doc(db, 'contratos', idExistente),
               {
                 ...campos,
                 numero,
                 ...(valorGlobal !== undefined ? { valorGlobal } : {}),
-                ...(saldoAtualFinanceiro !== undefined ? { saldoAtualFinanceiro } : {}),
                 atualizado_em: agora,
               },
               { merge: true },
