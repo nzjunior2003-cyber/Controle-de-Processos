@@ -15,6 +15,7 @@ import BuscaMilitarInput from '../../components/contratos/BuscaMilitarInput';
 import {
   formatarMoeda,
   mesclarItensContrato,
+  parseValorMonetario,
   somaValorItens,
   OPCOES_FONTE_RECURSO_CONTRATO,
   OPCOES_NATUREZA_DESPESA_CONTRATO,
@@ -58,6 +59,8 @@ interface FormState {
   contatoTelefone: string;
   valorGlobal: string;
   saldoInicialFinanceiro: string;
+  /** Só usado pelo master, na edição, pra corrigir um saldo atual errado (ex.: digitado errado na criação). Vazio = não mexe no saldo atual. */
+  saldoAtualFinanceiroCorrigido: string;
   controlaQuantidade: boolean;
   saldoInicialQuantitativo: string;
   inicioVigencia: string;
@@ -96,6 +99,7 @@ const estadoVazio: FormState = {
   contatoTelefone: '',
   valorGlobal: '',
   saldoInicialFinanceiro: '',
+  saldoAtualFinanceiroCorrigido: '',
   controlaQuantidade: false,
   saldoInicialQuantitativo: '',
   inicioVigencia: '',
@@ -137,6 +141,7 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
     valorGlobal: contrato.valorGlobal != null ? String(contrato.valorGlobal) : '',
     saldoInicialFinanceiro:
       contrato.saldoInicialFinanceiro != null ? String(contrato.saldoInicialFinanceiro) : '',
+    saldoAtualFinanceiroCorrigido: '',
     controlaQuantidade: contrato.saldoInicialQuantitativo != null,
     saldoInicialQuantitativo:
       contrato.saldoInicialQuantitativo != null ? String(contrato.saldoInicialQuantitativo) : '',
@@ -178,7 +183,7 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
 export default function ContratoForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { contratos, addContrato, updateContrato } = useApp();
+  const { contratos, addContrato, updateContrato, usuarioAtual } = useApp();
 
   const contrato = id ? contratos.find((c) => c.id === id) ?? null : null;
   const emEdicao = !!id;
@@ -237,16 +242,16 @@ export default function ContratoForm() {
   const totalItens = somaValorItens(
     itensValidos.map((item) => ({
       quantidadeInicial: Number(item.quantidadeInicial) || 0,
-      valorUnitario: Number(item.valorUnitario) || 0,
+      valorUnitario: parseValorMonetario(item.valorUnitario) || 0,
     })),
   );
-  const valorGlobalNumero = Number(form.valorGlobal) || 0;
+  const valorGlobalNumero = parseValorMonetario(form.valorGlobal) || 0;
   // Itens antigos (de antes do valor unitário existir) ficam com
   // valorUnitario zerado — não dá pra validar contra o Valor Global
   // nesse caso, ou qualquer edição nesse contrato (mesmo sem relação
   // com itens) ficaria travada sem explicação nenhuma. Só bloqueia
   // quando os itens têm de fato um preço lançado.
-  const itensSemPreco = itensValidos.some((item) => !(Number(item.valorUnitario) > 0));
+  const itensSemPreco = itensValidos.some((item) => !(parseValorMonetario(item.valorUnitario) > 0));
   // Poucos centavos de diferença por arredondamento não devem travar o
   // cadastro — só sinaliza quando a diferença é de fato relevante.
   const totalItensDivergente =
@@ -345,13 +350,16 @@ export default function ContratoForm() {
         contatosFornecedor: form.contatosFornecedor || '',
         contatoEmail: form.contatoEmail || '',
         contatoTelefone: form.contatoTelefone || '',
-        valorGlobal: Number(form.valorGlobal) || 0,
-        saldoInicialFinanceiro: Number(form.saldoInicialFinanceiro) || 0,
+        valorGlobal: parseValorMonetario(form.valorGlobal) || 0,
+        saldoInicialFinanceiro: parseValorMonetario(form.saldoInicialFinanceiro) || 0,
         // Em cadastro, o AppContext força saldoAtual = saldoInicial; em
-        // edição, o saldo atual não é alterado por este formulário.
+        // edição, o saldo atual só muda se o master usar o campo de
+        // correção manual — do contrário mantém o valor já existente.
         saldoAtualFinanceiro: emEdicao
-          ? (contrato?.saldoAtualFinanceiro ?? (Number(form.saldoInicialFinanceiro) || 0))
-          : Number(form.saldoInicialFinanceiro) || 0,
+          ? (form.saldoAtualFinanceiroCorrigido !== ''
+              ? parseValorMonetario(form.saldoAtualFinanceiroCorrigido)
+              : (contrato?.saldoAtualFinanceiro ?? (parseValorMonetario(form.saldoInicialFinanceiro) || 0)))
+          : parseValorMonetario(form.saldoInicialFinanceiro) || 0,
         ...(form.controlaQuantidade
           ? {
               // O saldo quantitativo agregado agora vem da soma das
@@ -380,7 +388,7 @@ export default function ContratoForm() {
         fonteRecurso: form.fonteRecurso || '',
         naturezaDespesa: form.naturezaDespesa || '',
         prd: form.prd || '',
-        ...(form.valorPRD ? { valorPRD: Number(form.valorPRD.replace(',', '.')) } : {}),
+        ...(form.valorPRD ? { valorPRD: parseValorMonetario(form.valorPRD) } : {}),
         empenho: form.empenho || '',
         dotacao: form.dotacao || '',
         doe: form.doe || '',
@@ -398,7 +406,7 @@ export default function ContratoForm() {
                   // setá-la como undefined.
                   ...(item.unidade.trim() ? { unidade: item.unidade.trim() } : {}),
                   quantidadeInicial: Number(item.quantidadeInicial) || 0,
-                  valorUnitario: Number(item.valorUnitario) || 0,
+                  valorUnitario: parseValorMonetario(item.valorUnitario) || 0,
                 })),
               ),
             }
@@ -691,7 +699,9 @@ export default function ContratoForm() {
               <div>
                 <label className={CLASSE_LABEL}>Valor Global (R$)</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Ex.: 19.239,92"
                   value={form.valorGlobal}
                   onChange={(e) => handleChange('valorGlobal', e.target.value)}
                   className={CLASSE_INPUT}
@@ -700,7 +710,9 @@ export default function ContratoForm() {
               <div>
                 <label className={CLASSE_LABEL}>Saldo Financeiro Inicial (R$)</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Ex.: 19.239,92"
                   value={form.saldoInicialFinanceiro}
                   onChange={(e) => handleChange('saldoInicialFinanceiro', e.target.value)}
                   className={CLASSE_INPUT}
@@ -712,6 +724,24 @@ export default function ContratoForm() {
                   }
                 />
               </div>
+              {emEdicao && usuarioAtual?.perfil === 'master' && (
+                <div>
+                  <label className={CLASSE_LABEL}>
+                    Corrigir Saldo Atual (R$){' '}
+                    <span className="text-xs font-normal text-gray-500">
+                      (só master — deixe em branco pra não alterar)
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={`Atual: ${formatarMoeda(contrato?.saldoAtualFinanceiro ?? 0)}`}
+                    value={form.saldoAtualFinanceiroCorrigido}
+                    onChange={(e) => handleChange('saldoAtualFinanceiroCorrigido', e.target.value)}
+                    className={CLASSE_INPUT}
+                  />
+                </div>
+              )}
               <div className="md:col-span-2 flex items-center gap-2">
                 <input
                   id="controlaQuantidade"
@@ -733,7 +763,7 @@ export default function ContratoForm() {
                   </p>
                   <div className="space-y-3">
                     {itensForm.map((item) => {
-                      const totalItem = (Number(item.quantidadeInicial) || 0) * (Number(item.valorUnitario) || 0);
+                      const totalItem = (Number(item.quantidadeInicial) || 0) * (parseValorMonetario(item.valorUnitario) || 0);
                       return (
                         <div key={item.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
                           <input
@@ -759,7 +789,8 @@ export default function ContratoForm() {
                             className={`${CLASSE_INPUT} sm:col-span-2`}
                           />
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             placeholder="Valor Unitário (R$)"
                             value={item.valorUnitario}
                             onChange={(e) => handleItemChange(item.id, 'valorUnitario', e.target.value)}
@@ -1019,7 +1050,8 @@ export default function ContratoForm() {
               <div>
                 <label className={CLASSE_LABEL}>Valor do PRD (R$)</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={form.valorPRD}
                   onChange={(e) => handleChange('valorPRD', e.target.value)}
                   className={CLASSE_INPUT}

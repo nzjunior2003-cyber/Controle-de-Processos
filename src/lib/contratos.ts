@@ -464,3 +464,45 @@ export const formatarMoeda = (valor: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
     Number.isFinite(valor) ? valor : 0,
   );
+
+/**
+ * Interpreta um valor monetário digitado tanto no formato BR ("19.239,92")
+ * quanto no formato "cru" que um <input type="number"> devolve ("19239.92")
+ * — um <input type="number"> comum aceita silenciosamente "19.239,92" como
+ * "19.23992" (ponto = decimal, vírgula descartada), corrompendo o valor sem
+ * nenhum aviso. Usado nos campos de dinheiro do formulário de contrato, que
+ * por isso são <input type="text"> em vez de type="number".
+ */
+export function parseValorMonetario(texto: string): number {
+  const limpo = texto.replace(/[^0-9.,-]/g, '').trim();
+  if (!limpo) return 0;
+
+  const temVirgula = limpo.includes(',');
+  const temPonto = limpo.includes('.');
+
+  if (temVirgula && temPonto) {
+    // O separador que aparece por último é o decimal; o outro é de milhar.
+    const decimalEhVirgula = limpo.lastIndexOf(',') > limpo.lastIndexOf('.');
+    const normalizado = decimalEhVirgula
+      ? limpo.replace(/\./g, '').replace(',', '.')
+      : limpo.replace(/,/g, '');
+    return parseFloat(normalizado) || 0;
+  }
+
+  if (temVirgula) {
+    return parseFloat(limpo.replace(',', '.')) || 0;
+  }
+
+  if (temPonto) {
+    // Só ponto: ambíguo entre decimal ("19239.92") e milhar ("19.239").
+    // Trata como milhar só quando há exatamente 3 dígitos depois do único
+    // ponto — o padrão de "R$ 19.239" sem centavos.
+    const partes = limpo.split('.');
+    if (partes.length === 2 && partes[1].length === 3) {
+      return parseFloat(limpo.replace('.', '')) || 0;
+    }
+    return parseFloat(limpo) || 0;
+  }
+
+  return parseFloat(limpo) || 0;
+}

@@ -9,7 +9,28 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const uploadMemoria = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const uploadMemoria = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+/**
+ * Erros do multer (ex.: arquivo maior que o limite) acontecem antes do
+ * handler da rota rodar — sem isso, o handler default do Express devolve
+ * uma página HTML de erro, e o cliente (que espera sempre JSON) mostra a
+ * mensagem genérica "Não foi possível enviar o arquivo."
+ */
+function tratarErroUpload(err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (err instanceof multer.MulterError) {
+    const mensagem =
+      err.code === "LIMIT_FILE_SIZE"
+        ? "Arquivo muito grande. O limite é 50MB."
+        : "Falha ao processar o arquivo enviado.";
+    return res.status(400).json({ error: mensagem });
+  }
+  if (err) {
+    console.error("Erro no upload:", err);
+    return res.status(400).json({ error: "Falha ao processar o arquivo enviado." });
+  }
+  next();
+}
 
 /**
  * Cliente OAuth autenticado como a conta institucional fixa
@@ -221,7 +242,7 @@ async function startServer() {
   // Upload de documentos de contrato (PDF do contrato, Nota de Empenho,
   // NF) pro Drive institucional (conta fixa, ver getDriveClient) — usado
   // por ContratoForm.tsx e ExecucaoModal.tsx via src/lib/driveUploadService.ts.
-  app.post("/api/upload-drive", uploadMemoria.single("arquivo"), async (req, res) => {
+  app.post("/api/upload-drive", uploadMemoria.single("arquivo"), tratarErroUpload, async (req, res) => {
     try {
       const authHeader = req.headers.authorization ?? "";
       const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;

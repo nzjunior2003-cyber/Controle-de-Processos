@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { uploadArquivoContrato } from '../../lib/driveUploadService';
 import {
   formatarMoeda,
+  parseValorMonetario,
   TIPO_ADITIVO_LABELS,
   TIPO_OCORRENCIA_LABELS,
   type Aditivo,
@@ -205,7 +206,7 @@ export default function ExecucaoModal({
         tipo: novaExecucao.tipo,
         nf: novaExecucao.nf,
         data: novaExecucao.data,
-        valor: usaValorCalculadoPorItens ? valorCalculadoItens : Number(novaExecucao.valor) || 0,
+        valor: usaValorCalculadoPorItens ? valorCalculadoItens : parseValorMonetario(novaExecucao.valor) || 0,
         quantidade: Number(novaExecucao.quantidade) || 1,
         observacao: novaExecucao.observacao,
         arquivoLink,
@@ -249,7 +250,7 @@ export default function ExecucaoModal({
         tipo: novoAditivo.tipo,
         numero: novoAditivo.numero,
         data: novoAditivo.data,
-        ...(aditivoExigeValor ? { valorAcrescido: Number(novoAditivo.valorAcrescido) || 0 } : {}),
+        ...(aditivoExigeValor ? { valorAcrescido: parseValorMonetario(novoAditivo.valorAcrescido) || 0 } : {}),
         ...(aditivoExigePrazo ? { novaFimVigencia: novoAditivo.novaFimVigencia } : {}),
         ...(aditivoExigeItens
           ? {
@@ -499,7 +500,8 @@ export default function ExecucaoModal({
                           {comQuantidade && novaExecucao.tipoDeducao !== 'valor' ? '(Opcional)' : ''}
                         </label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           value={novaExecucao.valor}
                           onChange={(e) => setNovaExecucao({ ...novaExecucao, valor: e.target.value })}
                           className={CLASSE_INPUT}
@@ -813,7 +815,8 @@ export default function ExecucaoModal({
                         Valor Acrescido (R$)
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={novoAditivo.valorAcrescido}
                         onChange={(e) =>
                           setNovoAditivo({ ...novoAditivo, valorAcrescido: e.target.value })

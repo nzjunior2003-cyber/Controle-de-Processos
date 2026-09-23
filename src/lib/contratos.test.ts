@@ -14,6 +14,7 @@ import {
   mesclarItensContrato,
   normalizarNomeFiscal,
   ordenarContratosPorNumero,
+  parseValorMonetario,
   pareceNomeDeFiscal,
   registrarTrocaFiscal,
   somaValorItens,
@@ -544,5 +545,34 @@ describe('buscarContratos', () => {
 
   it('devolve tudo quando a busca está vazia', () => {
     expect(buscarContratos([base], '   ')).toHaveLength(1);
+  });
+});
+
+describe('parseValorMonetario', () => {
+  it('interpreta o formato BR com milhar e decimal', () => {
+    expect(parseValorMonetario('19.239,92')).toBeCloseTo(19239.92);
+  });
+
+  it('interpreta o valor "cru" de um input type=number', () => {
+    expect(parseValorMonetario('19239.92')).toBeCloseTo(19239.92);
+  });
+
+  it('interpreta só vírgula como decimal', () => {
+    expect(parseValorMonetario('19239,92')).toBeCloseTo(19239.92);
+  });
+
+  it('interpreta ponto como milhar quando não há centavos', () => {
+    expect(parseValorMonetario('19.239')).toBe(19239);
+  });
+
+  it('não corrompe o valor quando alguém digita o formato BR num campo pensado pra formato cru (o bug real que aconteceu em produção)', () => {
+    // Um <input type="number"> aceita "19.239,92" mas descarta a vírgula,
+    // resultando em "19.23992" — nosso parser evita essa perda de dados.
+    expect(parseValorMonetario('19.239,92')).not.toBeCloseTo(19.23992);
+  });
+
+  it('devolve 0 pra texto vazio ou inválido', () => {
+    expect(parseValorMonetario('')).toBe(0);
+    expect(parseValorMonetario('abc')).toBe(0);
   });
 });
