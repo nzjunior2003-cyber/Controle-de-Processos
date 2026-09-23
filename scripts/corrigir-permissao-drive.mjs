@@ -44,7 +44,12 @@ async function acharPastaRaiz() {
   return pasta.id;
 }
 
-/** Lista recursivamente todo arquivo (não-pasta) dentro de `pastaId` e suas subpastas. */
+/**
+ * Lista recursivamente todo arquivo (não-pasta) dentro de `pastaId` e suas
+ * subpastas — pula Planilhas Google (a planilha institucional de dados
+ * financeiros de todos os contratos vive na mesma pasta raiz, mas não deve
+ * virar pública por link só porque os PDFs de contrato precisam ser).
+ */
 async function listarArquivosRecursivo(pastaId) {
   const arquivos = [];
   const pastasParaVisitar = [pastaId];
@@ -61,7 +66,7 @@ async function listarArquivosRecursivo(pastaId) {
       for (const arquivo of data.files ?? []) {
         if (arquivo.mimeType === 'application/vnd.google-apps.folder') {
           pastasParaVisitar.push(arquivo.id);
-        } else {
+        } else if (arquivo.mimeType !== 'application/vnd.google-apps.spreadsheet') {
           arquivos.push(arquivo);
         }
       }
