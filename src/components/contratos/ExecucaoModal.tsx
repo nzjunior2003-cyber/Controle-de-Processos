@@ -173,13 +173,20 @@ export default function ExecucaoModal({
     return total + Number(linha.quantidade) * (item.valorUnitario || 0);
   }, 0);
 
-  const camposInvalidos =
-    !novaExecucao.nf ||
-    !novaExecucao.data ||
-    (!usaValorCalculadoPorItens &&
-      (comQuantidade && novaExecucao.tipoDeducao === 'quantidade'
-        ? !novaExecucao.quantidade
-        : !novaExecucao.valor));
+  // "Recebimento da NE pelo Fornecedor" é só uma confirmação de que o
+  // fornecedor recebeu a Nota de Empenho — não abate saldo nem precisa de
+  // Nº de NF/valor, então o formulário fica reduzido a data + observação
+  // + comprovante.
+  const ehRecebimentoNE = comQuantidade && novaExecucao.tipo === 'Recebimento da NE pelo Fornecedor';
+
+  const camposInvalidos = ehRecebimentoNE
+    ? !novaExecucao.data
+    : !novaExecucao.nf ||
+      !novaExecucao.data ||
+      (!usaValorCalculadoPorItens &&
+        (comQuantidade && novaExecucao.tipoDeducao === 'quantidade'
+          ? !novaExecucao.quantidade
+          : !novaExecucao.valor));
 
   const handleAddExecucao = async () => {
     if (camposInvalidos) return;
@@ -416,22 +423,24 @@ export default function ExecucaoModal({
                 <div className="space-y-4">
                   {comQuantidade && (
                     <>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Abatimento de Saldo</label>
-                        <select
-                          value={novaExecucao.tipoDeducao}
-                          onChange={(e) =>
-                            setNovaExecucao({
-                              ...novaExecucao,
-                              tipoDeducao: e.target.value as 'valor' | 'quantidade',
-                            })
-                          }
-                          className={CLASSE_INPUT}
-                        >
-                          <option value="valor">Abater por Valor Mês/Serviço (R$)</option>
-                          <option value="quantidade">Abater por Quantidade (Bens/Materiais)</option>
-                        </select>
-                      </div>
+                      {!ehRecebimentoNE && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Abatimento de Saldo</label>
+                          <select
+                            value={novaExecucao.tipoDeducao}
+                            onChange={(e) =>
+                              setNovaExecucao({
+                                ...novaExecucao,
+                                tipoDeducao: e.target.value as 'valor' | 'quantidade',
+                              })
+                            }
+                            className={CLASSE_INPUT}
+                          >
+                            <option value="valor">Abater por Valor Mês/Serviço (R$)</option>
+                            <option value="quantidade">Abater por Quantidade (Bens/Materiais)</option>
+                          </select>
+                        </div>
+                      )}
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Tipo de Documento</label>
                         <select
@@ -449,17 +458,19 @@ export default function ExecucaoModal({
                     </>
                   )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      {comQuantidade ? 'Identificação do Doc. (Nº NF / Recibo)' : 'Nº da Nota Fiscal / Fatura'}
-                    </label>
-                    <input
-                      type="text"
-                      value={novaExecucao.nf}
-                      onChange={(e) => setNovaExecucao({ ...novaExecucao, nf: e.target.value })}
-                      className={CLASSE_INPUT}
-                    />
-                  </div>
+                  {!ehRecebimentoNE && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        {comQuantidade ? 'Identificação do Doc. (Nº NF / Recibo)' : 'Nº da Nota Fiscal / Fatura'}
+                      </label>
+                      <input
+                        type="text"
+                        value={novaExecucao.nf}
+                        onChange={(e) => setNovaExecucao({ ...novaExecucao, nf: e.target.value })}
+                        className={CLASSE_INPUT}
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
                       {comQuantidade ? 'Data do Faturamento / Recibo' : 'Data do Faturamento'}
@@ -472,43 +483,45 @@ export default function ExecucaoModal({
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    {comQuantidade && novaExecucao.tipoDeducao === 'quantidade' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Qtd. Utilizada (Obrigatório)</label>
-                        <input
-                          type="number"
-                          value={novaExecucao.quantidade}
-                          onChange={(e) => setNovaExecucao({ ...novaExecucao, quantidade: e.target.value })}
-                          className={CLASSE_INPUT}
-                        />
-                      </div>
-                    )}
-                    {usaValorCalculadoPorItens ? (
-                      <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Valor (calculado a partir dos itens)
-                        </label>
-                        <div className={`${CLASSE_INPUT} bg-gray-50 text-gray-700`}>
-                          {formatarMoeda(valorCalculadoItens)}
+                  {!ehRecebimentoNE && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {comQuantidade && novaExecucao.tipoDeducao === 'quantidade' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Qtd. Utilizada (Obrigatório)</label>
+                          <input
+                            type="number"
+                            value={novaExecucao.quantidade}
+                            onChange={(e) => setNovaExecucao({ ...novaExecucao, quantidade: e.target.value })}
+                            className={CLASSE_INPUT}
+                          />
                         </div>
-                      </div>
-                    ) : (
-                      <div className={!comQuantidade || novaExecucao.tipoDeducao === 'valor' ? 'col-span-2' : ''}>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Valor (R$){' '}
-                          {comQuantidade && novaExecucao.tipoDeducao !== 'valor' ? '(Opcional)' : ''}
-                        </label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={novaExecucao.valor}
-                          onChange={(e) => setNovaExecucao({ ...novaExecucao, valor: e.target.value })}
-                          className={CLASSE_INPUT}
-                        />
-                      </div>
-                    )}
-                  </div>
+                      )}
+                      {usaValorCalculadoPorItens ? (
+                        <div className="col-span-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Valor (calculado a partir dos itens)
+                          </label>
+                          <div className={`${CLASSE_INPUT} bg-gray-50 text-gray-700`}>
+                            {formatarMoeda(valorCalculadoItens)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={!comQuantidade || novaExecucao.tipoDeducao === 'valor' ? 'col-span-2' : ''}>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Valor (R$){' '}
+                            {comQuantidade && novaExecucao.tipoDeducao !== 'valor' ? '(Opcional)' : ''}
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={novaExecucao.valor}
+                            onChange={(e) => setNovaExecucao({ ...novaExecucao, valor: e.target.value })}
+                            className={CLASSE_INPUT}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Observação / Competência</label>
@@ -519,7 +532,7 @@ export default function ExecucaoModal({
                       className={CLASSE_INPUT}
                     />
                   </div>
-                  {temItens && (
+                  {temItens && !ehRecebimentoNE && (
                     <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
                       <p className="text-sm font-medium text-gray-700 mb-2">
                         Itens Recebidos/Consumidos nesta NF
@@ -606,7 +619,7 @@ export default function ExecucaoModal({
                     ) : (
                       <>
                         <PlusCircle className="-ml-1 mr-2 h-4 w-4" />
-                        Registrar Dedução
+                        {ehRecebimentoNE ? 'Registrar' : 'Registrar Dedução'}
                       </>
                     )}
                   </button>
