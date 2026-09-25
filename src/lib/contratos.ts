@@ -2,7 +2,7 @@
  * Regras de vigência de contratos compartilhadas por GestaoContratos e
  * FiscalContrato (antes duplicadas nas duas páginas).
  */
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, format } from 'date-fns';
 import type { Contrato, HistoricoFiscalContrato, ItemContrato } from '../types';
 
 /** Opções fixas de Natureza de Despesa exibidas no cadastro/filtro de contratos. */
@@ -521,4 +521,34 @@ export function parseValorMonetario(texto: string): number {
   }
 
   return parseFloat(limpo) || 0;
+}
+
+const COLUNAS_CSV_CONTRATOS = [
+  'Nº Contrato', 'PAE', 'Empresa', 'CNPJ', 'Objeto', 'Início Vigência', 'Fim Vigência',
+  'Valor Global', 'Saldo Atual', 'Fiscal Titular', 'Fiscal Suplente', 'Situação',
+];
+
+const formatarDataCsv = (valor?: string): string => {
+  if (!valor) return '';
+  const data = new Date(valor);
+  return Number.isNaN(data.getTime()) ? '' : format(data, 'dd/MM/yyyy');
+};
+
+/** Monta colunas/linhas de contratos pra exportação em CSV (art. 6.8 da PIDS/DTIC). */
+export function linhasCsvContratos(contratos: Contrato[]): { colunas: string[]; linhas: (string | number)[][] } {
+  const linhas = contratos.map((c) => [
+    c.numero ?? '',
+    c.pae ?? '',
+    c.empresa ?? '',
+    c.cnpj ?? '',
+    c.objeto ?? '',
+    formatarDataCsv(c.inicioVigencia),
+    formatarDataCsv(c.fimVigencia),
+    c.valorGlobal ?? 0,
+    c.saldoAtualFinanceiro ?? '',
+    c.fiscalTitular ?? '',
+    c.fiscalSuplente ?? '',
+    c.concluido ? 'Concluído' : 'Em andamento',
+  ]);
+  return { colunas: COLUNAS_CSV_CONTRATOS, linhas };
 }

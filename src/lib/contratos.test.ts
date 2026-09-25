@@ -12,6 +12,7 @@ import {
   extrairAnosDisponiveis,
   filtrarContratosDoFiscal,
   filtrarContratosPorAno,
+  linhasCsvContratos,
   marcoAlertaVencimento,
   mesclarItensContrato,
   normalizarNomeFiscal,
@@ -564,6 +565,15 @@ describe('extrairAnosDisponiveis e filtrarContratosPorAno', () => {
 
   it('devolve tudo quando o ano é null', () => {
     expect(filtrarContratosPorAno([contrato2020, contrato2022], null)).toHaveLength(2);
+  });
+});
+
+describe('linhasCsvContratos', () => {
+  it('gera colunas e uma linha por contrato', () => {
+    const { colunas, linhas } = linhasCsvContratos([base]);
+    expect(colunas).toContain('Nº Contrato');
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0][0]).toBe(base.numero);
   });
 });
 

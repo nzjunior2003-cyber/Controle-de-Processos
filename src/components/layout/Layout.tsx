@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import Breadcrumbs from './Breadcrumbs';
 
 export default function Layout() {
   // Começa aberta no desktop (como sempre foi) mas fechada no celular —
@@ -26,6 +27,7 @@ export default function Layout() {
             entrar em cena, num contexto de bloco normal (não mais flex).
           */}
           <div className="w-full">
+            <Breadcrumbs />
             <Outlet />
           </div>
         </main>

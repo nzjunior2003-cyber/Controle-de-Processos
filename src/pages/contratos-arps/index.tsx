@@ -1,10 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Filter, PlusCircle, Search } from 'lucide-react';
+import { Download, Filter, PlusCircle, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useMilitares } from '../../hooks/useMilitares';
 import FiltroAno from '../../components/contratos/FiltroAno';
-import { buscarContratos, extrairAnosDisponiveis, filtrarContratosPorAno } from '../../lib/contratos';
+import {
+  buscarContratos,
+  extrairAnosDisponiveis,
+  filtrarContratosPorAno,
+  linhasCsvContratos,
+} from '../../lib/contratos';
+import { exportarCsv } from '../../lib/exportarCsv';
 import type {
   PortariaFiscal,
   ProcedimentoLicitatorio,
@@ -304,7 +310,21 @@ export default function ContratosArps() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {abaAtiva === 'contratos' ? (
-              <FiltroAno anos={anosDisponiveis} valor={filtroAno} onChange={setFiltroAno} />
+              <>
+                <FiltroAno anos={anosDisponiveis} valor={filtroAno} onChange={setFiltroAno} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const { colunas, linhas } = linhasCsvContratos(contratosFiltrados);
+                    exportarCsv('contratos', colunas, linhas);
+                  }}
+                  title="Exporta os contratos filtrados nesta tela em CSV"
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  <Download className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
+                  Exportar CSV
+                </button>
+              </>
             ) : (
               <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                 <Filter className="-ml-1 mr-2 h-5 w-5 text-gray-400" />

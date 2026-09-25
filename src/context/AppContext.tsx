@@ -1293,37 +1293,50 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const addProcedimento = useCallback(
     async (dados: Omit<ProcedimentoLicitatorio, 'id'>) => {
-      await criarEm('procedimentos', dados);
+      const id = await criarEm('procedimentos', dados);
+      await registrarAuditoria('procedimentos', id, 'CREATE', dados);
     },
-    [criarEm],
+    [criarEm, registrarAuditoria],
   );
   const updateProcedimento = useCallback(
-    (id: string, dados: Partial<ProcedimentoLicitatorio>) =>
-      atualizarEm('procedimentos', id, dados),
-    [atualizarEm],
+    async (id: string, dados: Partial<ProcedimentoLicitatorio>) => {
+      const anterior = procedimentos.find((p) => p.id === id);
+      await atualizarEm('procedimentos', id, dados);
+      await registrarAuditoria('procedimentos', id, 'UPDATE', dados, anterior);
+    },
+    [atualizarEm, registrarAuditoria, procedimentos],
   );
 
   const addSancionatorio = useCallback(
     async (dados: Omit<ProcessoSancionatorio, 'id'>) => {
-      await criarEm('sancionatorios', dados);
+      const id = await criarEm('sancionatorios', dados);
+      await registrarAuditoria('sancionatorios', id, 'CREATE', dados);
     },
-    [criarEm],
+    [criarEm, registrarAuditoria],
   );
   const updateSancionatorio = useCallback(
-    (id: string, dados: Partial<ProcessoSancionatorio>) =>
-      atualizarEm('sancionatorios', id, dados),
-    [atualizarEm],
+    async (id: string, dados: Partial<ProcessoSancionatorio>) => {
+      const anterior = sancionatorios.find((s) => s.id === id);
+      await atualizarEm('sancionatorios', id, dados);
+      await registrarAuditoria('sancionatorios', id, 'UPDATE', dados, anterior);
+    },
+    [atualizarEm, registrarAuditoria, sancionatorios],
   );
 
   const addPortaria = useCallback(
     async (dados: Omit<PortariaFiscal, 'id'>) => {
-      await criarEm('portarias', dados);
+      const id = await criarEm('portarias', dados);
+      await registrarAuditoria('portarias', id, 'CREATE', dados);
     },
-    [criarEm],
+    [criarEm, registrarAuditoria],
   );
   const updatePortaria = useCallback(
-    (id: string, dados: Partial<PortariaFiscal>) => atualizarEm('portarias', id, dados),
-    [atualizarEm],
+    async (id: string, dados: Partial<PortariaFiscal>) => {
+      const anterior = portarias.find((p) => p.id === id);
+      await atualizarEm('portarias', id, dados);
+      await registrarAuditoria('portarias', id, 'UPDATE', dados, anterior);
+    },
+    [atualizarEm, registrarAuditoria, portarias],
   );
 
   const valor = useMemo<AppContextData>(

@@ -18,6 +18,7 @@ execução financeira dos contratos.
 - [Modelo de dados (Firestore)](#modelo-de-dados-firestore)
 - [Perfis de acesso](#perfis-de-acesso)
 - [Segurança](#segurança)
+- [Documentação institucional (PIDS/DTIC)](#documentação-institucional-pidsdtic)
 
 ## Arquitetura
 
@@ -194,3 +195,17 @@ fiscalização.
 - Excluir um usuário na tela de administração remove o **perfil** (documento em
   `usuarios`). A conta no Firebase Authentication precisa ser removida pelo
   Console (o SDK do cliente não permite excluir contas de terceiros).
+
+## Documentação institucional (PIDS/DTIC)
+
+Este sistema está em processo de avaliação de adequação à Política
+Institucional de Desenvolvimento de Sistemas do CBMPA. Documentos
+relacionados:
+
+- [`docs/DOCUMENTACAO_TECNICA.md`](docs/DOCUMENTACAO_TECNICA.md) — documentação
+  completa exigida pelo Capítulo 11 da política (arquitetura, modelo de
+  dados, perfis, integrações, backup, responsáveis).
+- [`docs/EXCECOES_CONFORMIDADE_PIDS.md`](docs/EXCECOES_CONFORMIDADE_PIDS.md) —
+  registro formal das exceções de conformidade conhecidas (art. 16.2),
+  principalmente autenticação fora do Keycloak e ausência de integração com
+  o SI3.

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  AlertCircle, ArrowDownAZ, ArrowUpAZ, BellRing, ChevronRight, Clock, FileText, Filter, Mail,
-  PlusCircle, RefreshCw, Search, ShieldAlert, Users, UserPlus, UserX,
+  AlertCircle, ArrowDownAZ, ArrowUpAZ, BellRing, ChevronRight, Clock, Download, FileText, Filter,
+  Mail, PlusCircle, RefreshCw, Search, ShieldAlert, Users, UserPlus, UserX,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
@@ -21,6 +21,7 @@ import {
   calcularStatusContrato,
   extrairAnosDisponiveis,
   filtrarContratosPorAno,
+  linhasCsvContratos,
   normalizarNomeFiscal,
   ordenarContratosPorNumero,
   pareceNomeDeFiscal,
@@ -28,6 +29,7 @@ import {
   OPCOES_NATUREZA_DESPESA_CONTRATO,
   type ContratoComStatus,
 } from '../../lib/contratos';
+import { exportarCsv } from '../../lib/exportarCsv';
 
 /**
  * Depois de uma execução (NF) ou aditivo lançado no app mudar o saldo/
@@ -434,6 +436,18 @@ export default function GestaoContratos() {
           >
             <Filter className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
             Filtros{filtrosAtivos > 0 ? ` (${filtrosAtivos})` : ''}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const { colunas, linhas } = linhasCsvContratos(filtrados);
+              exportarCsv('contratos', colunas, linhas);
+            }}
+            title="Exporta os contratos filtrados nesta tela em CSV"
+            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 whitespace-nowrap"
+          >
+            <Download className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
+            Exportar CSV
           </button>
         </div>
       </div>
