@@ -173,13 +173,15 @@ export default function ExecucaoModal({
     return total + Number(linha.quantidade) * (item.valorUnitario || 0);
   }, 0);
 
-  // "Recebimento da NE pelo Fornecedor" é só uma confirmação de que o
-  // fornecedor recebeu a Nota de Empenho — não abate saldo nem precisa de
-  // Nº de NF/valor, então o formulário fica reduzido a data + observação
+  // "Recebimento da NE pelo Fornecedor" e "Recibo de Pagamento" são só uma
+  // confirmação/comprovante — não abatem saldo nem precisam de Nº de NF/
+  // quantidade/valor, então o formulário fica reduzido a data + observação
   // + comprovante.
-  const ehRecebimentoNE = comQuantidade && novaExecucao.tipo === 'Recebimento da NE pelo Fornecedor';
+  const formularioReduzido =
+    comQuantidade &&
+    (novaExecucao.tipo === 'Recebimento da NE pelo Fornecedor' || novaExecucao.tipo === 'Recibo de Pagamento');
 
-  const camposInvalidos = ehRecebimentoNE
+  const camposInvalidos = formularioReduzido
     ? !novaExecucao.data
     : !novaExecucao.nf ||
       !novaExecucao.data ||
@@ -423,7 +425,7 @@ export default function ExecucaoModal({
                 <div className="space-y-4">
                   {comQuantidade && (
                     <>
-                      {!ehRecebimentoNE && (
+                      {!formularioReduzido && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700">Abatimento de Saldo</label>
                           <select
@@ -458,7 +460,7 @@ export default function ExecucaoModal({
                     </>
                   )}
 
-                  {!ehRecebimentoNE && (
+                  {!formularioReduzido && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
                         {comQuantidade ? 'Identificação do Doc. (Nº NF / Recibo)' : 'Nº da Nota Fiscal / Fatura'}
@@ -483,7 +485,7 @@ export default function ExecucaoModal({
                     />
                   </div>
 
-                  {!ehRecebimentoNE && (
+                  {!formularioReduzido && (
                     <div className="grid grid-cols-2 gap-4">
                       {comQuantidade && novaExecucao.tipoDeducao === 'quantidade' && (
                         <div>
@@ -532,7 +534,7 @@ export default function ExecucaoModal({
                       className={CLASSE_INPUT}
                     />
                   </div>
-                  {temItens && !ehRecebimentoNE && (
+                  {temItens && !formularioReduzido && (
                     <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
                       <p className="text-sm font-medium text-gray-700 mb-2">
                         Itens Recebidos/Consumidos nesta NF
@@ -619,7 +621,7 @@ export default function ExecucaoModal({
                     ) : (
                       <>
                         <PlusCircle className="-ml-1 mr-2 h-4 w-4" />
-                        {ehRecebimentoNE ? 'Registrar' : 'Registrar Dedução'}
+                        {formularioReduzido ? 'Registrar' : 'Registrar Dedução'}
                       </>
                     )}
                   </button>
