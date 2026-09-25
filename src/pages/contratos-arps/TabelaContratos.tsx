@@ -59,8 +59,11 @@ export default function TabelaContratos({ dados }: { dados: Contrato[] }) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-bold">
                     <button
-                      onClick={() => item.linkContrato && window.open(item.linkContrato, '_blank')}
-                      disabled={!item.linkContrato}
+                      onClick={() => {
+                        const link = item.contratoPdfLink || item.linkContrato;
+                        if (link) window.open(link, '_blank');
+                      }}
+                      disabled={!item.contratoPdfLink && !item.linkContrato}
                       className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md shadow-sm text-xs font-medium transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >
                       Acessar Contrato

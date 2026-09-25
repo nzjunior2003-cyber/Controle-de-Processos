@@ -122,8 +122,11 @@ export default function TabelaContratosVigencia({
                           <div>
                             <span className="font-semibold text-gray-900 flex items-center justify-between mb-1">Ações</span>
                             <button
-                              onClick={() => item.linkContrato && window.open(item.linkContrato, '_blank')}
-                              disabled={!item.linkContrato}
+                              onClick={() => {
+                                const link = item.contratoPdfLink || item.linkContrato;
+                                if (link) window.open(link, '_blank');
+                              }}
+                              disabled={!item.contratoPdfLink && !item.linkContrato}
                               className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none disabled:bg-gray-300 disabled:cursor-not-allowed mb-2"
                             >
                               <FileText className="w-4 h-4 mr-1.5" />
