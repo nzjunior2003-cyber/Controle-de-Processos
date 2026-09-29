@@ -4,6 +4,7 @@ import {
   calcularDiasEstada,
   calcularMediaDiasPorLocalizacao,
   calcularMediaDiasPorRito,
+  calcularProgressoChecklist,
   calcularTempoTotal,
   localizacaoEfetiva,
   montarLinhaDoTempo,
@@ -152,5 +153,29 @@ describe('agruparEstadasPorProcesso', () => {
     ]);
     expect(mapa.get('p1')?.map((e) => e.id)).toEqual(['a', 'c']);
     expect(mapa.get('p2')?.map((e) => e.id)).toEqual(['b']);
+  });
+});
+
+describe('calcularProgressoChecklist', () => {
+  it('calcula o percentual com base no checklist do rito', () => {
+    expect(
+      calcularProgressoChecklist({
+        rito_processual: 'Pregão Eletrônico',
+        checklist_rito: ['Documento de Formalização de Demanda', 'Estudo Técnico Preliminar'],
+      }),
+    ).toBe(15); // 2 de 13 itens do checklist de Pregão Eletrônico
+
+  });
+
+  it('devolve null sem rito processual definido', () => {
+    expect(calcularProgressoChecklist({ rito_processual: undefined, checklist_rito: [] })).toBeNull();
+  });
+
+  it('devolve null pra um rito sem checklist conhecido', () => {
+    expect(calcularProgressoChecklist({ rito_processual: 'Rito Inexistente', checklist_rito: [] })).toBeNull();
+  });
+
+  it('devolve 0% quando nada foi marcado ainda', () => {
+    expect(calcularProgressoChecklist({ rito_processual: 'Pregão Eletrônico', checklist_rito: [] })).toBe(0);
   });
 });

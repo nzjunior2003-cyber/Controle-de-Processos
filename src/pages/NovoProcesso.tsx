@@ -31,6 +31,16 @@ export default function NovoProcesso() {
   const processo = id ? processos.find((p) => p.id === id) : undefined;
   const pcaVinculado = processo?.pca_id ? pcas.find((p) => p.id === processo.pca_id) : undefined;
 
+  // Quantos processos (além do que está sendo editado, se for o caso) já
+  // apontam pra cada item do PCA — um mesmo item pode atender a mais de um
+  // processo de contratação, então isso é só um indicativo, não um bloqueio.
+  const contagemVinculosPca = processos.reduce<Record<string, number>>((contagem, p) => {
+    if (p.pca_id && p.id !== processo?.id) {
+      contagem[p.pca_id] = (contagem[p.pca_id] ?? 0) + 1;
+    }
+    return contagem;
+  }, {});
+
   const [numeroProcesso, setNumeroProcesso] = useState(processo?.numero_processo ?? '');
   const [objeto, setObjeto] = useState(processo?.objeto ?? '');
   const [descricao, setDescricao] = useState(processo?.descricao ?? '');
@@ -319,7 +329,13 @@ export default function NovoProcesso() {
                 onSelect={(pca) => setPcaId(pca.id)}
                 placeholder="Digite a ordem, demandante ou descrição..."
                 className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
+                contagemVinculos={contagemVinculosPca}
               />
+              <p className="mt-1 text-xs text-gray-500">
+                Um mesmo item do PCA pode atender a mais de um processo — não há problema em
+                selecionar um item já vinculado a outro processo, se este for outra contratação
+                para a mesma necessidade.
+              </p>
             </div>
 
             <div className="md:col-span-2">

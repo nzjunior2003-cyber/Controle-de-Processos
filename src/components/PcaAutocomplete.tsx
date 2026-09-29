@@ -9,9 +9,17 @@ interface PcaAutocompleteProps {
   placeholder?: string;
   name?: string;
   className?: string;
+  /**
+   * Quantos processos já apontam pra cada item do PCA (por id) — um mesmo
+   * item pode atender a mais de um processo de contratação, então isso é
+   * só um indicativo pro usuário, não um bloqueio de seleção.
+   */
+  contagemVinculos?: Record<string, number>;
 }
 
-export function PcaAutocomplete({ pcas, value, onChange, onSelect, placeholder, name, className }: PcaAutocompleteProps) {
+export function PcaAutocomplete({
+  pcas, value, onChange, onSelect, placeholder, name, className, contagemVinculos,
+}: PcaAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -67,6 +75,11 @@ export function PcaAutocomplete({ pcas, value, onChange, onSelect, placeholder, 
               <div className="flex flex-col">
                 <span className="font-medium text-sm text-gray-900 line-clamp-1">Ordem: {p.codigo_pca} - {p.objeto_pca}</span>
                 <span className="text-xs text-gray-500 mt-0.5">{p.unidade_responsavel} • {p.fonte_recurso} • R$ {p.valor_previsto?.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                {!!contagemVinculos?.[p.id] && (
+                  <span className="text-xs text-amber-700 mt-0.5">
+                    Já vinculado a {contagemVinculos[p.id]} processo{contagemVinculos[p.id] > 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
             </li>
           ))}

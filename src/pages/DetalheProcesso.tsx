@@ -4,11 +4,12 @@ import { useApp } from '../context/AppContext';
 import { ArrowLeft, Clock, FileCheck2, MapPin, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
 import { CHECKLISTS_RITOS, STATUS_PROCESSO_LABELS } from '../types';
-import { localizacaoEfetiva, montarLinhaDoTempo } from '../lib/fluxoProcesso';
+import { calcularProgressoChecklist, localizacaoEfetiva, montarLinhaDoTempo } from '../lib/fluxoProcesso';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
 import { getAccessToken, googleSignIn } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
 import { processoParaDadosPlanilha, SUBFASE_CONTRATADO } from '../lib/planilhaProcessos';
+import { formatarMoeda } from '../lib/contratos';
 
 const CORES_GANTT = [
   'bg-blue-400', 'bg-indigo-400', 'bg-purple-400', 'bg-emerald-400',
@@ -110,6 +111,7 @@ export default function DetalheProcesso() {
   const diasNaLocalizacaoAtual = linhaDoTempo[linhaDoTempo.length - 1]?.dias;
 
   const checklistDisponivel = processo.rito_processual ? CHECKLISTS_RITOS[processo.rito_processual] : undefined;
+  const progressoChecklist = calcularProgressoChecklist(processo) ?? 0;
 
   const isMasterOrApoio = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'apoio';
 
@@ -226,6 +228,18 @@ export default function DetalheProcesso() {
                     <dd className="mt-1 text-sm text-gray-900">{processo.rito_processual}</dd>
                   </div>
                 )}
+                {processo.valor_estimado != null && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Valor Estimado</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{formatarMoeda(processo.valor_estimado)}</dd>
+                  </div>
+                )}
+                {processo.fonte && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Fonte de Recurso</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{processo.fonte}</dd>
+                  </div>
+                )}
                 {processo.fase_processo && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Fase do Processo</dt>
@@ -270,12 +284,12 @@ export default function DetalheProcesso() {
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-medium text-gray-900">Checklist do Rito: {processo.rito_processual}</h2>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    {Math.round(((processo.checklist_rito?.length || 0) / checklistDisponivel.length) * 100)}% Concluído
+                    {progressoChecklist}% Concluído
                   </span>
                 </div>
-                
+
                 <div className="w-full bg-gray-200 rounded-full h-2 mb-6">
-                  <div className="bg-red-600 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.round(((processo.checklist_rito?.length || 0) / checklistDisponivel.length) * 100)}%` }}></div>
+                  <div className="bg-red-600 h-2 rounded-full transition-all duration-500" style={{ width: `${progressoChecklist}%` }}></div>
                 </div>
 
                 <div className="space-y-3">

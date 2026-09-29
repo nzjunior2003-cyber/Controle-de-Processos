@@ -6,6 +6,7 @@ import { differenceInDays } from 'date-fns';
 import IntegracaoPCA from './IntegracaoPCA';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS } from '../types';
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
+import { calcularProgressoChecklist } from '../lib/fluxoProcesso';
 
 export default function Aquisicoes() {
   const { processos, setores, usuarioAtual, syncProcessosDaPlanilha } = useApp();
@@ -355,6 +356,7 @@ export default function Aquisicoes() {
                       const diasNoSetor = proc.ultima_tramitacao
                         ? Math.max(0, differenceInDays(hoje, new Date(proc.ultima_tramitacao)))
                         : null;
+                      const progresso = calcularProgressoChecklist(proc);
                       return (
                         <tr
                           key={proc.id}
@@ -400,6 +402,14 @@ export default function Aquisicoes() {
                             >
                               {STATUS_LABELS[proc.status]}
                             </span>
+                            {progresso !== null && (
+                              <div className="mt-1.5 flex items-center gap-1.5" title={`${progresso}% do checklist do rito concluído`}>
+                                <div className="w-16 bg-gray-200 rounded-full h-1.5">
+                                  <div className="bg-red-600 h-1.5 rounded-full" style={{ width: `${progresso}%` }}></div>
+                                </div>
+                                <span className="text-xs text-gray-500">{progresso}%</span>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       );

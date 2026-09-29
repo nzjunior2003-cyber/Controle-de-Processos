@@ -6,7 +6,7 @@
  * estimativas de tempo por setor/tipo de contratação.
  */
 import { differenceInDays } from 'date-fns';
-import type { Processo } from '../types';
+import { CHECKLISTS_RITOS, type Processo } from '../types';
 
 /** Um período em que o processo ficou numa localização (setor/unidade). */
 export interface EstadaProcesso {
@@ -107,6 +107,22 @@ export function localizacaoEfetiva(
   siglaDoSetor: (id: string) => string | undefined,
 ): string {
   return processo.localizacao_atual || siglaDoSetor(processo.fase_atual_id) || 'Desconhecido';
+}
+
+/**
+ * Percentual de conclusão de um processo: etapas marcadas no checklist do
+ * seu rito processual em relação ao total de etapas daquele rito. Devolve
+ * `null` quando o processo não tem rito definido ou o rito não tem
+ * checklist conhecido (nesses casos não há "total" pra calcular %).
+ */
+export function calcularProgressoChecklist(
+  processo: Pick<Processo, 'rito_processual' | 'checklist_rito'>,
+): number | null {
+  if (!processo.rito_processual) return null;
+  const checklistDoRito = CHECKLISTS_RITOS[processo.rito_processual];
+  if (!checklistDoRito || checklistDoRito.length === 0) return null;
+  const concluidas = processo.checklist_rito?.length ?? 0;
+  return Math.round((concluidas / checklistDoRito.length) * 100);
 }
 
 /** Agrupa uma lista de estadias por processo, num Map por processo_id. */
