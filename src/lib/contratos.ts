@@ -3,7 +3,7 @@
  * FiscalContrato (antes duplicadas nas duas páginas).
  */
 import { differenceInDays, format } from 'date-fns';
-import type { Contrato, HistoricoFiscalContrato, ItemContrato } from '../types';
+import type { Contrato, HistoricoFiscalContrato, ItemContrato, ProcedimentoLicitatorio } from '../types';
 
 /** Opções fixas de Natureza de Despesa exibidas no cadastro/filtro de contratos. */
 export const OPCOES_NATUREZA_DESPESA_CONTRATO = ['CONSUMO', 'PERMANENTE', 'SERVIÇO'];
@@ -521,6 +521,38 @@ export function parseValorMonetario(texto: string): number {
   }
 
   return parseFloat(limpo) || 0;
+}
+
+/**
+ * Vínculos de um processo (Apoio e Suprimento) com o Contrato e o
+ * Procedimento Licitatório correspondentes — encontrados por PAE em tempo
+ * de exibição, sem duplicar/sincronizar campos entre os módulos (evita
+ * divergência de dados entre cópias).
+ */
+export function encontrarVinculosPorPae(
+  pae: string,
+  dados: { contratos: Contrato[]; procedimentos?: ProcedimentoLicitatorio[] },
+): { contrato?: Contrato; procedimento?: ProcedimentoLicitatorio } {
+  if (!pae) return {};
+  return {
+    contrato: dados.contratos.find((c) => c.pae === pae),
+    procedimento: dados.procedimentos?.find((p) => p.pae === pae),
+  };
+}
+
+/**
+ * Economicidade: diferença entre o valor estimado do processo (Apoio e
+ * Suprimento) e o valor global do contrato efetivamente firmado — em valor
+ * (R$) e em percentual sobre o valor estimado. `null` quando não há valor
+ * estimado pra comparar (não dá pra calcular economicidade sem uma base).
+ */
+export function calcularEconomicidade(
+  valorEstimado: number | undefined,
+  valorContratado: number,
+): { valor: number; percentual: number } | null {
+  if (!valorEstimado || valorEstimado <= 0) return null;
+  const valor = valorEstimado - valorContratado;
+  return { valor, percentual: (valor / valorEstimado) * 100 };
 }
 
 const COLUNAS_CSV_CONTRATOS = [

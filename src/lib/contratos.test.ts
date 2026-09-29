@@ -8,6 +8,8 @@ import {
   calcularStatusContrato,
   devolverItens,
   devolverSaldo,
+  calcularEconomicidade,
+  encontrarVinculosPorPae,
   extrairAnoNumeroContrato,
   extrairAnosDisponiveis,
   filtrarContratosDoFiscal,
@@ -565,6 +567,44 @@ describe('extrairAnosDisponiveis e filtrarContratosPorAno', () => {
 
   it('devolve tudo quando o ano é null', () => {
     expect(filtrarContratosPorAno([contrato2020, contrato2022], null)).toHaveLength(2);
+  });
+});
+
+describe('encontrarVinculosPorPae', () => {
+  it('acha o contrato e o procedimento pelo mesmo pae', () => {
+    const contrato = { ...base, pae: 'E-2026/123' };
+    const procedimento = { id: 'proc1', pae: 'E-2026/123', numero: '1/2026', modalidade: 'Pregão Eletrônico', objeto: '', fase: '', dataPublicacao: '', previsaoAbertura: '' };
+    const resultado = encontrarVinculosPorPae('E-2026/123', { contratos: [contrato], procedimentos: [procedimento] });
+    expect(resultado.contrato?.pae).toBe('E-2026/123');
+    expect(resultado.procedimento?.numero).toBe('1/2026');
+  });
+
+  it('devolve objeto vazio sem pae', () => {
+    expect(encontrarVinculosPorPae('', { contratos: [base] })).toEqual({});
+  });
+
+  it('não acha nada quando o pae não bate com nenhum', () => {
+    const resultado = encontrarVinculosPorPae('outro-pae', { contratos: [base] });
+    expect(resultado.contrato).toBeUndefined();
+  });
+});
+
+describe('calcularEconomicidade', () => {
+  it('calcula economia (valor contratado menor que o estimado)', () => {
+    const resultado = calcularEconomicidade(1000, 800);
+    expect(resultado?.valor).toBe(200);
+    expect(resultado?.percentual).toBe(20);
+  });
+
+  it('calcula valor negativo quando o contratado passa do estimado', () => {
+    const resultado = calcularEconomicidade(1000, 1200);
+    expect(resultado?.valor).toBe(-200);
+    expect(resultado?.percentual).toBe(-20);
+  });
+
+  it('devolve null sem valor estimado', () => {
+    expect(calcularEconomicidade(undefined, 800)).toBeNull();
+    expect(calcularEconomicidade(0, 800)).toBeNull();
   });
 });
 

@@ -179,6 +179,9 @@ export interface Processo {
   valor_estimado?: number;
   rito_processual?: string;
   checklist_rito?: string[];
+  /** Só usados quando rito_processual === 'Adesão ARP'. */
+  orgaoGerenciadorArp?: string;
+  fornecedorArp?: string;
   fase_processo?: string;
   subfase_processo?: string;
   /**

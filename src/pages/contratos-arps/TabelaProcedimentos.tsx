@@ -96,6 +96,18 @@ export default function TabelaProcedimentos({
                               <span className="font-medium text-gray-500 block">PAE</span>
                               <span className="text-gray-900">{item.pae}</span>
                             </div>
+                            {item.orgaoGerenciador && (
+                              <div>
+                                <span className="font-medium text-gray-500 block">Órgão Gerenciador</span>
+                                <span className="text-gray-900">{item.orgaoGerenciador}</span>
+                              </div>
+                            )}
+                            {item.fornecedor && (
+                              <div>
+                                <span className="font-medium text-gray-500 block">Fornecedor</span>
+                                <span className="text-gray-900">{item.fornecedor}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                         {podeEditar && (

@@ -105,6 +105,11 @@ export default function ContratosArps() {
             dataPublicacao: '-',
             previsaoAbertura: '-',
             isAuto: true,
+            // Espelhados do processo de origem (Apoio e Suprimento) — só
+            // preenchidos pra Adesão à ARP; evita redigitar a mesma
+            // informação em Contratos e ARP's.
+            ...(p.orgaoGerenciadorArp ? { orgaoGerenciador: p.orgaoGerenciadorArp } : {}),
+            ...(p.fornecedorArp ? { fornecedor: p.fornecedorArp } : {}),
           };
         }),
     [processos, procedimentos],

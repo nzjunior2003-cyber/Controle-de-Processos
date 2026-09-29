@@ -9,7 +9,7 @@ import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
 import { getAccessToken, googleSignIn } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
 import { processoParaDadosPlanilha, SUBFASE_CONTRATADO } from '../lib/planilhaProcessos';
-import { formatarMoeda } from '../lib/contratos';
+import { calcularEconomicidade, encontrarVinculosPorPae, formatarMoeda } from '../lib/contratos';
 
 const CORES_GANTT = [
   'bg-blue-400', 'bg-indigo-400', 'bg-purple-400', 'bg-emerald-400',
@@ -19,7 +19,7 @@ const CORES_GANTT = [
 export default function DetalheProcesso() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { processos, setores, estadasProcesso, pcas, usuarioAtual, updateProcesso, deleteProcesso } = useApp();
+  const { processos, setores, estadasProcesso, pcas, contratos, procedimentos, usuarioAtual, updateProcesso, deleteProcesso } = useApp();
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const [marcandoContratado, setMarcandoContratado] = useState(false);
@@ -148,6 +148,14 @@ export default function DetalheProcesso() {
 
   const checklistDisponivel = processo.rito_processual ? CHECKLISTS_RITOS[processo.rito_processual] : undefined;
   const progressoChecklist = calcularProgressoChecklist(processo) ?? 0;
+
+  const { contrato: contratoVinculado, procedimento: procedimentoVinculado } = encontrarVinculosPorPae(
+    processo.numero_processo,
+    { contratos, procedimentos },
+  );
+  const economicidade = contratoVinculado
+    ? calcularEconomicidade(processo.valor_estimado, contratoVinculado.valorGlobal)
+    : null;
 
   const isMasterOrApoio = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'apoio';
 
@@ -288,6 +296,18 @@ export default function DetalheProcesso() {
                     <dd className="mt-1 text-sm text-gray-900">{processo.fonte}</dd>
                   </div>
                 )}
+                {processo.orgaoGerenciadorArp && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Órgão Gerenciador da ARP</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{processo.orgaoGerenciadorArp}</dd>
+                  </div>
+                )}
+                {processo.fornecedorArp && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Fornecedor</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{processo.fornecedorArp}</dd>
+                  </div>
+                )}
                 {processo.fase_processo && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Fase do Processo</dt>
@@ -325,6 +345,53 @@ export default function DetalheProcesso() {
               </dl>
             </div>
           </div>
+
+          {(contratoVinculado || procedimentoVinculado) && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Vínculo com Contratos/ARP&apos;s</h2>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                {contratoVinculado && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Contrato Vinculado</dt>
+                    <dd className="mt-1 text-sm">
+                      <Link
+                        to={`/sistema/gestao-contratos/${contratoVinculado.id}/editar`}
+                        className="text-red-700 font-medium hover:underline"
+                      >
+                        Nº {contratoVinculado.numero}
+                      </Link>
+                      <span className="text-gray-500"> — {formatarMoeda(contratoVinculado.valorGlobal)}</span>
+                    </dd>
+                  </div>
+                )}
+                {procedimentoVinculado && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Procedimento Vinculado</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {procedimentoVinculado.modalidade} {procedimentoVinculado.numero}
+                    </dd>
+                  </div>
+                )}
+                {economicidade && (
+                  <div className={`sm:col-span-2 rounded-md p-3 border ${
+                    economicidade.valor >= 0
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : 'bg-amber-50 border-amber-200'
+                  }`}>
+                    <dt className={`text-sm font-medium ${economicidade.valor >= 0 ? 'text-emerald-800' : 'text-amber-800'}`}>
+                      {economicidade.valor >= 0 ? 'Economicidade' : 'Acima do valor estimado'}
+                    </dt>
+                    <dd className={`mt-1 text-base font-semibold ${economicidade.valor >= 0 ? 'text-emerald-900' : 'text-amber-900'}`}>
+                      {formatarMoeda(Math.abs(economicidade.valor))} ({Math.abs(economicidade.percentual).toFixed(1)}%)
+                    </dd>
+                    <dd className={`text-xs ${economicidade.valor >= 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      Comparado ao Valor Estimado de {formatarMoeda(processo.valor_estimado ?? 0)}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
 
           {checklistDisponivel && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">

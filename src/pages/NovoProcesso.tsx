@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { ArrowLeft, FileCheck2, Save } from 'lucide-react';
+import { ArrowLeft, FileCheck2, RotateCcw, Save } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { PcaAutocomplete } from '../components/PcaAutocomplete';
 import { CHECKLISTS_RITOS } from '../types';
@@ -52,6 +52,8 @@ export default function NovoProcesso() {
 
   const [ritoProcessual, setRitoProcessual] = useState(processo?.rito_processual ?? '');
   const [checklistLocal, setChecklistLocal] = useState<string[]>(processo?.checklist_rito ?? []);
+  const [orgaoGerenciadorArp, setOrgaoGerenciadorArp] = useState(processo?.orgaoGerenciadorArp ?? '');
+  const [fornecedorArp, setFornecedorArp] = useState(processo?.fornecedorArp ?? '');
   const [naturezaDespesa, setNaturezaDespesa] = useState(processo?.natureza_despesa ?? '');
   const [fonte, setFonte] = useState(processo?.fonte ?? '');
   const [valorEstimado, setValorEstimado] = useState(
@@ -62,47 +64,75 @@ export default function NovoProcesso() {
 
   const jaContratadoAditivado = (processo?.subfase_processo ?? '').toUpperCase().includes('CONTRATADO');
 
+  const sincronizarSubfaseNaPlanilha = async (subfase: string) => {
+    if (!processo) return;
+    let googleToken = await getAccessToken();
+    if (!googleToken) {
+      const resultado = await googleSignIn();
+      googleToken = resultado?.accessToken ?? null;
+    }
+    if (!googleToken) {
+      alert(
+        'Situação atualizada no sistema, mas não foi possível conectar ao Google para ' +
+          'replicar na planilha automaticamente. Atualize a coluna Q manualmente ou tente de novo depois.',
+      );
+      return;
+    }
+
+    const linha = await sincronizarProcessoNaPlanilha(
+      googleToken,
+      ID_PLANILHA_PROCESSOS,
+      { ...processoParaDadosPlanilha(processo), subfase_processo: subfase },
+      processo.planilha_linha,
+    );
+    if (linha !== processo.planilha_linha) {
+      await updateProcesso(processo.id, { planilha_linha: linha });
+    }
+  };
+
   // Marca a Subfase do Processo (coluna Q da planilha) com o valor
   // "CONTRATADO" — a mesma opção já existente no menu suspenso da
   // planilha — e o status "Contratado/Aditivado" no app. Representa o
   // fim da fase de Instrução (que vai da abertura até a publicação do
-  // contrato) e a passagem pra fase de Gestão do Contrato. Sem
-  // "reverter": essa coluna também é escrita pelo RPA, sem um valor
-  // anterior confiável pra restaurar por aqui.
+  // contrato) e a passagem pra fase de Gestão do Contrato. Guarda o
+  // status/fase/subfase anteriores pra permitir desmarcar depois (ver
+  // handleDesmarcarContratadoAditivado).
   const handleMarcarContratadoAditivado = async () => {
     if (!processo) return;
     setMarcandoContratado(true);
     try {
       await updateProcesso(processo.id, {
+        statusAnterior: processo.status,
+        faseAnterior: processo.fase_processo ?? '',
+        subfaseAnterior: processo.subfase_processo ?? '',
         subfase_processo: SUBFASE_CONTRATADO,
         status: 'contratado_aditivado',
       });
-
-      let googleToken = await getAccessToken();
-      if (!googleToken) {
-        const resultado = await googleSignIn();
-        googleToken = resultado?.accessToken ?? null;
-      }
-      if (!googleToken) {
-        alert(
-          'Situação atualizada no sistema, mas não foi possível conectar ao Google para ' +
-            'replicar na planilha automaticamente. Atualize a coluna Q manualmente ou tente de novo depois.',
-        );
-        return;
-      }
-
-      const linha = await sincronizarProcessoNaPlanilha(
-        googleToken,
-        ID_PLANILHA_PROCESSOS,
-        { ...processoParaDadosPlanilha(processo), subfase_processo: SUBFASE_CONTRATADO },
-        processo.planilha_linha,
-      );
-      if (linha !== processo.planilha_linha) {
-        await updateProcesso(processo.id, { planilha_linha: linha });
-      }
+      await sincronizarSubfaseNaPlanilha(SUBFASE_CONTRATADO);
     } catch (erro) {
       alert(
         'Não foi possível atualizar a situação do processo: ' +
+          (erro instanceof Error ? erro.message : String(erro)),
+      );
+    } finally {
+      setMarcandoContratado(false);
+    }
+  };
+
+  const handleDesmarcarContratadoAditivado = async () => {
+    if (!processo) return;
+    setMarcandoContratado(true);
+    try {
+      const subfaseRestaurada = processo.subfaseAnterior ?? '';
+      await updateProcesso(processo.id, {
+        status: processo.statusAnterior ?? 'em_andamento',
+        fase_processo: processo.faseAnterior ?? '',
+        subfase_processo: subfaseRestaurada,
+      });
+      await sincronizarSubfaseNaPlanilha(subfaseRestaurada);
+    } catch (erro) {
+      alert(
+        'Não foi possível reverter a situação do processo: ' +
           (erro instanceof Error ? erro.message : String(erro)),
       );
     } finally {
@@ -148,6 +178,9 @@ export default function NovoProcesso() {
         natureza_despesa: naturezaDespesa,
         fonte,
         valor_estimado: valorEstimadoNumero ?? 0,
+        ...(ritoProcessual === 'Adesão ARP'
+          ? { orgaoGerenciadorArp, fornecedorArp }
+          : { orgaoGerenciadorArp: '', fornecedorArp: '' }),
       };
 
       // Pede a autorização do Google ANTES de gravar no Firestore: feita
@@ -252,10 +285,22 @@ export default function NovoProcesso() {
         </div>
         {emEdicao && processo && (
           jaContratadoAditivado ? (
-            <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-purple-50 text-purple-700 border border-purple-200">
-              <FileCheck2 className="-ml-1 mr-1.5 h-4 w-4" />
-              Contratado/Aditivado
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                <FileCheck2 className="-ml-1 mr-1.5 h-4 w-4" />
+                Contratado/Aditivado
+              </span>
+              <button
+                type="button"
+                onClick={handleDesmarcarContratadoAditivado}
+                disabled={marcandoContratado}
+                title="Reverte pra situação anterior a marcar como Contratado/Aditivado"
+                className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="-ml-1 mr-1.5 h-4 w-4" />
+                {marcandoContratado ? 'Atualizando...' : 'Desmarcar'}
+              </button>
+            </div>
           ) : (
             <button
               type="button"
@@ -369,6 +414,35 @@ export default function NovoProcesso() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {ritoProcessual === 'Adesão ARP' && (
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="orgaoGerenciadorArp" className="block text-sm font-medium text-gray-700">
+                      Órgão Gerenciador da ARP
+                    </label>
+                    <input
+                      id="orgaoGerenciadorArp"
+                      type="text"
+                      value={orgaoGerenciadorArp}
+                      onChange={(e) => setOrgaoGerenciadorArp(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="fornecedorArp" className="block text-sm font-medium text-gray-700">
+                      Fornecedor
+                    </label>
+                    <input
+                      id="fornecedorArp"
+                      type="text"
+                      value={fornecedorArp}
+                      onChange={(e) => setFornecedorArp(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                    />
                   </div>
                 </div>
               )}
