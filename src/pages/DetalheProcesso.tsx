@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { ArrowLeft, Clock, FileCheck2, MapPin, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, FileCheck2, MapPin, Pencil, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
 import { CHECKLISTS_RITOS, STATUS_PROCESSO_LABELS } from '../types';
 import { calcularProgressoChecklist, localizacaoEfetiva, montarLinhaDoTempo } from '../lib/fluxoProcesso';
@@ -42,48 +42,84 @@ export default function DetalheProcesso() {
 
   const jaContratadoAditivado = (processo.subfase_processo ?? '').toUpperCase().includes('CONTRATADO');
 
+  // Sincroniza um valor de subfase com a planilha de controle (coluna Q) —
+  // compartilhado entre marcar e desmarcar Contratado/Aditivado.
+  const sincronizarSubfaseNaPlanilha = async (subfase: string) => {
+    let googleToken = await getAccessToken();
+    if (!googleToken) {
+      const resultado = await googleSignIn();
+      googleToken = resultado?.accessToken ?? null;
+    }
+    if (!googleToken) {
+      alert(
+        'Situação atualizada no sistema, mas não foi possível conectar ao Google para ' +
+          'replicar na planilha automaticamente. Atualize a coluna Q manualmente ou tente de novo depois.',
+      );
+      return;
+    }
+
+    const linha = await sincronizarProcessoNaPlanilha(
+      googleToken,
+      ID_PLANILHA_PROCESSOS,
+      { ...processoParaDadosPlanilha(processo), subfase_processo: subfase },
+      processo.planilha_linha,
+    );
+    if (linha !== processo.planilha_linha) {
+      await updateProcesso(processo.id, { planilha_linha: linha });
+    }
+  };
+
   // Marca a Subfase do Processo (coluna Q da planilha) com o valor
   // "CONTRATADO" — a mesma opção já existente no menu suspenso da
   // planilha — e o status "Contratado/Aditivado" no app, na mesma ação.
   // Representa o fim da fase de Instrução (que vai da abertura até a
   // publicação do contrato) e a passagem pra fase de Gestão do
-  // Contrato. Não tem "reverter": essa coluna também é escrita pelo
-  // RPA, e não existe um valor anterior confiável pra restaurar por
-  // aqui — se precisar desfazer, é direto na planilha (o app absorve na
-  // próxima sincronização).
+  // Contrato. Guarda o status/fase/subfase anteriores antes de
+  // sobrescrever, pra permitir desmarcar restaurando exatamente esse
+  // estado (ver handleDesmarcarContratadoAditivado).
   const handleMarcarContratadoAditivado = async () => {
     setMarcandoContratado(true);
     try {
       await updateProcesso(processo.id, {
+        statusAnterior: processo.status,
+        faseAnterior: processo.fase_processo ?? '',
+        subfaseAnterior: processo.subfase_processo ?? '',
         subfase_processo: SUBFASE_CONTRATADO,
         status: 'contratado_aditivado',
       });
-
-      let googleToken = await getAccessToken();
-      if (!googleToken) {
-        const resultado = await googleSignIn();
-        googleToken = resultado?.accessToken ?? null;
-      }
-      if (!googleToken) {
-        alert(
-          'Situação atualizada no sistema, mas não foi possível conectar ao Google para ' +
-            'replicar na planilha automaticamente. Atualize a coluna Q manualmente ou tente de novo depois.',
-        );
-        return;
-      }
-
-      const linha = await sincronizarProcessoNaPlanilha(
-        googleToken,
-        ID_PLANILHA_PROCESSOS,
-        { ...processoParaDadosPlanilha(processo), subfase_processo: SUBFASE_CONTRATADO },
-        processo.planilha_linha,
-      );
-      if (linha !== processo.planilha_linha) {
-        await updateProcesso(processo.id, { planilha_linha: linha });
-      }
+      await sincronizarSubfaseNaPlanilha(SUBFASE_CONTRATADO);
     } catch (erro) {
       alert(
         'Não foi possível atualizar a situação do processo: ' +
+          (erro instanceof Error ? erro.message : String(erro)),
+      );
+    } finally {
+      setMarcandoContratado(false);
+    }
+  };
+
+  // Restaura o status/fase/subfase que o processo tinha antes de ser
+  // marcado como Contratado/Aditivado (guardados em *Anterior no momento em
+  // que foi marcado) — para o caso de ter sido marcado por engano ou o
+  // processo voltar de fase.
+  const handleDesmarcarContratadoAditivado = async () => {
+    setMarcandoContratado(true);
+    try {
+      // Não precisa limpar statusAnterior/faseAnterior/subfaseAnterior aqui:
+      // o botão "Desmarcar" só aparece enquanto subfase_processo contém
+      // "CONTRATADO" (jaContratadoAditivado), e esses três campos são
+      // sempre regravados do zero da próxima vez que o processo for
+      // marcado de novo.
+      const subfaseRestaurada = processo.subfaseAnterior ?? '';
+      await updateProcesso(processo.id, {
+        status: processo.statusAnterior ?? 'em_andamento',
+        fase_processo: processo.faseAnterior ?? '',
+        subfase_processo: subfaseRestaurada,
+      });
+      await sincronizarSubfaseNaPlanilha(subfaseRestaurada);
+    } catch (erro) {
+      alert(
+        'Não foi possível reverter a situação do processo: ' +
           (erro instanceof Error ? erro.message : String(erro)),
       );
     } finally {
@@ -161,10 +197,22 @@ export default function DetalheProcesso() {
           {isMasterOrApoio && (
             <>
               {jaContratadoAditivado ? (
-                <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <FileCheck2 className="-ml-1 mr-1.5 h-4 w-4" />
-                  Contratado/Aditivado
-                </span>
+                <>
+                  <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <FileCheck2 className="-ml-1 mr-1.5 h-4 w-4" />
+                    Contratado/Aditivado
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleDesmarcarContratadoAditivado}
+                    disabled={marcandoContratado}
+                    title="Reverte pra situação anterior a marcar como Contratado/Aditivado"
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RotateCcw className="-ml-1 mr-1.5 h-4 w-4" />
+                    {marcandoContratado ? 'Atualizando...' : 'Desmarcar'}
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"

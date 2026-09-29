@@ -193,6 +193,15 @@ export interface Processo {
   ultima_tramitacao?: string;
   /** Linha (1-based) desse processo na planilha de controle, para atualizações futuras acharem a linha certa sem precisar buscar de novo. */
   planilha_linha?: number;
+  /**
+   * Snapshot de status/fase/subfase tirado no instante em que o processo é
+   * marcado como "Contratado/Aditivado" — permite desmarcar restaurando
+   * exatamente o estado anterior, em vez de reconfigurar tudo manualmente.
+   * Limpo ao desmarcar.
+   */
+  statusAnterior?: StatusProcesso;
+  faseAnterior?: string;
+  subfaseAnterior?: string;
   criado_em: string;
   atualizado_em: string;
 }

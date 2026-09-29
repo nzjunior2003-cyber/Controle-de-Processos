@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
@@ -8,21 +8,45 @@ import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
 import { calcularProgressoChecklist } from '../lib/fluxoProcesso';
 
+type FiltroTempo = 'todos' | 'verde' | 'amarelo' | 'vermelho' | 'contratado';
+type FiltroPrevisaoPca = 'todos' | 'sim' | 'nao';
+
 export default function Aquisicoes() {
   const { processos, setores, usuarioAtual, syncProcessosDaPlanilha } = useApp();
   const navigate = useNavigate();
-  const [busca, setBusca] = useState('');
-  const [activeTab, setActiveTab] = useState<'processos' | 'pca'>('processos');
   const [sincronizando, setSincronizando] = useState(false);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
-  const [filtroTempo, setFiltroTempo] = useState<'todos' | 'verde' | 'amarelo' | 'vermelho' | 'contratado'>('todos');
-  const [filtroRito, setFiltroRito] = useState('');
-  const [filtroNatureza, setFiltroNatureza] = useState('');
-  const [filtroSetorAtual, setFiltroSetorAtual] = useState('');
-  const [filtroFonte, setFiltroFonte] = useState('');
-  const [filtroPrevisaoPca, setFiltroPrevisaoPca] = useState<'todos' | 'sim' | 'nao'>('todos');
-  const [filtroDemandante, setFiltroDemandante] = useState('');
+  // Filtros na URL (query params), não em useState local — assim, ao entrar
+  // no detalhe de um processo e voltar, a lista mantém exatamente os
+  // filtros aplicados antes (useState local se perdia ao desmontar a tela).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const definirParam = (chave: string, valor: string, valorPadrao: string) => {
+    const proximos = new URLSearchParams(searchParams);
+    if (valor === valorPadrao) proximos.delete(chave);
+    else proximos.set(chave, valor);
+    setSearchParams(proximos, { replace: true });
+  };
+
+  const busca = searchParams.get('busca') ?? '';
+  const setBusca = (v: string) => definirParam('busca', v, '');
+  const activeTab = (searchParams.get('tab') as 'processos' | 'pca') || 'processos';
+  const setActiveTab = (v: 'processos' | 'pca') => definirParam('tab', v, 'processos');
+
+  const filtroTempo = (searchParams.get('tempo') as FiltroTempo) || 'todos';
+  const setFiltroTempo = (v: FiltroTempo) => definirParam('tempo', v, 'todos');
+  const filtroRito = searchParams.get('rito') ?? '';
+  const setFiltroRito = (v: string) => definirParam('rito', v, '');
+  const filtroNatureza = searchParams.get('natureza') ?? '';
+  const setFiltroNatureza = (v: string) => definirParam('natureza', v, '');
+  const filtroSetorAtual = searchParams.get('setor') ?? '';
+  const setFiltroSetorAtual = (v: string) => definirParam('setor', v, '');
+  const filtroFonte = searchParams.get('fonte') ?? '';
+  const setFiltroFonte = (v: string) => definirParam('fonte', v, '');
+  const filtroPrevisaoPca = (searchParams.get('pca') as FiltroPrevisaoPca) || 'todos';
+  const setFiltroPrevisaoPca = (v: FiltroPrevisaoPca) => definirParam('pca', v, 'todos');
+  const filtroDemandante = searchParams.get('demandante') ?? '';
+  const setFiltroDemandante = (v: string) => definirParam('demandante', v, '');
 
   const hoje = new Date();
 
