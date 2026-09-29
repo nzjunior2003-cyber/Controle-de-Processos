@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, Clock, FileCheck2, MapPin, Pencil, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
-import { CHECKLISTS_RITOS, STATUS_PROCESSO_LABELS } from '../types';
+import { STATUS_PROCESSO_LABELS } from '../types';
+import { useEtapasPorRito } from '../hooks/useEtapasPorRito';
 import {
   agruparLinhaDoTempoPorSetor,
   calcularProgressoChecklist,
@@ -25,6 +26,7 @@ export default function DetalheProcesso() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { processos, setores, estadasProcesso, pcas, contratos, procedimentos, usuarioAtual, updateProcesso, deleteProcesso } = useApp();
+  const etapasPorRito = useEtapasPorRito();
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const [marcandoContratado, setMarcandoContratado] = useState(false);
@@ -151,8 +153,8 @@ export default function DetalheProcesso() {
     : undefined;
   const diasNaLocalizacaoAtual = linhaDoTempo[linhaDoTempo.length - 1]?.dias;
 
-  const checklistDisponivel = processo.rito_processual ? CHECKLISTS_RITOS[processo.rito_processual] : undefined;
-  const progressoChecklist = calcularProgressoChecklist(processo) ?? 0;
+  const checklistDisponivel = processo.rito_processual ? etapasPorRito[processo.rito_processual] : undefined;
+  const progressoChecklist = calcularProgressoChecklist(processo, etapasPorRito) ?? 0;
 
   const { contrato: contratoVinculado, procedimento: procedimentoVinculado } = encontrarVinculosPorPae(
     processo.numero_processo,

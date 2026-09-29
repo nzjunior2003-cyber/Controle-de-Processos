@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  mapAbaRitoDeProcessos,
   mapSheetArrayToPca,
   mapSheetRowToPca,
   mapSheetRowToProcesso,
@@ -195,5 +196,43 @@ describe('mapSheetArrayToPca', () => {
     expect(pca.objeto_pca).toBe('Sem Objeto');
     expect(pca.unidade_responsavel).toBe('Desconhecida');
     expect(pca.exercicio).toBe(2026);
+  });
+});
+
+describe('mapAbaRitoDeProcessos', () => {
+  // Papa.parse com header:true sempre devolve o mesmo conjunto de colunas
+  // em toda linha (string vazia quando a célula não tem valor) — por isso
+  // toda linha do fixture já inclui todas as colunas, mesmo vazias.
+  const linhas = [
+    { 'PEÇAS': 'Documento de Formalização de Demanda', 'Pregão Eletrônico ORDEM': '1', 'Dispensa em Situação de Emergência ORDEM': '1', 'Acréscimo ou supressão ORDEMC1': '' },
+    { 'PEÇAS': 'Estudo Técnico Preliminar', 'Pregão Eletrônico ORDEM': '2', 'Dispensa em Situação de Emergência ORDEM': '', 'Acréscimo ou supressão ORDEMC1': '' },
+    { 'PEÇAS': 'Análise de Risco', 'Pregão Eletrônico ORDEM': '3', 'Dispensa em Situação de Emergência ORDEM': '2', 'Acréscimo ou supressão ORDEMC1': '' },
+    { 'PEÇAS': 'Acréscimo ou supressão', 'Pregão Eletrônico ORDEM': '', 'Dispensa em Situação de Emergência ORDEM': '', 'Acréscimo ou supressão ORDEMC1': '1' },
+  ];
+
+  it('pivoteia a matriz peça x rito numa lista ordenada por rito', () => {
+    const resultado = mapAbaRitoDeProcessos(linhas);
+    expect(resultado['Pregão Eletrônico']).toEqual([
+      'Documento de Formalização de Demanda',
+      'Estudo Técnico Preliminar',
+      'Análise de Risco',
+    ]);
+  });
+
+  it('ignora peças sem ordem numérica pra aquele rito', () => {
+    const resultado = mapAbaRitoDeProcessos(linhas);
+    expect(resultado['Dispensa em Situação de Emergência']).toEqual([
+      'Documento de Formalização de Demanda',
+      'Análise de Risco',
+    ]);
+  });
+
+  it('lida com o sufixo ORDEMC1 (coluna com nome levemente diferente)', () => {
+    const resultado = mapAbaRitoDeProcessos(linhas);
+    expect(resultado['Acréscimo ou supressão']).toEqual(['Acréscimo ou supressão']);
+  });
+
+  it('devolve objeto vazio pra planilha vazia', () => {
+    expect(mapAbaRitoDeProcessos([])).toEqual({});
   });
 });

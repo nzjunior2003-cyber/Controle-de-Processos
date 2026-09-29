@@ -7,6 +7,7 @@ import IntegracaoPCA from './IntegracaoPCA';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS } from '../types';
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
 import { calcularProgressoChecklist } from '../lib/fluxoProcesso';
+import { useEtapasPorRito } from '../hooks/useEtapasPorRito';
 
 type FiltroTempo = 'todos' | 'verde' | 'amarelo' | 'vermelho' | 'contratado';
 type FiltroPrevisaoPca = 'todos' | 'sim' | 'nao';
@@ -14,6 +15,7 @@ type FiltroPrevisaoPca = 'todos' | 'sim' | 'nao';
 export default function Aquisicoes() {
   const { processos, setores, usuarioAtual, syncProcessosDaPlanilha } = useApp();
   const navigate = useNavigate();
+  const etapasPorRito = useEtapasPorRito();
   const [sincronizando, setSincronizando] = useState(false);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
@@ -380,7 +382,7 @@ export default function Aquisicoes() {
                       const diasNoSetor = proc.ultima_tramitacao
                         ? Math.max(0, differenceInDays(hoje, new Date(proc.ultima_tramitacao)))
                         : null;
-                      const progresso = calcularProgressoChecklist(proc);
+                      const progresso = calcularProgressoChecklist(proc, etapasPorRito);
                       return (
                         <tr
                           key={proc.id}

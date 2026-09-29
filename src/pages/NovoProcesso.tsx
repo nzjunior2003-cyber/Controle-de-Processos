@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { ArrowLeft, FileCheck2, RotateCcw, Save } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { PcaAutocomplete } from '../components/PcaAutocomplete';
-import { CHECKLISTS_RITOS } from '../types';
+import { useEtapasPorRito } from '../hooks/useEtapasPorRito';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
@@ -21,6 +21,7 @@ export default function NovoProcesso() {
   const { id } = useParams<{ id: string }>();
   const { addProcesso, updateProcesso, processos, pcas, usuarioAtual } = useApp();
   const navigate = useNavigate();
+  const etapasPorRito = useEtapasPorRito();
 
   useEffect(() => {
     const cancelar = initAuth();
@@ -387,16 +388,16 @@ export default function NovoProcesso() {
               <label htmlFor="ritoProcessual" className="block text-sm font-medium text-gray-700">Rito Processual</label>
               <select id="ritoProcessual" value={ritoProcessual} onChange={handleRitoChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
                 <option value="">Selecione um Rito...</option>
-                {Object.keys(CHECKLISTS_RITOS).map(rito => (
+                {Object.keys(etapasPorRito).map(rito => (
                   <option key={rito} value={rito}>{rito}</option>
                 ))}
               </select>
 
-              {ritoProcessual && CHECKLISTS_RITOS[ritoProcessual] && (
+              {ritoProcessual && etapasPorRito[ritoProcessual] && (
                 <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
                   <h4 className="text-sm font-medium text-gray-900 mb-2">Checklist Inicial:</h4>
                   <div className="space-y-2">
-                    {CHECKLISTS_RITOS[ritoProcessual].map((item, idx) => (
+                    {etapasPorRito[ritoProcessual].map((item, idx) => (
                       <div key={idx} className="flex items-start">
                         <div className="flex items-center h-5">
                           <input

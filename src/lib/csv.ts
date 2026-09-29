@@ -164,6 +164,48 @@ export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha 
 export const ID_PLANILHA_PROCESSOS = '1deakLqP8-enEgY384EkFyYedgo5WYSONjvYIBJDwqXE';
 export const URL_PLANILHA_PROCESSOS = `https://docs.google.com/spreadsheets/d/${ID_PLANILHA_PROCESSOS}/edit?usp=sharing`;
 
+/** Aba da planilha de controle de processos com as etapas ("peças") de cada rito processual, na ordem oficial. */
+export const ABA_RITO_DE_PROCESSOS = 'RITO DE PROCESSOS';
+
+/**
+ * Pivotea a aba "RITO DE PROCESSOS": cada linha é uma etapa/peça, e cada
+ * rito tem sua própria coluna de ordem (ex.: "Pregão Eletrônico ORDEM"),
+ * em branco quando aquela peça não se aplica àquele rito. Devolve um
+ * dicionário `{ rito: [peças ordenadas] }`, ignorando peças sem ordem
+ * numérica pra aquele rito. É a fonte de verdade das etapas por rito —
+ * substitui o dicionário hardcoded `CHECKLISTS_RITOS` (`types.ts`), que
+ * vira fallback pra quando a planilha não estiver acessível.
+ */
+export function mapAbaRitoDeProcessos(linhas: LinhaPlanilha[]): Record<string, string[]> {
+  if (linhas.length === 0) return {};
+  const colunas = Object.keys(linhas[0]);
+  const colunaPeca = colunas.find((c) => c.trim().toUpperCase() === 'PEÇAS');
+  if (!colunaPeca) return {};
+  const colunasRito = colunas.filter((c) => c !== colunaPeca && /ORDEM/i.test(c));
+
+  const resultado: Record<string, string[]> = {};
+  for (const coluna of colunasRito) {
+    const nomeRito = coluna.replace(/ORDEMC?\d*/i, '').replace(/\s+/g, ' ').trim();
+    if (!nomeRito) continue;
+
+    const pares = linhas
+      .map((linha) => ({
+        peca: (linha[colunaPeca] ?? '').toString().trim(),
+        ordemTexto: (linha[coluna] ?? '').toString().trim(),
+      }))
+      // Number('') é 0, não "sem ordem" — por isso o filtro do texto vazio
+      // vem antes da conversão pra número.
+      .filter((par) => par.peca && par.ordemTexto !== '')
+      .map((par) => ({ peca: par.peca, ordem: Number(par.ordemTexto) }))
+      .filter((par) => Number.isFinite(par.ordem));
+
+    if (pares.length === 0) continue;
+    pares.sort((a, b) => a.ordem - b.ordem);
+    resultado[nomeRito] = pares.map((par) => par.peca);
+  }
+  return resultado;
+}
+
 /** Id da planilha de Gestão de Contratos (aba "GERAL" da "GESTÃO DE CONTRATOS - 2026 DESPESAS MENSAIS"). */
 export const ID_PLANILHA_CONTRATOS = '1pL_00gdCSdduzJjGxCO-H1xjbQx-yo4QqHAN8g6ef8c';
 export const URL_PLANILHA_CONTRATOS = `https://docs.google.com/spreadsheets/d/${ID_PLANILHA_CONTRATOS}/edit?usp=sharing`;

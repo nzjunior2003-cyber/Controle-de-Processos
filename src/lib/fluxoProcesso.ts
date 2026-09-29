@@ -145,9 +145,10 @@ export function localizacaoEfetiva(
  */
 export function calcularProgressoChecklist(
   processo: Pick<Processo, 'rito_processual' | 'checklist_rito'>,
+  checklistsPorRito: Record<string, string[]> = CHECKLISTS_RITOS,
 ): number | null {
   if (!processo.rito_processual) return null;
-  const checklistDoRito = CHECKLISTS_RITOS[processo.rito_processual];
+  const checklistDoRito = checklistsPorRito[processo.rito_processual];
   if (!checklistDoRito || checklistDoRito.length === 0) return null;
   const concluidas = processo.checklist_rito?.length ?? 0;
   return Math.round((concluidas / checklistDoRito.length) * 100);
