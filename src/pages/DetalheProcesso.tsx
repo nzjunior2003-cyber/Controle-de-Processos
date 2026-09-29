@@ -4,7 +4,12 @@ import { useApp } from '../context/AppContext';
 import { ArrowLeft, Clock, FileCheck2, MapPin, Pencil, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
 import { CHECKLISTS_RITOS, STATUS_PROCESSO_LABELS } from '../types';
-import { calcularProgressoChecklist, localizacaoEfetiva, montarLinhaDoTempo } from '../lib/fluxoProcesso';
+import {
+  agruparLinhaDoTempoPorSetor,
+  calcularProgressoChecklist,
+  localizacaoEfetiva,
+  montarLinhaDoTempo,
+} from '../lib/fluxoProcesso';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
 import { getAccessToken, googleSignIn } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
@@ -435,45 +440,45 @@ export default function DetalheProcesso() {
           )}
 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Gráfico de Tarefas (Gantt)</h2>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Gráfico de Tarefas (Gantt) — por Setor</h2>
             {linhaDoTempo.length === 0 ? (
               <p className="text-sm text-gray-500 italic">Sem histórico de localização registrado ainda.</p>
             ) : (
-              <div className="space-y-4">
-                <div className="w-full h-8 flex rounded-md overflow-hidden ring-1 ring-gray-200">
-                  {(() => {
-                    const totalDias = linhaDoTempo.reduce((acc, e) => acc + e.dias, 0) || 1;
-                    return linhaDoTempo
-                      .filter((e) => e.dias > 0)
-                      .map((estada, idx) => (
-                        <div
-                          key={estada.id}
-                          className={`${CORES_GANTT[idx % CORES_GANTT.length]} h-full group relative transition-all hover:brightness-110 flex items-center justify-center cursor-help`}
-                          style={{ width: `${Math.max((estada.dias / totalDias) * 100, 5)}%` }}
-                          title={`${estada.localizacao}: ${estada.dias} dias`}
-                        >
-                          <span className="text-[10px] font-bold text-white truncate px-1 drop-shadow-md">
-                            {estada.localizacao}
-                          </span>
-                        </div>
-                      ));
-                  })()}
-                </div>
+              (() => {
+                const raias = agruparLinhaDoTempoPorSetor(linhaDoTempo);
+                const inicioGlobal = new Date(linhaDoTempo[0].data_inicio).getTime();
+                const fimGlobal = new Date().getTime();
+                const spanTotal = Math.max(fimGlobal - inicioGlobal, 1);
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
-                  {linhaDoTempo
-                    .filter((e) => e.dias > 0)
-                    .map((estada, idx) => (
-                      <div key={estada.id} className="flex items-center text-xs">
-                        <span className={`w-3 h-3 rounded-sm ${CORES_GANTT[idx % CORES_GANTT.length]} mr-1.5 flex-shrink-0 shadow-sm`}></span>
-                        <span className="truncate text-gray-700" title={estada.localizacao}>
-                          <span className="font-medium">{estada.localizacao}</span>
-                          <span className="text-gray-500 ml-1">({estada.dias}d)</span>
-                        </span>
+                return (
+                  <div className="space-y-3">
+                    {raias.map((raia, idxRaia) => (
+                      <div key={raia.localizacao} className="flex items-center gap-3">
+                        <div className="w-32 sm:w-44 flex-shrink-0 text-xs font-medium text-gray-700 truncate" title={raia.localizacao}>
+                          {raia.localizacao}
+                        </div>
+                        <div className="relative flex-1 h-6 bg-gray-100 rounded overflow-hidden">
+                          {raia.visitas.map((visita) => {
+                            const inicioVisita = new Date(visita.data_inicio).getTime();
+                            const fimVisita = visita.data_fim ? new Date(visita.data_fim).getTime() : fimGlobal;
+                            const left = ((inicioVisita - inicioGlobal) / spanTotal) * 100;
+                            const width = Math.max(((fimVisita - inicioVisita) / spanTotal) * 100, 1.5);
+                            return (
+                              <div
+                                key={visita.id}
+                                className={`absolute top-0 h-full ${CORES_GANTT[idxRaia % CORES_GANTT.length]} hover:brightness-110 cursor-help rounded-sm`}
+                                style={{ left: `${left}%`, width: `${width}%` }}
+                                title={`${raia.localizacao}: ${visita.dias} dia${visita.dias === 1 ? '' : 's'} (${format(new Date(visita.data_inicio), 'dd/MM/yyyy')}${visita.data_fim ? ` a ${format(new Date(visita.data_fim), 'dd/MM/yyyy')}` : ' — atual'})`}
+                              />
+                            );
+                          })}
+                        </div>
+                        <div className="w-14 flex-shrink-0 text-xs text-gray-500 text-right">{raia.diasTotal}d</div>
                       </div>
                     ))}
-                </div>
-              </div>
+                  </div>
+                );
+              })()
             )}
           </div>
 

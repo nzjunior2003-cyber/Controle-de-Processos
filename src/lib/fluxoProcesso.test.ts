@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   agruparEstadasPorProcesso,
+  agruparLinhaDoTempoPorSetor,
   calcularDiasEstada,
   calcularMediaDiasPorLocalizacao,
   calcularMediaDiasPorRito,
@@ -153,6 +154,27 @@ describe('agruparEstadasPorProcesso', () => {
     ]);
     expect(mapa.get('p1')?.map((e) => e.id)).toEqual(['a', 'c']);
     expect(mapa.get('p2')?.map((e) => e.id)).toEqual(['b']);
+  });
+});
+
+describe('agruparLinhaDoTempoPorSetor', () => {
+  it('agrupa visitas repetidas ao mesmo setor numa única raia, somando os dias', () => {
+    const linhaDoTempo = montarLinhaDoTempo([
+      estada({ id: 'e1', localizacao: 'SEPLAD', data_inicio: '2026-08-01T00:00:00Z', data_fim: '2026-08-05T00:00:00Z' }),
+      estada({ id: 'e2', localizacao: 'DTIC', data_inicio: '2026-08-05T00:00:00Z', data_fim: '2026-08-10T00:00:00Z' }),
+      estada({ id: 'e3', localizacao: 'SEPLAD', data_inicio: '2026-08-10T00:00:00Z', data_fim: '2026-08-12T00:00:00Z' }),
+    ], agora);
+
+    const raias = agruparLinhaDoTempoPorSetor(linhaDoTempo);
+
+    expect(raias.map((r) => r.localizacao)).toEqual(['SEPLAD', 'DTIC']);
+    const raiaSeplad = raias.find((r) => r.localizacao === 'SEPLAD')!;
+    expect(raiaSeplad.visitas).toHaveLength(2);
+    expect(raiaSeplad.diasTotal).toBe(4 + 2);
+  });
+
+  it('devolve lista vazia pra linha do tempo vazia', () => {
+    expect(agruparLinhaDoTempoPorSetor([])).toEqual([]);
   });
 });
 

@@ -44,6 +44,34 @@ export function calcularTempoTotal(estadas: EstadaProcesso[], agora: Date = new 
   return estadas.reduce((total, estada) => total + calcularDiasEstada(estada, agora), 0);
 }
 
+/** Uma raia (swimlane) do Gantt: todas as passagens do processo por um mesmo setor/etapa. */
+export interface RaiaSetor {
+  localizacao: string;
+  visitas: Array<EstadaProcesso & { dias: number }>;
+  diasTotal: number;
+}
+
+/**
+ * Agrupa a linha do tempo (já ordenada por `montarLinhaDoTempo`) por
+ * localização — uma raia por setor/etapa, preservando cada passagem
+ * separadamente (pra desenhar no eixo do tempo real, com os intervalos em
+ * que o processo esteve fora daquele setor aparecendo como espaço vazio na
+ * raia). A ordem das raias segue a primeira vez que o processo passou por
+ * cada localização.
+ */
+export function agruparLinhaDoTempoPorSetor(
+  linhaDoTempo: Array<EstadaProcesso & { dias: number }>,
+): RaiaSetor[] {
+  const mapa = new Map<string, RaiaSetor>();
+  for (const estada of linhaDoTempo) {
+    const raia = mapa.get(estada.localizacao) ?? { localizacao: estada.localizacao, visitas: [], diasTotal: 0 };
+    raia.visitas.push(estada);
+    raia.diasTotal += estada.dias;
+    mapa.set(estada.localizacao, raia);
+  }
+  return Array.from(mapa.values());
+}
+
 /**
  * Média de dias por localização, considerando as estadias de todos os
  * processos que já passaram por cada lugar — usado para identificar em
