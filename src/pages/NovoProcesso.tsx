@@ -292,6 +292,14 @@ export default function NovoProcesso() {
     }
   };
 
+  if (usuarioAtual?.perfil !== 'master' && usuarioAtual?.perfil !== 'apoio') {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        Você não tem permissão para cadastrar ou editar processos.
+      </div>
+    );
+  }
+
   if (emEdicao && !processo) {
     return <div className="p-6">Processo não encontrado.</div>;
   }

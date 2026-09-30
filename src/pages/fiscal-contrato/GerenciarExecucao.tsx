@@ -38,6 +38,15 @@ export default function GerenciarExecucaoFiscal() {
     return encontrado ? calcularStatusContrato(encontrado) : null;
   }, [contratos, id]);
 
+  const perfil = usuarioAtual?.perfil;
+  if (perfil !== 'master' && perfil !== 'fiscal' && perfil !== 'gestao' && perfil !== 'contratos') {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        Você não tem permissão para gerenciar a execução deste contrato.
+      </div>
+    );
+  }
+
   if (!contrato) {
     return (
       <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center text-gray-500">

@@ -11,9 +11,12 @@ import { calcularStatusContrato, filtrarContratosDoFiscal } from '../../lib/cont
  */
 export default function DashboardFiscalContrato() {
   const { contratos, usuarioAtual } = useApp();
-  const isMaster = usuarioAtual?.perfil === 'master';
+  // Só o Fiscal fica restrito aos próprios contratos; master, Diretoria e
+  // Demandante (que não são fiscais de nada) veem a visão completa em vez
+  // de uma lista vazia.
+  const verTodos = usuarioAtual?.perfil !== 'fiscal';
 
-  const contratosDoEscopo = isMaster ? contratos : filtrarContratosDoFiscal(contratos, usuarioAtual);
+  const contratosDoEscopo = verTodos ? contratos : filtrarContratosDoFiscal(contratos, usuarioAtual);
   const contratosComStatus = contratosDoEscopo.map((contrato) => calcularStatusContrato(contrato));
 
   return (
@@ -21,7 +24,7 @@ export default function DashboardFiscalContrato() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard do Fiscal do Contrato</h1>
         <p className="mt-1 text-sm text-gray-500">
-          {isMaster
+          {verTodos
             ? 'Visão geral de todos os contratos, por vigência e valor global.'
             : 'Visão geral dos contratos sob sua fiscalização.'}
         </p>

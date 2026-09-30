@@ -1,12 +1,16 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Package, FileText, CheckSquare, Search, Users, FileCheck, ClipboardList, ClipboardCheck, DollarSign } from 'lucide-react';
+import { Package, FileText, CheckSquare, Search, Users, FileCheck, ClipboardList, ClipboardCheck, DollarSign, LayoutDashboard } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { ehPerfilDiretoria } from '../types';
 
 export default function SistemaHome() {
   const { usuarioAtual } = useApp();
   const perfil = usuarioAtual?.perfil;
   const isMaster = perfil === 'master';
+  // Master e perfis de Diretoria (DGA, DAL, DF, DCA, BM4) enxergam o card de
+  // todos os módulos — os da Diretoria só pra consulta (as telas travam a edição).
+  const verTudo = isMaster || ehPerfilDiretoria(perfil);
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
@@ -18,7 +22,7 @@ export default function SistemaHome() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {(isMaster || perfil === 'apoio') && (
+        {(verTudo || perfil === 'apoio') && (
           <Link to="/sistema/apoio" className="bg-white group rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 hover:shadow-md hover:border-red-300 hover:ring-1 hover:ring-red-100 transition-all flex flex-col items-center text-center">
             <div className="bg-orange-50 text-orange-600 p-3 rounded-full group-hover:bg-orange-600 group-hover:text-white transition-colors mb-2 sm:mb-3">
               <Package className="w-6 h-6 sm:w-8 sm:h-8" />
@@ -28,7 +32,7 @@ export default function SistemaHome() {
           </Link>
         )}
 
-        {(isMaster || perfil === 'contratos') && (
+        {(verTudo || perfil === 'contratos') && (
           <Link to="/sistema/contratos-arps" className="bg-white group rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 hover:shadow-md hover:border-red-300 hover:ring-1 hover:ring-red-100 transition-all flex flex-col items-center text-center">
             <div className="bg-blue-50 text-blue-600 p-3 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors mb-2 sm:mb-3">
               <FileText className="w-6 h-6 sm:w-8 sm:h-8" />
@@ -38,7 +42,7 @@ export default function SistemaHome() {
           </Link>
         )}
 
-        {(isMaster || perfil === 'gestao') && (
+        {(verTudo || perfil === 'gestao') && (
           <Link to="/sistema/gestao-contratos" className="bg-white group rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 hover:shadow-md hover:border-red-300 hover:ring-1 hover:ring-red-100 transition-all flex flex-col items-center text-center">
             <div className="bg-emerald-50 text-emerald-600 p-3 rounded-full group-hover:bg-emerald-600 group-hover:text-white transition-colors mb-2 sm:mb-3">
               <CheckSquare className="w-6 h-6 sm:w-8 sm:h-8" />
@@ -48,7 +52,7 @@ export default function SistemaHome() {
           </Link>
         )}
 
-        {(isMaster || perfil === 'fiscal') && (
+        {(verTudo || perfil === 'fiscal') && (
           <Link to="/sistema/fiscal-contrato" className="bg-white group rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 hover:shadow-md hover:border-red-300 hover:ring-1 hover:ring-red-100 transition-all flex flex-col items-center text-center">
             <div className="bg-indigo-50 text-indigo-600 p-3 rounded-full group-hover:bg-indigo-600 group-hover:text-white transition-colors mb-2 sm:mb-3">
               <FileCheck className="w-6 h-6 sm:w-8 sm:h-8" />
@@ -58,7 +62,7 @@ export default function SistemaHome() {
           </Link>
         )}
 
-        {(isMaster || perfil === 'bm4') && (
+        {verTudo && (
           <Link to="/sistema/planejamento" className="bg-white group rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 hover:shadow-md hover:border-red-300 hover:ring-1 hover:ring-red-100 transition-all flex flex-col items-center text-center">
             <div className="bg-cyan-50 text-cyan-600 p-3 rounded-full group-hover:bg-cyan-600 group-hover:text-white transition-colors mb-2 sm:mb-3">
               <ClipboardList className="w-6 h-6 sm:w-8 sm:h-8" />
@@ -76,13 +80,23 @@ export default function SistemaHome() {
           <p className="text-xs sm:text-sm text-gray-500 mt-1">Itens planejados do PCA e seus vínculos com processos.</p>
         </Link>
 
-        {(isMaster || perfil === 'financeiro') && (
+        {(verTudo || perfil === 'financeiro') && (
           <Link to="/sistema/financeiro" className="bg-white group rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 hover:shadow-md hover:border-red-300 hover:ring-1 hover:ring-red-100 transition-all flex flex-col items-center text-center">
             <div className="bg-lime-50 text-lime-600 p-3 rounded-full group-hover:bg-lime-600 group-hover:text-white transition-colors mb-2 sm:mb-3">
               <DollarSign className="w-6 h-6 sm:w-8 sm:h-8" />
             </div>
             <h3 className="text-base sm:text-lg font-bold text-gray-900 group-hover:text-red-700">Financeiro</h3>
             <p className="text-xs sm:text-sm text-gray-500 mt-1">Pagamentos aos fornecedores e dotações orçamentárias.</p>
+          </Link>
+        )}
+
+        {verTudo && (
+          <Link to="/sistema/dashboard" className="bg-white group rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 hover:shadow-md hover:border-red-300 hover:ring-1 hover:ring-red-100 transition-all flex flex-col items-center text-center">
+            <div className="bg-rose-50 text-rose-600 p-3 rounded-full group-hover:bg-rose-600 group-hover:text-white transition-colors mb-2 sm:mb-3">
+              <LayoutDashboard className="w-6 h-6 sm:w-8 sm:h-8" />
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 group-hover:text-red-700">Dashboard Corporativo</h3>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">Painel executivo e indicadores de todos os módulos.</p>
           </Link>
         )}
 

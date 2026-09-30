@@ -518,6 +518,16 @@ export default function ContratoForm() {
     }
   };
 
+  const podeEditarContrato =
+    usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'gestao' || usuarioAtual?.perfil === 'contratos';
+  if (!podeEditarContrato) {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        Você não tem permissão para cadastrar ou editar contratos.
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">

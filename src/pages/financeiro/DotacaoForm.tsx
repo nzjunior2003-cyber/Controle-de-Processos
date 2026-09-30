@@ -65,7 +65,7 @@ export default function DotacaoForm() {
     }
   };
 
-  if (usuarioAtual?.perfil === 'demandante') {
+  if (usuarioAtual?.perfil !== 'master' && usuarioAtual?.perfil !== 'financeiro') {
     return (
       <div className="p-8 text-center text-gray-500">
         Você não tem permissão para acessar este módulo.

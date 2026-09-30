@@ -7,7 +7,7 @@ const ANO_ATUAL = new Date().getFullYear();
 
 export default function PcaForm() {
   const { id } = useParams<{ id: string }>();
-  const { pcas, addPca, updatePca, deletePca } = useApp();
+  const { pcas, addPca, updatePca, deletePca, usuarioAtual } = useApp();
   const navigate = useNavigate();
 
   const emEdicao = !!id;
@@ -96,6 +96,14 @@ export default function PcaForm() {
       setExcluindo(false);
     }
   };
+
+  if (usuarioAtual?.perfil !== 'master' && usuarioAtual?.perfil !== 'bm4') {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        Você não tem permissão para cadastrar ou editar itens do PCA.
+      </div>
+    );
+  }
 
   if (emEdicao && !pca) {
     return <div className="p-6">Item do PCA não encontrado.</div>;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileCheck, FileText, Package, CheckSquare, LayoutDashboard } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { ehPerfilDiretoria } from '../types';
 import DashboardApoio from './dashboards/DashboardApoio';
 import DashboardContratosArps from './dashboards/DashboardContratosArps';
 import DashboardGestaoContratos from './dashboards/DashboardGestaoContratos';
@@ -18,14 +19,21 @@ export default function Dashboard() {
   const perfil = usuarioAtual?.perfil;
   const isMaster = perfil === 'master';
   const isDemandante = perfil === 'demandante';
+  const isDiretoria = ehPerfilDiretoria(perfil);
+  // Master, Diretoria (DGA, DAL, DF, DCA, BM4) e Demandante veem as abas de
+  // todos os módulos; o painel Executivo é só do master e da Diretoria.
+  const verTodosOsModulos = isMaster || isDiretoria || isDemandante;
 
   const abas = [
-    { id: 'apoio', nome: 'Apoio e Suprimento', icon: Package, show: isMaster || isDemandante || perfil === 'apoio', Componente: DashboardApoio },
-    { id: 'contratos-arps', nome: "Contratos e ARP's", icon: FileText, show: isMaster || isDemandante || perfil === 'contratos', Componente: DashboardContratosArps },
-    { id: 'gestao-contratos', nome: 'Gestão de Contratos', icon: CheckSquare, show: isMaster || isDemandante || perfil === 'gestao', Componente: DashboardGestaoContratos },
-    { id: 'fiscal-contrato', nome: 'Fiscal do Contrato', icon: FileCheck, show: isMaster || isDemandante || perfil === 'fiscal', Componente: DashboardFiscalContrato },
-    { id: 'dga', nome: 'Executivo (DGA)', icon: LayoutDashboard, show: isMaster || perfil === 'dga', Componente: DashboardDga },
-  ].filter((aba) => aba.show);
+    { id: 'apoio', nome: 'Apoio e Suprimento', icon: Package, show: verTodosOsModulos || perfil === 'apoio', Componente: DashboardApoio },
+    { id: 'contratos-arps', nome: "Contratos e ARP's", icon: FileText, show: verTodosOsModulos || perfil === 'contratos', Componente: DashboardContratosArps },
+    { id: 'gestao-contratos', nome: 'Gestão de Contratos', icon: CheckSquare, show: verTodosOsModulos || perfil === 'gestao', Componente: DashboardGestaoContratos },
+    { id: 'fiscal-contrato', nome: 'Fiscal do Contrato', icon: FileCheck, show: verTodosOsModulos || perfil === 'fiscal', Componente: DashboardFiscalContrato },
+    { id: 'dga', nome: 'Executivo (DGA)', icon: LayoutDashboard, show: isMaster || isDiretoria, Componente: DashboardDga },
+  ]
+    .filter((aba) => aba.show)
+    // Pra Diretoria, o painel Executivo abre primeiro.
+    .sort((a, b) => (isDiretoria ? Number(b.id === 'dga') - Number(a.id === 'dga') : 0));
 
   const [abaAtiva, setAbaAtiva] = useState(abas[0]?.id);
   const abaSelecionada = abas.find((aba) => aba.id === abaAtiva) ?? abas[0];

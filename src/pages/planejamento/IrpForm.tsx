@@ -17,6 +17,11 @@ export default function IrpForm() {
   const emEdicao = !!id;
   const irp = id ? irps.find((i) => i.id === id) : undefined;
   const isDemandante = usuarioAtual?.perfil === 'demandante';
+  const isMasterOuBm4 = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'bm4';
+  // Quem não cadastra (master/bm4) nem responde (demandante) só consulta:
+  // abre a IRP em leitura, sem botão de salvar/excluir.
+  const somenteLeitura = !isMasterOuBm4 && !isDemandante;
+  const cadastroBloqueado = isDemandante || somenteLeitura;
 
   const [esferaOrgao, setEsferaOrgao] = useState<EsferaOrgaoIrp>(irp?.esferaOrgao ?? 'Federal');
   const [orgaoGerenciador, setOrgaoGerenciador] = useState(irp?.orgaoGerenciador ?? '');
@@ -100,10 +105,10 @@ export default function IrpForm() {
     return <div className="p-6">IRP não encontrada.</div>;
   }
 
-  if (isDemandante && !emEdicao) {
+  if ((isDemandante || somenteLeitura) && !emEdicao) {
     return (
       <div className="p-8 text-center text-gray-500">
-        Você não tem permissão para cadastrar uma nova IRP — só pode responder às já direcionadas ao seu setor.
+        Você não tem permissão para cadastrar uma nova IRP.
       </div>
     );
   }
@@ -119,17 +124,19 @@ export default function IrpForm() {
         </button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">
-            {isDemandante ? `Responder IRP ${irp?.numeroIrp}` : emEdicao ? `Editar IRP ${irp?.numeroIrp}` : 'Nova IRP'}
+            {somenteLeitura ? `IRP ${irp?.numeroIrp}` : isDemandante ? `Responder IRP ${irp?.numeroIrp}` : emEdicao ? `Editar IRP ${irp?.numeroIrp}` : 'Nova IRP'}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {isDemandante
+            {somenteLeitura
+              ? 'Consulta da Intenção de Registro de Preços (somente leitura).'
+              : isDemandante
               ? 'Manifeste o interesse do seu setor e registre a resposta dentro do prazo.'
               : emEdicao
                 ? 'Atualize os dados da Intenção de Registro de Preços.'
                 : 'Cadastre uma IRP publicada por outro órgão, à disposição dos setores demandantes.'}
           </p>
         </div>
-        {emEdicao && !isDemandante && (
+        {emEdicao && !isDemandante && !somenteLeitura && (
           <button
             type="button"
             onClick={handleExcluir}
@@ -164,7 +171,7 @@ export default function IrpForm() {
               <select
                 id="esferaOrgao"
                 required
-                disabled={isDemandante}
+                disabled={cadastroBloqueado}
                 value={esferaOrgao}
                 onChange={(e) => setEsferaOrgao(e.target.value as EsferaOrgaoIrp)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white disabled:bg-gray-100 disabled:text-gray-500"
@@ -183,7 +190,7 @@ export default function IrpForm() {
                 type="text"
                 id="orgaoGerenciador"
                 required
-                disabled={isDemandante}
+                disabled={cadastroBloqueado}
                 value={orgaoGerenciador}
                 onChange={(e) => setOrgaoGerenciador(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
@@ -198,7 +205,7 @@ export default function IrpForm() {
                 type="text"
                 id="numeroIrp"
                 required
-                disabled={isDemandante}
+                disabled={cadastroBloqueado}
                 value={numeroIrp}
                 onChange={(e) => setNumeroIrp(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
@@ -212,7 +219,7 @@ export default function IrpForm() {
               <input
                 type="text"
                 id="processoOrigem"
-                disabled={isDemandante}
+                disabled={cadastroBloqueado}
                 value={processoOrigem}
                 onChange={(e) => setProcessoOrigem(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
@@ -226,7 +233,7 @@ export default function IrpForm() {
               <input
                 type="date"
                 id="dataPublicacao"
-                disabled={isDemandante}
+                disabled={cadastroBloqueado}
                 value={dataPublicacao}
                 onChange={(e) => setDataPublicacao(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
@@ -241,7 +248,7 @@ export default function IrpForm() {
                 type="date"
                 id="prazoManifestacao"
                 required
-                disabled={isDemandante}
+                disabled={cadastroBloqueado}
                 value={prazoManifestacao}
                 onChange={(e) => setPrazoManifestacao(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
@@ -253,8 +260,9 @@ export default function IrpForm() {
               <select
                 id="status"
                 value={status}
+                disabled={somenteLeitura}
                 onChange={(e) => setStatus(e.target.value as StatusIrp)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white disabled:bg-gray-100 disabled:text-gray-500"
               >
                 {(Object.keys(STATUS_IRP_LABELS) as StatusIrp[]).map((s) => (
                   <option key={s} value={s}>{STATUS_IRP_LABELS[s]}</option>
@@ -269,7 +277,7 @@ export default function IrpForm() {
               <input
                 type="text"
                 id="linkEdital"
-                disabled={isDemandante}
+                disabled={cadastroBloqueado}
                 value={linkEdital}
                 onChange={(e) => setLinkEdital(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
@@ -285,7 +293,7 @@ export default function IrpForm() {
                 id="objeto"
                 rows={2}
                 required
-                disabled={isDemandante}
+                disabled={cadastroBloqueado}
                 value={objeto}
                 onChange={(e) => setObjeto(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
@@ -301,7 +309,7 @@ export default function IrpForm() {
                   <button
                     type="button"
                     key={setor}
-                    disabled={isDemandante}
+                    disabled={cadastroBloqueado}
                     onClick={() => handleToggleSetor(setor)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium border disabled:cursor-not-allowed disabled:opacity-70 ${
                       setoresDemandantes.includes(setor)
@@ -322,9 +330,10 @@ export default function IrpForm() {
               <input
                 type="text"
                 id="responsavelRespostaNome"
+                disabled={somenteLeitura}
                 value={responsavelRespostaNome}
                 onChange={(e) => setResponsavelRespostaNome(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
 
@@ -335,9 +344,10 @@ export default function IrpForm() {
               <input
                 type="email"
                 id="responsavelRespostaEmail"
+                disabled={somenteLeitura}
                 value={responsavelRespostaEmail}
                 onChange={(e) => setResponsavelRespostaEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
                 placeholder="Usado no e-mail de alerta de prazo"
               />
             </div>
@@ -349,9 +359,10 @@ export default function IrpForm() {
               <textarea
                 id="observacaoResposta"
                 rows={3}
+                disabled={somenteLeitura}
                 value={observacaoResposta}
                 onChange={(e) => setObservacaoResposta(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
           </div>
@@ -362,16 +373,18 @@ export default function IrpForm() {
               onClick={() => navigate(-1)}
               className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
             >
-              Cancelar
+              {somenteLeitura ? 'Voltar' : 'Cancelar'}
             </button>
-            <button
-              type="submit"
-              disabled={salvando}
-              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
-              <Save className="-ml-1 mr-2 h-5 w-5" />
-              {salvando ? 'Salvando...' : isDemandante ? 'Salvar Resposta' : emEdicao ? 'Salvar Alterações' : 'Salvar IRP'}
-            </button>
+            {!somenteLeitura && (
+              <button
+                type="submit"
+                disabled={salvando}
+                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <Save className="-ml-1 mr-2 h-5 w-5" />
+                {salvando ? 'Salvando...' : isDemandante ? 'Salvar Resposta' : emEdicao ? 'Salvar Alterações' : 'Salvar IRP'}
+              </button>
+            )}
           </div>
         </form>
       </div>

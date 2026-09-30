@@ -1,4 +1,16 @@
-export type Perfil = 'master' | 'contratos' | 'apoio' | 'gestao' | 'fiscal' | 'bm4' | 'financeiro' | 'dga' | 'demandante';
+export type Perfil =
+  | 'master'
+  | 'contratos'
+  | 'apoio'
+  | 'gestao'
+  | 'fiscal'
+  | 'bm4'
+  | 'financeiro'
+  | 'dga'
+  | 'dal'
+  | 'df'
+  | 'dca'
+  | 'demandante';
 
 export const PERFIL_LABELS: Record<Perfil, string> = {
   master: 'Master',
@@ -9,8 +21,23 @@ export const PERFIL_LABELS: Record<Perfil, string> = {
   bm4: 'Planejamento (4ª Seção do EMG)',
   financeiro: 'Financeiro (Diretoria de Finanças)',
   dga: 'DGA (Departamento Geral de Administração)',
+  dal: 'DAL (Diretoria)',
+  df: 'DF (Diretoria)',
+  dca: 'DCA (Diretoria)',
   demandante: 'Demandante (Setor Requisitante)',
 };
+
+/**
+ * Perfis de Diretoria (Chefe de Departamento e Diretores): enxergam todos os
+ * módulos, menos Usuários e Auditoria, mas não editam nada — a única
+ * exceção é o BM4, que continua cadastrando IRPs e editando o PCA
+ * (Planejamento). Não confundir com os perfis "donos" de módulo
+ * (apoio, contratos, gestao, fiscal, financeiro), que editam o próprio módulo.
+ */
+export const PERFIS_DIRETORIA: Perfil[] = ['dga', 'dal', 'df', 'dca', 'bm4'];
+
+export const ehPerfilDiretoria = (perfil?: Perfil): boolean =>
+  !!perfil && PERFIS_DIRETORIA.includes(perfil);
 
 export interface Usuario {
   id: string;
