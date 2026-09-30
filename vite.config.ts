@@ -11,12 +11,19 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        // Só o app shell (JS/CSS/ícones) é pré-cacheado, pra abrir rápido
-        // e ser instalável — dados (Firestore/API) continuam sempre
-        // buscados da rede, sem cache offline, pra nunca mostrar
-        // processos/contratos desatualizados.
-        workbox: {
-          cleanupOutdatedCaches: true,
+        // `injectManifest` (em vez do `generateSW` padrão) porque o Service
+        // Worker precisa de um listener de `push` customizado pras
+        // notificações push (VAPID) — não dá pra fazer isso com o SW
+        // 100% auto-gerado. `src/sw.ts` chama `precacheAndRoute` na mão,
+        // preservando o mesmo comportamento de pré-cache de antes.
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.ts',
+        injectManifest: {
+          // Só o app shell (JS/CSS/ícones) é pré-cacheado, pra abrir rápido
+          // e ser instalável — dados (Firestore/API) continuam sempre
+          // buscados da rede, sem cache offline, pra nunca mostrar
+          // processos/contratos desatualizados.
           globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
           // logo-qcg.png é usado só na tela pública/login (não é crítico
           // pra abrir o app offline) e passa do limite padrão de 2 MiB —

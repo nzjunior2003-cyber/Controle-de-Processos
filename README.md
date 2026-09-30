@@ -102,6 +102,13 @@ Opcionalmente, para o disparo real de e-mails de alerta:
 SMTP_HOST=  SMTP_PORT=  SMTP_USER=  SMTP_PASS=  SMTP_FROM=
 ```
 
+Opcionalmente, para as notificações push (gere o par uma única vez com
+`npx web-push generate-vapid-keys`):
+
+```
+VAPID_PUBLIC_KEY=  VAPID_PRIVATE_KEY=  VITE_VAPID_PUBLIC_KEY=
+```
+
 O arquivo `.env` está no `.gitignore` e **nunca** deve ser versionado. O antigo
 `firebase-applet-config.json` foi removido do repositório: as chaves agora vêm
 apenas do ambiente.

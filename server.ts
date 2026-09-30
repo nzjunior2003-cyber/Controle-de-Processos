@@ -6,8 +6,17 @@ import nodemailer from "nodemailer";
 import multer from "multer";
 import { google } from "googleapis";
 import dotenv from "dotenv";
+import webpush from "web-push";
 
 dotenv.config();
+
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    "mailto:ggc.cbmpa@gmail.com",
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  );
+}
 
 const uploadMemoria = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
@@ -236,6 +245,41 @@ async function startServer() {
     } catch (error) {
       console.error("Error sending email:", error);
       res.status(500).json({ error: "Failed to send email" });
+    }
+  });
+
+  // Notificações push (Web Push/VAPID) — disparadas pelo próprio cliente
+  // que gerou o evento (mudança de setor/fase/conclusão de um processo,
+  // ver `dispararNotificacoesProcesso`, AppContext.tsx). Sem Cloud
+  // Functions neste projeto: o cliente já sabe quem precisa ser
+  // notificado e já tem as inscrições de push carregadas, então só repassa
+  // pro `web-push` — mesmo padrão de "relay fino" do /api/send-email.
+  app.post("/api/send-push", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization ?? "";
+      const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+      if (!(await idTokenValido(idToken))) {
+        return res.status(401).json({ error: "Não autenticado." });
+      }
+
+      if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+        return res.status(500).json({ error: "Push não está configurado no servidor (faltam as chaves VAPID)." });
+      }
+
+      const { subscriptions, payload } = req.body ?? {};
+      if (!Array.isArray(subscriptions) || subscriptions.length === 0 || !payload) {
+        return res.status(400).json({ error: "Campos obrigatórios: subscriptions (array), payload." });
+      }
+
+      const resultados = await Promise.allSettled(
+        subscriptions.map((subscription) => webpush.sendNotification(subscription, JSON.stringify(payload))),
+      );
+      const falhas = resultados.filter((r) => r.status === "rejected").length;
+
+      return res.json({ enviados: resultados.length - falhas, falhas });
+    } catch (error) {
+      console.error("Error sending push:", error);
+      res.status(500).json({ error: "Falha ao enviar a notificação push." });
     }
   });
 

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell } from 'lucide-react';
+import { Bell, BellRing } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { usePushNotifications } from '../../hooks/usePushNotifications';
 
 const formatarQuando = (iso: string) => {
   const data = new Date(iso);
@@ -20,8 +21,11 @@ export default function NotificacaoSino() {
   const navigate = useNavigate();
   const [aberto, setAberto] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { suportado, ativando, erro, ativar } = usePushNotifications();
 
   const naoLidas = notificacoes.filter((n) => !n.lida).length;
+  const podeAtivarPush =
+    suportado && typeof Notification !== 'undefined' && Notification.permission === 'default';
 
   useEffect(() => {
     if (!aberto) return;
@@ -67,6 +71,19 @@ export default function NotificacaoSino() {
             <span className="text-sm font-semibold">Notificações</span>
             {naoLidas > 0 && <span className="text-xs text-gray-500">{naoLidas} não lida(s)</span>}
           </div>
+          {podeAtivarPush && (
+            <div className="px-4 py-3 border-b border-gray-100 bg-amber-50">
+              <button
+                onClick={ativar}
+                disabled={ativando}
+                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white bg-red-700 hover:bg-red-800 disabled:opacity-50"
+              >
+                <BellRing className="h-3.5 w-3.5" />
+                {ativando ? 'Ativando...' : 'Ativar notificações push'}
+              </button>
+              {erro && <p className="mt-1.5 text-[11px] text-red-600">{erro}</p>}
+            </div>
+          )}
           {notificacoes.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-gray-500">Nenhuma notificação ainda.</p>
           ) : (
