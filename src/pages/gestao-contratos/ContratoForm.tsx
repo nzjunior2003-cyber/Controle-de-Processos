@@ -506,7 +506,9 @@ export default function ContratoForm() {
         );
       }
 
-      navigate('/sistema/gestao-contratos');
+      // Volta pro módulo de onde a pessoa veio: quem é do perfil Contratos e
+      // ARP's edita o contrato por aqui, mas trabalha na tela dele.
+      navigate(usuarioAtual?.perfil === 'contratos' ? '/sistema/contratos-arps' : '/sistema/gestao-contratos');
     } catch (erroCapturado) {
       setErro(
         erroCapturado instanceof Error

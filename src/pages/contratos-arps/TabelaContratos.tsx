@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Contrato } from '../../types';
 import { formatarMoeda } from '../../lib/contratos';
@@ -10,7 +10,13 @@ const formatarData = (valor?: string) => {
   return Number.isNaN(data.getTime()) ? '-' : format(data, 'dd/MM/yyyy');
 };
 
-export default function TabelaContratos({ dados }: { dados: Contrato[] }) {
+export default function TabelaContratos({
+  dados,
+  onEditar,
+}: {
+  dados: Contrato[];
+  onEditar?: (contrato: Contrato) => void;
+}) {
   const [expandido, setExpandido] = useState<string | null>(null);
 
   return (
@@ -58,6 +64,7 @@ export default function TabelaContratos({ dados }: { dados: Contrato[] }) {
                     {formatarMoeda(item.valorGlobal)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-bold">
+                    <div className="flex flex-col items-center gap-2">
                     <button
                       onClick={() => {
                         const link = item.contratoPdfLink || item.linkContrato;
@@ -68,6 +75,16 @@ export default function TabelaContratos({ dados }: { dados: Contrato[] }) {
                     >
                       Acessar Contrato
                     </button>
+                    {onEditar && (
+                      <button
+                        onClick={() => onEditar(item)}
+                        className="inline-flex items-center text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 px-3 py-1.5 rounded-md shadow-sm text-xs font-medium transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                        Editar Contrato
+                      </button>
+                    )}
+                    </div>
                   </td>
                 </tr>
                 {isExpanded && (

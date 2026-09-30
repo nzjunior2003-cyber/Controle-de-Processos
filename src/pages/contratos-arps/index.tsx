@@ -349,7 +349,16 @@ export default function ContratosArps() {
         </div>
 
         <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
-          {abaAtiva === 'contratos' && <TabelaContratos dados={contratosFiltrados} />}
+          {abaAtiva === 'contratos' && (
+            <TabelaContratos
+              dados={contratosFiltrados}
+              onEditar={
+                isMasterOrContratos
+                  ? (contrato) => navigate(`/sistema/gestao-contratos/${contrato.id}/editar`)
+                  : undefined
+              }
+            />
+          )}
 
           {isAbaProcedimento(abaAtiva) && (
             <TabelaProcedimentos
