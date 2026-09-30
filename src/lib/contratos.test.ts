@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   abaterItens,
   abaterSaldo,
+  aditivoDuplicado,
   aplicarAditivoFinanceiro,
   aplicarAditivoQuantidade,
   buscarContratos,
@@ -9,7 +10,9 @@ import {
   devolverItens,
   devolverSaldo,
   calcularEconomicidade,
+  contratoComNumeroDuplicado,
   criarProcedimentoDeIrp,
+  execucaoDuplicada,
   encontrarVinculosPorPae,
   extrairAnoNumeroContrato,
   extrairAnosDisponiveis,
@@ -639,6 +642,59 @@ describe('criarProcedimentoDeIrp', () => {
   it('usa processoOrigem como pae quando existir', () => {
     const procedimento = criarProcedimentoDeIrp({ ...irp, processoOrigem: 'E-2026/123456' });
     expect(procedimento.pae).toBe('E-2026/123456');
+  });
+});
+
+describe('contratoComNumeroDuplicado', () => {
+  const contratos = [
+    { id: 'c1', numero: '529/2026' },
+    { id: 'c2', numero: '089/2025' },
+  ];
+
+  it('acha outro contrato com o mesmo número, ignorando caixa e espaços', () => {
+    expect(contratoComNumeroDuplicado(contratos, '  529/2026 ')?.id).toBe('c1');
+  });
+
+  it('não conta o próprio contrato em edição', () => {
+    expect(contratoComNumeroDuplicado(contratos, '529/2026', 'c1')).toBeUndefined();
+  });
+
+  it('não acusa duplicidade com número novo ou vazio', () => {
+    expect(contratoComNumeroDuplicado(contratos, '999/2026')).toBeUndefined();
+    expect(contratoComNumeroDuplicado(contratos, '')).toBeUndefined();
+    expect(contratoComNumeroDuplicado(contratos, undefined)).toBeUndefined();
+  });
+});
+
+describe('aditivoDuplicado', () => {
+  const aditivos = [{ contratoId: 'c1', numero: '1º TA' }];
+
+  it('detecta o mesmo número no mesmo contrato', () => {
+    expect(aditivoDuplicado(aditivos, 'c1', '1º ta ')).toBe(true);
+  });
+
+  it('permite o mesmo número em outro contrato', () => {
+    expect(aditivoDuplicado(aditivos, 'c2', '1º TA')).toBe(false);
+  });
+});
+
+describe('execucaoDuplicada', () => {
+  const execucoes = [{ contratoId: 'c1', tipo: 'NF/Fatura', nf: '1234' }];
+
+  it('detecta mesmo contrato, tipo e nº de documento', () => {
+    expect(execucaoDuplicada(execucoes, { contratoId: 'c1', tipo: 'NF/Fatura', nf: ' 1234' })).toBe(true);
+  });
+
+  it('trata tipo ausente como NF/Fatura', () => {
+    expect(execucaoDuplicada(execucoes, { contratoId: 'c1', nf: '1234' })).toBe(true);
+  });
+
+  it('permite o mesmo número com outro tipo de documento (ex.: recibo da mesma NF)', () => {
+    expect(execucaoDuplicada(execucoes, { contratoId: 'c1', tipo: 'Recibo de Pagamento', nf: '1234' })).toBe(false);
+  });
+
+  it('nunca acusa duplicidade sem nº de documento', () => {
+    expect(execucaoDuplicada(execucoes, { contratoId: 'c1', tipo: 'NF/Fatura', nf: '' })).toBe(false);
   });
 });
 

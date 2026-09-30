@@ -59,8 +59,11 @@ import {
   abaterItens,
   abaterSaldo,
   aplicarAditivoFinanceiro,
+  aditivoDuplicado,
   aplicarAditivoQuantidade,
+  contratoComNumeroDuplicado,
   criarProcedimentoDeIrp,
+  execucaoDuplicada,
   devolverItens,
   devolverSaldo,
   registrarTrocaFiscal,
@@ -1282,6 +1285,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const addContrato = useCallback(
     async (dados: Omit<Contrato, 'id'>) => {
+      const repetido = contratoComNumeroDuplicado(contratos, dados.numero);
+      if (repetido) {
+        throw new Error(
+          `Já existe um contrato com o número ${repetido.numero} (${repetido.empresa}). ` +
+            'Edite o contrato existente em vez de cadastrar outro.',
+        );
+      }
       if (dados.fiscalEmail && !validarLimiteFiscal(contratos, dados.fiscalEmail).valido) {
         throw new Error(
           'Este fiscal já possui 3 contratos ativos sob sua titularidade (limite atingido).',
@@ -1305,6 +1315,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
   const updateContrato = useCallback(
     async (id: string, dados: Partial<Contrato>) => {
+      const repetido = contratoComNumeroDuplicado(contratos, dados.numero, id);
+      if (repetido) {
+        throw new Error(
+          `Já existe outro contrato com o número ${repetido.numero} (${repetido.empresa}).`,
+        );
+      }
       if (dados.fiscalEmail && !validarLimiteFiscal(contratos, dados.fiscalEmail, id).valido) {
         throw new Error(
           'Este fiscal já possui 3 contratos ativos sob sua titularidade (limite atingido).',
@@ -1334,6 +1350,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
    * lançadas ao mesmo tempo.
    */
   const addExecucao = useCallback(async (dados: Omit<ExecucaoContrato, 'id'>) => {
+    if (execucaoDuplicada(execucoes, dados)) {
+      throw new Error(
+        `Já existe um lançamento de ${dados.tipo ?? 'NF/Fatura'} com o nº ${dados.nf} neste contrato.`,
+      );
+    }
     const db = requireDb();
     const contratoRef = doc(db, 'contratos', dados.contratoId);
     const execucaoRef = doc(collection(db, 'execucoes'));
@@ -1370,7 +1391,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     await registrarAuditoria('execucoes', execucaoRef.id, 'CREATE', dados);
     return novoSaldo;
-  }, [registrarAuditoria]);
+  }, [execucoes, registrarAuditoria]);
 
   /** Remove uma execução e devolve valor/quantidade ao saldo atual do contrato. */
   const deleteExecucao = useCallback(async (id: string, contratoId: string) => {
@@ -1450,6 +1471,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (!podeRegistrar) {
         throw new Error('Você não tem permissão para registrar aditivos neste contrato.');
       }
+      if (aditivoDuplicado(aditivos, dados.contratoId, dados.numero)) {
+        throw new Error(`Já existe um aditivo nº ${dados.numero} registrado neste contrato.`);
+      }
 
       const db = requireDb();
       const contratoRef = doc(db, 'contratos', dados.contratoId);
@@ -1485,7 +1509,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       await registrarAuditoria('contratos', dados.contratoId, 'UPDATE', atualizacaoContrato, contratoAntes);
       return atualizacaoContrato;
     },
-    [usuarioAtual, registrarAuditoria],
+    [usuarioAtual, aditivos, registrarAuditoria],
   );
 
   const addProcedimento = useCallback(

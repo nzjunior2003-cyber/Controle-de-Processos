@@ -555,6 +555,56 @@ export function calcularEconomicidade(
   return { valor, percentual: (valor / valorEstimado) * 100 };
 }
 
+/** Normaliza um identificador (nº de contrato, aditivo, NF) pra comparar ignorando caixa e espaços extras. */
+const normalizarIdentificador = (texto: string | undefined): string =>
+  (texto ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+/**
+ * Procura outro contrato com o mesmo número (nnnn/aaaa). Em edição, passe
+ * `ignorarId` pra não contar o próprio contrato. Devolve o encontrado, pra
+ * mensagem de erro poder citá-lo.
+ */
+export function contratoComNumeroDuplicado<T extends Pick<Contrato, 'id' | 'numero'>>(
+  contratos: T[],
+  numero: string | undefined,
+  ignorarId?: string,
+): T | undefined {
+  const alvo = normalizarIdentificador(numero);
+  if (!alvo) return undefined;
+  return contratos.find((c) => c.id !== ignorarId && normalizarIdentificador(c.numero) === alvo);
+}
+
+/** Procura, no mesmo contrato, um aditivo já registrado com o mesmo número. */
+export function aditivoDuplicado(
+  aditivos: Pick<Aditivo, 'contratoId' | 'numero'>[],
+  contratoId: string,
+  numero: string,
+): boolean {
+  const alvo = normalizarIdentificador(numero);
+  if (!alvo) return false;
+  return aditivos.some((a) => a.contratoId === contratoId && normalizarIdentificador(a.numero) === alvo);
+}
+
+/**
+ * Procura, no mesmo contrato, um lançamento do mesmo tipo com o mesmo nº de
+ * documento (NF/recibo). Sem nº de documento não dá pra identificar
+ * repetição, então nunca conta como duplicado.
+ */
+export function execucaoDuplicada(
+  execucoes: Pick<ExecucaoContrato, 'contratoId' | 'tipo' | 'nf'>[],
+  nova: Pick<ExecucaoContrato, 'contratoId' | 'tipo' | 'nf'>,
+): boolean {
+  const nf = normalizarIdentificador(nova.nf);
+  if (!nf) return false;
+  const tipo = normalizarIdentificador(nova.tipo ?? 'NF/Fatura');
+  return execucoes.some(
+    (e) =>
+      e.contratoId === nova.contratoId &&
+      normalizarIdentificador(e.tipo ?? 'NF/Fatura') === tipo &&
+      normalizarIdentificador(e.nf) === nf,
+  );
+}
+
 /**
  * Monta o ProcedimentoLicitatorio a ser criado automaticamente em
  * "Contratos e ARP's" quando uma IRP (módulo Planejamento) tem o status
