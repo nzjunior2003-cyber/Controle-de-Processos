@@ -29,7 +29,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     { name: 'Fiscal do Contrato', href: '/sistema/fiscal-contrato', icon: FileCheck, show: true },
     { name: 'Planejamento', href: '/sistema/planejamento', icon: ClipboardList, show: true },
     { name: 'Plano de Contratação Anual', href: '/sistema/pca', icon: ClipboardCheck, show: true },
-    { name: 'Financeiro', href: '/sistema/financeiro', icon: DollarSign, show: true },
+    { name: 'Financeiro', href: '/sistema/financeiro', icon: DollarSign, show: perfil !== 'demandante' },
     { name: 'Dashboard Corporativo', href: '/sistema/dashboard', icon: PieChart, show: true },
     { name: 'Usuários', href: '/sistema/usuarios', icon: Users, show: isMaster },
     { name: 'Auditoria', href: '/sistema/auditoria', icon: History, show: isMaster },

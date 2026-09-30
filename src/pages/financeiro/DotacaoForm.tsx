@@ -8,7 +8,7 @@ const ANO_ATUAL = new Date().getFullYear();
 
 export default function DotacaoForm() {
   const { id } = useParams<{ id: string }>();
-  const { dotacoes, addDotacao, updateDotacao, deleteDotacao } = useApp();
+  const { dotacoes, addDotacao, updateDotacao, deleteDotacao, usuarioAtual } = useApp();
   const navigate = useNavigate();
 
   const emEdicao = !!id;
@@ -64,6 +64,14 @@ export default function DotacaoForm() {
       setExcluindo(false);
     }
   };
+
+  if (usuarioAtual?.perfil === 'demandante') {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        Você não tem permissão para acessar este módulo.
+      </div>
+    );
+  }
 
   if (emEdicao && !dotacao) {
     return <div className="p-6">Dotação não encontrada.</div>;

@@ -9,7 +9,7 @@ const paraDataInput = (isoOuVazio?: string) => (isoOuVazio ? isoOuVazio.split('T
 export default function PagamentoForm() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  const { pagamentos, contratos, dotacoes, addPagamento, updatePagamento, deletePagamento } = useApp();
+  const { pagamentos, contratos, dotacoes, addPagamento, updatePagamento, deletePagamento, usuarioAtual } = useApp();
   const navigate = useNavigate();
 
   const emEdicao = !!id;
@@ -76,6 +76,14 @@ export default function PagamentoForm() {
       setExcluindo(false);
     }
   };
+
+  if (usuarioAtual?.perfil === 'demandante') {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        Você não tem permissão para acessar este módulo.
+      </div>
+    );
+  }
 
   if (emEdicao && !pagamento) {
     return <div className="p-6">Pagamento não encontrado.</div>;

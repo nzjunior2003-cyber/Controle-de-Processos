@@ -16,6 +16,7 @@ export default function IrpForm() {
 
   const emEdicao = !!id;
   const irp = id ? irps.find((i) => i.id === id) : undefined;
+  const isDemandante = usuarioAtual?.perfil === 'demandante';
 
   const [esferaOrgao, setEsferaOrgao] = useState<EsferaOrgaoIrp>(irp?.esferaOrgao ?? 'Federal');
   const [orgaoGerenciador, setOrgaoGerenciador] = useState(irp?.orgaoGerenciador ?? '');
@@ -99,6 +100,14 @@ export default function IrpForm() {
     return <div className="p-6">IRP não encontrada.</div>;
   }
 
+  if (isDemandante && !emEdicao) {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        Você não tem permissão para cadastrar uma nova IRP — só pode responder às já direcionadas ao seu setor.
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
@@ -110,15 +119,17 @@ export default function IrpForm() {
         </button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">
-            {emEdicao ? `Editar IRP ${irp?.numeroIrp}` : 'Nova IRP'}
+            {isDemandante ? `Responder IRP ${irp?.numeroIrp}` : emEdicao ? `Editar IRP ${irp?.numeroIrp}` : 'Nova IRP'}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {emEdicao
-              ? 'Atualize os dados da Intenção de Registro de Preços.'
-              : 'Cadastre uma IRP publicada por outro órgão, à disposição dos setores demandantes.'}
+            {isDemandante
+              ? 'Manifeste o interesse do seu setor e registre a resposta dentro do prazo.'
+              : emEdicao
+                ? 'Atualize os dados da Intenção de Registro de Preços.'
+                : 'Cadastre uma IRP publicada por outro órgão, à disposição dos setores demandantes.'}
           </p>
         </div>
-        {emEdicao && (
+        {emEdicao && !isDemandante && (
           <button
             type="button"
             onClick={handleExcluir}
@@ -153,9 +164,10 @@ export default function IrpForm() {
               <select
                 id="esferaOrgao"
                 required
+                disabled={isDemandante}
                 value={esferaOrgao}
                 onChange={(e) => setEsferaOrgao(e.target.value as EsferaOrgaoIrp)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white disabled:bg-gray-100 disabled:text-gray-500"
               >
                 {ESFERAS.map((esfera) => (
                   <option key={esfera} value={esfera}>{esfera}</option>
@@ -171,9 +183,10 @@ export default function IrpForm() {
                 type="text"
                 id="orgaoGerenciador"
                 required
+                disabled={isDemandante}
                 value={orgaoGerenciador}
                 onChange={(e) => setOrgaoGerenciador(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
 
@@ -185,9 +198,10 @@ export default function IrpForm() {
                 type="text"
                 id="numeroIrp"
                 required
+                disabled={isDemandante}
                 value={numeroIrp}
                 onChange={(e) => setNumeroIrp(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
 
@@ -198,9 +212,10 @@ export default function IrpForm() {
               <input
                 type="text"
                 id="processoOrigem"
+                disabled={isDemandante}
                 value={processoOrigem}
                 onChange={(e) => setProcessoOrigem(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
 
@@ -211,9 +226,10 @@ export default function IrpForm() {
               <input
                 type="date"
                 id="dataPublicacao"
+                disabled={isDemandante}
                 value={dataPublicacao}
                 onChange={(e) => setDataPublicacao(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
 
@@ -225,9 +241,10 @@ export default function IrpForm() {
                 type="date"
                 id="prazoManifestacao"
                 required
+                disabled={isDemandante}
                 value={prazoManifestacao}
                 onChange={(e) => setPrazoManifestacao(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
 
@@ -252,9 +269,10 @@ export default function IrpForm() {
               <input
                 type="text"
                 id="linkEdital"
+                disabled={isDemandante}
                 value={linkEdital}
                 onChange={(e) => setLinkEdital(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
                 placeholder="https://..."
               />
             </div>
@@ -267,9 +285,10 @@ export default function IrpForm() {
                 id="objeto"
                 rows={2}
                 required
+                disabled={isDemandante}
                 value={objeto}
                 onChange={(e) => setObjeto(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
 
@@ -282,8 +301,9 @@ export default function IrpForm() {
                   <button
                     type="button"
                     key={setor}
+                    disabled={isDemandante}
                     onClick={() => handleToggleSetor(setor)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border disabled:cursor-not-allowed disabled:opacity-70 ${
                       setoresDemandantes.includes(setor)
                         ? 'bg-red-700 text-white border-red-700'
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
@@ -350,7 +370,7 @@ export default function IrpForm() {
               className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
             >
               <Save className="-ml-1 mr-2 h-5 w-5" />
-              {salvando ? 'Salvando...' : emEdicao ? 'Salvar Alterações' : 'Salvar IRP'}
+              {salvando ? 'Salvando...' : isDemandante ? 'Salvar Resposta' : emEdicao ? 'Salvar Alterações' : 'Salvar IRP'}
             </button>
           </div>
         </form>

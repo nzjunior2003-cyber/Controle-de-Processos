@@ -47,6 +47,14 @@ export default function Financeiro() {
 
   const totalPago = pagamentosFiltrados.reduce((acc, p) => acc + (p.valorPago || 0), 0);
 
+  if (usuarioAtual?.perfil === 'demandante') {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        Você não tem permissão para acessar este módulo.
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Search, UserPlus, Shield, Info, Edit2, X, Trash2 } from 'lucide-react';
 import { PERFIL_LABELS, Perfil, Usuario } from '../types';
+import { OPCOES_UNIDADE_DEMANDANTE } from '../lib/planilhaProcessos';
 
 export default function Usuarios() {
   const { usuarios, setores, updateUsuario, deleteUsuario, usuarioAtual, addUsuario } = useApp();
@@ -18,6 +19,7 @@ export default function Usuarios() {
     setor_id: string;
     ativo: boolean;
     mf: string;
+    unidadeDemandante: string;
   }>({
     nome: '',
     email: '',
@@ -26,6 +28,7 @@ export default function Usuarios() {
     setor_id: setores[0]?.id || '1',
     ativo: true,
     mf: '',
+    unidadeDemandante: '',
   });
 
   const [usuarioExcluindo, setUsuarioExcluindo] = useState<string | null>(null);
@@ -63,6 +66,7 @@ export default function Usuarios() {
         perfil: usuarioEditando.perfil,
         ativo: usuarioEditando.ativo,
         mf: usuarioEditando.mf || '',
+        unidadeDemandante: usuarioEditando.unidadeDemandante || '',
       });
       setUsuarioEditando(null);
     } catch (erro) {
@@ -72,7 +76,7 @@ export default function Usuarios() {
 
   const handleCriarUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { nome, email, senha, perfil, setor_id, ativo, mf } = novoUsuarioForm;
+    const { nome, email, senha, perfil, setor_id, ativo, mf, unidadeDemandante } = novoUsuarioForm;
     if (!nome || !email || !senha) {
       alert("Preencha todos os campos obrigatórios.");
       return;
@@ -91,6 +95,7 @@ export default function Usuarios() {
         cargo: 'Não Especificado',
         ativo,
         ...(mf ? { mf } : {}),
+        ...(unidadeDemandante ? { unidadeDemandante } : {}),
       });
 
       setIsNovoUsuarioOpen(false);
@@ -102,6 +107,7 @@ export default function Usuarios() {
         setor_id: setores[0]?.id || '1',
         ativo: true,
         mf: '',
+        unidadeDemandante: '',
       });
     } catch (erro) {
       alert(erro instanceof Error ? erro.message : 'Não foi possível criar o usuário.');
@@ -263,6 +269,25 @@ export default function Usuarios() {
                 </div>
               )}
 
+              {usuarioEditando.perfil === 'demandante' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unidade Demandante</label>
+                  <select
+                    value={usuarioEditando.unidadeDemandante ?? ''}
+                    onChange={(e) => setUsuarioEditando({ ...usuarioEditando, unidadeDemandante: e.target.value })}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md border"
+                  >
+                    <option value="">Selecione...</option>
+                    {OPCOES_UNIDADE_DEMANDANTE.map((opcao) => (
+                      <option key={opcao} value={opcao}>{opcao}</option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Define quais IRPs (Planejamento) aparecem pra esse usuário responder.
+                  </p>
+                </div>
+              )}
+
               <div className="flex items-center mt-4">
                 <input
                   id="ativo"
@@ -379,6 +404,22 @@ export default function Usuarios() {
                     onChange={(e) => setNovoUsuarioForm({ ...novoUsuarioForm, mf: e.target.value })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm"
                   />
+                </div>
+              )}
+
+              {novoUsuarioForm.perfil === 'demandante' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unidade Demandante</label>
+                  <select
+                    value={novoUsuarioForm.unidadeDemandante}
+                    onChange={(e) => setNovoUsuarioForm({ ...novoUsuarioForm, unidadeDemandante: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                  >
+                    <option value="">Selecione...</option>
+                    {OPCOES_UNIDADE_DEMANDANTE.map((opcao) => (
+                      <option key={opcao} value={opcao}>{opcao}</option>
+                    ))}
+                  </select>
                 </div>
               )}
 

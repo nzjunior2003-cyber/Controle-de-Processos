@@ -17,12 +17,13 @@ export default function Dashboard() {
   const { usuarioAtual } = useApp();
   const perfil = usuarioAtual?.perfil;
   const isMaster = perfil === 'master';
+  const isDemandante = perfil === 'demandante';
 
   const abas = [
-    { id: 'apoio', nome: 'Apoio e Suprimento', icon: Package, show: isMaster || perfil === 'apoio', Componente: DashboardApoio },
-    { id: 'contratos-arps', nome: "Contratos e ARP's", icon: FileText, show: isMaster || perfil === 'contratos', Componente: DashboardContratosArps },
-    { id: 'gestao-contratos', nome: 'Gestão de Contratos', icon: CheckSquare, show: isMaster || perfil === 'gestao', Componente: DashboardGestaoContratos },
-    { id: 'fiscal-contrato', nome: 'Fiscal do Contrato', icon: FileCheck, show: isMaster || perfil === 'fiscal', Componente: DashboardFiscalContrato },
+    { id: 'apoio', nome: 'Apoio e Suprimento', icon: Package, show: isMaster || isDemandante || perfil === 'apoio', Componente: DashboardApoio },
+    { id: 'contratos-arps', nome: "Contratos e ARP's", icon: FileText, show: isMaster || isDemandante || perfil === 'contratos', Componente: DashboardContratosArps },
+    { id: 'gestao-contratos', nome: 'Gestão de Contratos', icon: CheckSquare, show: isMaster || isDemandante || perfil === 'gestao', Componente: DashboardGestaoContratos },
+    { id: 'fiscal-contrato', nome: 'Fiscal do Contrato', icon: FileCheck, show: isMaster || isDemandante || perfil === 'fiscal', Componente: DashboardFiscalContrato },
     { id: 'dga', nome: 'Executivo (DGA)', icon: LayoutDashboard, show: isMaster || perfil === 'dga', Componente: DashboardDga },
   ].filter((aba) => aba.show);
 

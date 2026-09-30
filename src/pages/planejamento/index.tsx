@@ -28,9 +28,18 @@ export default function Planejamento() {
 
   const hoje = useMemo(() => new Date(), []);
 
+  // Demandante só enxerga as IRPs direcionadas ao próprio setor (é o pedido
+  // original: "IRPs direcionadas ao setor dele") — os demais perfis (master,
+  // bm4) continuam vendo todas, como sempre.
+  const irpsVisiveis = useMemo(() => {
+    if (usuarioAtual?.perfil !== 'demandante') return irps;
+    const unidade = usuarioAtual.unidadeDemandante;
+    return irps.filter((irp) => unidade && irp.setoresDemandantes.includes(unidade));
+  }, [irps, usuarioAtual]);
+
   const filtradas = useMemo(() => {
     const buscaNormalizada = busca.toLowerCase();
-    return irps
+    return irpsVisiveis
       .filter((irp) => {
         if (filtroStatus && irp.status !== filtroStatus) return false;
         if (!buscaNormalizada) return true;
@@ -38,18 +47,18 @@ export default function Planejamento() {
           .some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
       })
       .sort((a, b) => new Date(a.prazoManifestacao).getTime() - new Date(b.prazoManifestacao).getTime());
-  }, [irps, busca, filtroStatus]);
+  }, [irpsVisiveis, busca, filtroStatus]);
 
   const contadores = useMemo(() => {
-    const abertas = irps.filter((i) => i.status === 'aberta' || i.status === 'em_analise').length;
-    const prazoProximo = irps.filter((i) => {
+    const abertas = irpsVisiveis.filter((i) => i.status === 'aberta' || i.status === 'em_analise').length;
+    const prazoProximo = irpsVisiveis.filter((i) => {
       if (i.status !== 'aberta' && i.status !== 'em_analise') return false;
       const dias = differenceInDays(new Date(i.prazoManifestacao), hoje);
       return dias >= 0 && dias <= 5;
     }).length;
-    const aderidas = irps.filter((i) => i.status === 'aderida').length;
-    return { abertas, prazoProximo, aderidas, total: irps.length };
-  }, [irps, hoje]);
+    const aderidas = irpsVisiveis.filter((i) => i.status === 'aderida').length;
+    return { abertas, prazoProximo, aderidas, total: irpsVisiveis.length };
+  }, [irpsVisiveis, hoje]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">

@@ -1,4 +1,4 @@
-export type Perfil = 'master' | 'contratos' | 'apoio' | 'gestao' | 'fiscal' | 'bm4' | 'financeiro' | 'dga';
+export type Perfil = 'master' | 'contratos' | 'apoio' | 'gestao' | 'fiscal' | 'bm4' | 'financeiro' | 'dga' | 'demandante';
 
 export const PERFIL_LABELS: Record<Perfil, string> = {
   master: 'Master',
@@ -9,6 +9,7 @@ export const PERFIL_LABELS: Record<Perfil, string> = {
   bm4: 'Planejamento (4ª Seção do EMG)',
   financeiro: 'Financeiro (Diretoria de Finanças)',
   dga: 'DGA (Departamento Geral de Administração)',
+  demandante: 'Demandante (Setor Requisitante)',
 };
 
 export interface Usuario {
@@ -31,6 +32,14 @@ export interface Usuario {
   nomeGuerra?: string;
   /** UBM (Unidade Bombeiro Militar) informada no primeiro acesso — texto livre por enquanto. */
   ubm?: string;
+  /**
+   * Unidade demandante (mesma lista de `OPCOES_UNIDADE_DEMANDANTE`,
+   * `src/lib/planilhaProcessos.ts`) vinculada a usuários do perfil
+   * `demandante` — NÃO é o mesmo conceito de `setor_id`/`Setor` acima, que
+   * é a etapa interna de tramitação do fluxo antigo, não o departamento
+   * requisitante da contratação.
+   */
+  unidadeDemandante?: string;
 }
 
 export interface Setor {
@@ -602,4 +611,35 @@ export interface PagamentoContrato {
   anexoLink?: string;
   criado_em: string;
   atualizado_em: string;
+}
+
+/** Eventos de um processo que disparam notificação (push + central interna). */
+export type TipoEventoNotificacao = 'mudanca_setor' | 'mudanca_fase' | 'conclusao';
+
+/**
+ * Notificação dirigida a um único usuário (destinatarioId), gravada pelo
+ * cliente que executou a ação que a originou (não há Cloud Functions nesse
+ * projeto — ver `dispararNotificacoesProcesso`, AppContext.tsx). Alimenta a
+ * central de notificações (sino) e, quando há inscrição de push, também o
+ * `/api/send-push`.
+ */
+export interface Notificacao {
+  id: string;
+  destinatarioId: string;
+  tipo: TipoEventoNotificacao;
+  titulo: string;
+  corpo: string;
+  /** Link pra abrir ao clicar na notificação (ex.: /sistema/processos/:id). */
+  url?: string;
+  lida: boolean;
+  criado_em: string;
+}
+
+/** Inscrição de push (Web Push/VAPID) de um usuário num navegador/dispositivo. */
+export interface PushSubscriptionRegistro {
+  id: string;
+  usuarioId: string;
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  criado_em: string;
 }
