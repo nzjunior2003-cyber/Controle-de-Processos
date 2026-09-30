@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, FileCheck2, RotateCcw, Save } from 'lucide-react';
@@ -6,6 +6,7 @@ import { differenceInDays } from 'date-fns';
 import { PcaAutocomplete } from '../components/PcaAutocomplete';
 import { useEtapasPorRito } from '../hooks/useEtapasPorRito';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
+import { encontrarObjetosSemelhantes, type CandidatoObjeto } from '../lib/correspondenciaTexto';
 import { getAccessToken, googleSignIn, initAuth } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
 import {
@@ -18,9 +19,11 @@ import {
 
 const paraDataInput = (isoOuVazio?: string) => (isoOuVazio ? isoOuVazio.split('T')[0] : '');
 
+const MODALIDADES_ARP = ['Adesão', 'Partícipe'];
+
 export default function NovoProcesso() {
   const { id } = useParams<{ id: string }>();
-  const { addProcesso, updateProcesso, processos, pcas, usuarioAtual } = useApp();
+  const { addProcesso, updateProcesso, processos, pcas, irps, procedimentos, usuarioAtual } = useApp();
   const navigate = useNavigate();
   const etapasPorRito = useEtapasPorRito();
 
@@ -63,6 +66,33 @@ export default function NovoProcesso() {
   );
   const [salvando, setSalvando] = useState(false);
   const [marcandoContratado, setMarcandoContratado] = useState(false);
+
+  // Candidatos a "já existe IRP/ARP pra esse objeto" — IRPs em que já
+  // manifestamos interesse/aderimos, e ARPs (Adesão/Partícipe) ainda
+  // vigentes. Comparados por similaridade de texto livre (item 17).
+  const candidatosObjeto = useMemo<CandidatoObjeto<{ tipo: 'IRP' | 'ARP'; rotulo: string }>[]>(() => {
+    const hoje = new Date();
+    const doIrps = irps
+      .filter((irp) => irp.status === 'aderida' || irp.status === 'manifestado_interesse')
+      .map((irp) => ({ item: { tipo: 'IRP' as const, rotulo: `IRP ${irp.numeroIrp} (${irp.orgaoGerenciador})` }, objeto: irp.objeto }));
+
+    const doProcedimentos = procedimentos
+      .filter((p) => MODALIDADES_ARP.includes(p.modalidade))
+      .filter((p) => !p.vigenciaArp || new Date(p.vigenciaArp) >= hoje)
+      .map((p) => ({ item: { tipo: 'ARP' as const, rotulo: `ARP ${p.numero} (${p.orgaoGerenciador || p.modalidade})` }, objeto: p.objeto }));
+
+    return [...doIrps, ...doProcedimentos];
+  }, [irps, procedimentos]);
+
+  const [correspondenciasObjeto, setCorrespondenciasObjeto] = useState<{ tipo: 'IRP' | 'ARP'; rotulo: string }[]>([]);
+
+  useEffect(() => {
+    const temporizador = setTimeout(() => {
+      const encontrados = encontrarObjetosSemelhantes(objeto, candidatosObjeto).map((r) => r.item);
+      setCorrespondenciasObjeto(encontrados);
+    }, 500);
+    return () => clearTimeout(temporizador);
+  }, [objeto, candidatosObjeto]);
 
   const jaContratadoAditivado = (processo?.subfase_processo ?? '').toUpperCase().includes('CONTRATADO');
 
@@ -516,6 +546,18 @@ export default function NovoProcesso() {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
                 placeholder="Descrição resumida do objeto da aquisição"
               />
+              {correspondenciasObjeto.length > 0 && (
+                <div className="mt-2 rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+                  <p className="font-medium">
+                    Já existe uma IRP/ARP com objeto semelhante — verifique se este caso é de adesão em vez de novo processo:
+                  </p>
+                  <ul className="mt-1 list-disc list-inside">
+                    {correspondenciasObjeto.map((item, idx) => (
+                      <li key={idx}>{item.rotulo}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             <div className="md:col-span-2">
