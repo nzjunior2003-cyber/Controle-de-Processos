@@ -89,7 +89,8 @@ service cloud.firestore {
       allow read, write: if ativo();
     }
     match /pcas/{documento} {
-      allow read, write: if ativo();
+      allow read: if ativo();
+      allow write: if ativo() && perfilDoc().perfil in ['master', 'bm4'];
     }
     match /alertas/{documento} {
       allow read, write: if ativo();

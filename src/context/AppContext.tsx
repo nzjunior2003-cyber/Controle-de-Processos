@@ -176,6 +176,9 @@ interface AppContextData {
   addIrp: (dados: Omit<IRP, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
   updateIrp: (id: string, dados: Partial<IRP>) => Promise<void>;
   deleteIrp: (id: string) => Promise<void>;
+  addPca: (dados: Omit<PCA, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
+  updatePca: (id: string, dados: Partial<PCA>) => Promise<void>;
+  deletePca: (id: string) => Promise<void>;
 }
 
 /**
@@ -1371,6 +1374,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [irps, registrarAuditoria],
   );
 
+  const addPca = useCallback(
+    async (dados: Omit<PCA, 'id' | 'criado_em' | 'atualizado_em'>) => {
+      const id = await criarEm('pcas', dados);
+      await registrarAuditoria('pcas', id, 'CREATE', dados);
+      return id;
+    },
+    [criarEm, registrarAuditoria],
+  );
+  const updatePca = useCallback(
+    async (id: string, dados: Partial<PCA>) => {
+      const anterior = pcas.find((p) => p.id === id);
+      await atualizarEm('pcas', id, dados);
+      await registrarAuditoria('pcas', id, 'UPDATE', dados, anterior);
+    },
+    [atualizarEm, registrarAuditoria, pcas],
+  );
+  const deletePca = useCallback(
+    async (id: string) => {
+      const db = requireDb();
+      const anterior = pcas.find((p) => p.id === id);
+      await deleteDoc(doc(db, 'pcas', id));
+      await registrarAuditoria('pcas', id, 'DELETE', {}, anterior);
+    },
+    [pcas, registrarAuditoria],
+  );
+
   const valor = useMemo<AppContextData>(
     () => ({
       setores: SETORES,
@@ -1426,6 +1455,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addIrp,
       updateIrp,
       deleteIrp,
+      addPca,
+      updatePca,
+      deletePca,
     }),
     [
       usuarios,
@@ -1479,6 +1511,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addIrp,
       updateIrp,
       deleteIrp,
+      addPca,
+      updatePca,
+      deletePca,
     ],
   );
 

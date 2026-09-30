@@ -251,6 +251,9 @@ export interface PCA {
   contrato_novo?: boolean; // "Contrato Novo" — SIM/NÃO
   modalidade_licitacao?: string; // "*Provável Modalidade de Licitação ou de Rito Processual"
   numero_pae?: string; // "Nº do PAE"
+  qdqq?: { q1: boolean; q2: boolean; q3: boolean; q4: boolean }; // Quadrimestre(s) previsto(s) para efetivação/entrega
+  criado_em?: string;
+  atualizado_em?: string;
 }
 
 export type TipoAlerta = 'prazo' | 'pendencia' | 'gargalo';
