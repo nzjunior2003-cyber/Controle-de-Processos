@@ -3,8 +3,11 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import Breadcrumbs from './Breadcrumbs';
+import { useSincronizacaoAutomatica } from '../../hooks/useSincronizacaoAutomatica';
 
 export default function Layout() {
+  useSincronizacaoAutomatica();
+
   // Começa aberta no desktop (como sempre foi) mas fechada no celular —
   // do contrário, o primeiro carregamento num celular mostrava o menu
   // ocupando a tela toda com overlay por cima do conteúdo.

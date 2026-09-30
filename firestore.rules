@@ -169,6 +169,14 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'observacaoResposta', 'responsavelRespostaNome', 'responsavelRespostaEmail', 'procedimentoVinculadoId', 'atualizado_em']);
     }
+    // "Turno" da sincronização automática com as planilhas (quem grava
+    // `ultimaExecucao` primeiro assume a rodada — ver
+    // src/hooks/useSincronizacaoAutomatica.ts). Só os perfis que já podem
+    // sincronizar manualmente.
+    match /sincronizacoes/{documento} {
+      allow read, write: if ativo()
+        && perfilDoc().perfil in ['master', 'apoio', 'contratos', 'gestao'];
+    }
     match /notificacoes/{documento} {
       // Cada usuário só lê as próprias notificações (o cliente que dispara
       // o evento grava um doc por destinatário — ver

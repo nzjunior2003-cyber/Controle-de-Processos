@@ -296,6 +296,18 @@ function useNotificacoesDoUsuario(usuarioId: string | undefined, ativo: boolean)
   return dados;
 }
 
+/**
+ * Indica se algum dos campos novos difere do que já está gravado no
+ * documento. Usado pelas sincronizações com planilha pra só gravar o que
+ * mudou de verdade — rodando automaticamente a cada poucos minutos, gravar
+ * todas as linhas sempre estouraria a cota de escritas do Firestore e
+ * dispararia releitura em todos os navegadores abertos.
+ */
+function algumCampoMudou(existente: object, novos: Record<string, unknown>): boolean {
+  const atual = existente as Record<string, unknown>;
+  return Object.entries(novos).some(([chave, valor]) => JSON.stringify(atual[chave]) !== JSON.stringify(valor));
+}
+
 /** Normaliza uma MF pra usar como id de documento em `matriculas/{mf}` (sem espaço/caixa divergente virando "matrículas diferentes"). */
 function normalizarMf(mf: string): string {
   return mf.trim().toLowerCase().replace(/\s+/g, '');
@@ -830,12 +842,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           const idExistente = processoExistente?.id ?? idsCriadosNestaSincronizacao.get(numero_processo);
 
           if (idExistente) {
-            lote.set(
-              doc(db, 'processos', idExistente),
-              { ...campos, numero_processo, atualizado_em: agora },
-              { merge: true },
-            );
-            atualizados++;
+            if (!processoExistente || algumCampoMudou(processoExistente, { ...campos, numero_processo })) {
+              lote.set(
+                doc(db, 'processos', idExistente),
+                { ...campos, numero_processo, atualizado_em: agora },
+                { merge: true },
+              );
+              atualizados++;
+            }
             if (dados.localizacao_atual) {
               mudancasDeLocalizacao.push({
                 processoId: idExistente,
@@ -973,9 +987,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             Object.entries(resto).filter(([, v]) => v !== undefined),
           );
 
-          const idExistente =
-            contratos.find((c) => c.numero === numero)?.id ??
-            idsCriadosNestaSincronizacao.get(numero);
+          const contratoExistente = contratos.find((c) => c.numero === numero);
+          const idExistente = contratoExistente?.id ?? idsCriadosNestaSincronizacao.get(numero);
 
           if (idExistente) {
             // saldoAtualFinanceiro NÃO é resincronizado aqui: uma vez que o
@@ -985,17 +998,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             // desatualizado assim que a primeira execução é lançada, e
             // sobrescrever com ele a cada sincronização reverte o saldo
             // vigente pro valor errado da planilha.
-            lote.set(
-              doc(db, 'contratos', idExistente),
-              {
-                ...campos,
-                numero,
-                ...(valorGlobal !== undefined ? { valorGlobal } : {}),
-                atualizado_em: agora,
-              },
-              { merge: true },
-            );
-            atualizados++;
+            const camposDaPlanilha = {
+              ...campos,
+              numero,
+              ...(valorGlobal !== undefined ? { valorGlobal } : {}),
+            };
+            if (!contratoExistente || algumCampoMudou(contratoExistente, camposDaPlanilha)) {
+              lote.set(
+                doc(db, 'contratos', idExistente),
+                { ...camposDaPlanilha, atualizado_em: agora },
+                { merge: true },
+              );
+              atualizados++;
+            }
           } else {
             const novaRef = doc(collection(db, 'contratos'));
             idsCriadosNestaSincronizacao.set(numero, novaRef.id);
