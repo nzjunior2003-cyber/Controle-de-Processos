@@ -16,6 +16,7 @@ import { getAccessToken, googleSignIn } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
 import { processoParaDadosPlanilha, SUBFASE_CONTRATADO } from '../lib/planilhaProcessos';
 import { calcularEconomicidade, encontrarVinculosPorPae, formatarMoeda } from '../lib/contratos';
+import { calcularDataPrevista, PRAZOS_ALVO_POR_RITO } from '../lib/prazosProcesso';
 
 const CORES_GANTT = [
   'bg-blue-400', 'bg-indigo-400', 'bg-purple-400', 'bg-emerald-400',
@@ -30,6 +31,7 @@ export default function DetalheProcesso() {
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const [marcandoContratado, setMarcandoContratado] = useState(false);
+  const [modoGantt, setModoGantt] = useState<'real' | 'planejado' | 'sobreposto'>('sobreposto');
 
   const processo = processos.find(p => p.id === id);
   if (!processo) {
@@ -163,6 +165,11 @@ export default function DetalheProcesso() {
   const economicidade = contratoVinculado
     ? calcularEconomicidade(processo.valor_estimado, contratoVinculado.valorGlobal)
     : null;
+
+  const dataPrevistaEfetivacao =
+    processo.status === 'contratado_aditivado' || processo.status === 'concluido'
+      ? null
+      : calcularDataPrevista(processo.data_entrada, processo.rito_processual);
 
   const isMasterOrApoio = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'apoio';
 
@@ -340,6 +347,16 @@ export default function DetalheProcesso() {
                     <dd className="mt-0.5 text-xs text-gray-500">Tempo Total: <span className="font-semibold text-gray-900">{tempoTotalDias} dias</span></dd>
                   </div>
                 )}
+                {dataPrevistaEfetivacao && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Previsão de Efetivação do Contrato</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{format(dataPrevistaEfetivacao, 'dd/MM/yyyy')}</dd>
+                    <dd className="mt-0.5 text-xs text-gray-500">
+                      Com base no prazo-alvo do rito ({PRAZOS_ALVO_POR_RITO[processo.rito_processual ?? '']} dias
+                      a partir da abertura)
+                    </dd>
+                  </div>
+                )}
                 {processo.ultima_tramitacao && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Última Tramitação</dt>
@@ -442,18 +459,73 @@ export default function DetalheProcesso() {
           )}
 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Gráfico de Tarefas (Gantt) — por Setor</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <h2 className="text-lg font-medium text-gray-900">Gráfico de Tarefas (Gantt) — por Setor</h2>
+              <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs font-medium flex-shrink-0">
+                {(['real', 'planejado', 'sobreposto'] as const).map((modo) => (
+                  <button
+                    key={modo}
+                    type="button"
+                    onClick={() => setModoGantt(modo)}
+                    className={`px-3 py-1.5 ${modoGantt === modo ? 'bg-red-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'} ${modo !== 'real' ? 'border-l border-gray-300' : ''}`}
+                  >
+                    {modo === 'real' ? 'Real' : modo === 'planejado' ? 'Planejado' : 'Sobreposto'}
+                  </button>
+                ))}
+              </div>
+            </div>
             {linhaDoTempo.length === 0 ? (
               <p className="text-sm text-gray-500 italic">Sem histórico de localização registrado ainda.</p>
+            ) : !dataPrevistaEfetivacao && modoGantt !== 'real' ? (
+              <p className="text-sm text-gray-500 italic">
+                Este rito ({processo.rito_processual || 'não informado'}) ainda não tem prazo-alvo definido —
+                mostrando só o andamento real.
+              </p>
             ) : (
               (() => {
                 const raias = agruparLinhaDoTempoPorSetor(linhaDoTempo);
                 const inicioGlobal = new Date(linhaDoTempo[0].data_inicio).getTime();
-                const fimGlobal = new Date().getTime();
+                const hoje = new Date().getTime();
+                const fimPrevisto = dataPrevistaEfetivacao?.getTime();
+                const fimGlobal = Math.max(hoje, fimPrevisto ?? 0);
                 const spanTotal = Math.max(fimGlobal - inicioGlobal, 1);
+                const dentroDoPrazo = fimPrevisto == null || hoje <= fimPrevisto;
+
+                const raiaPlanejada = fimPrevisto ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-32 sm:w-44 flex-shrink-0 text-xs font-medium text-gray-700 truncate">
+                      Meta (Planejado)
+                    </div>
+                    <div className="relative flex-1 h-6 bg-gray-100 rounded overflow-hidden">
+                      <div
+                        className={`absolute top-0 h-full rounded-sm ${dentroDoPrazo ? 'bg-emerald-400' : 'bg-red-400'} opacity-70`}
+                        style={{
+                          left: '0%',
+                          width: `${Math.min(((fimPrevisto - inicioGlobal) / spanTotal) * 100, 100)}%`,
+                        }}
+                        title={`Prazo-alvo até ${format(new Date(fimPrevisto), 'dd/MM/yyyy')}`}
+                      />
+                      {hoje > fimPrevisto && (
+                        <div
+                          className="absolute top-0 h-full w-0.5 bg-red-700"
+                          style={{ left: `${Math.min(((hoje - inicioGlobal) / spanTotal) * 100, 100)}%` }}
+                          title="Hoje"
+                        />
+                      )}
+                    </div>
+                    <div className={`w-14 flex-shrink-0 text-xs text-right font-medium ${dentroDoPrazo ? 'text-emerald-700' : 'text-red-700'}`}>
+                      {dentroDoPrazo ? 'no prazo' : 'atrasado'}
+                    </div>
+                  </div>
+                ) : null;
+
+                if (modoGantt === 'planejado') {
+                  return <div className="space-y-3">{raiaPlanejada}</div>;
+                }
 
                 return (
                   <div className="space-y-3">
+                    {modoGantt === 'sobreposto' && raiaPlanejada}
                     {raias.map((raia, idxRaia) => (
                       <div key={raia.localizacao} className="flex items-center gap-3">
                         <div className="w-32 sm:w-44 flex-shrink-0 text-xs font-medium text-gray-700 truncate" title={raia.localizacao}>
