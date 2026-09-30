@@ -1,4 +1,4 @@
-export type Perfil = 'master' | 'contratos' | 'apoio' | 'gestao' | 'fiscal' | 'bm4';
+export type Perfil = 'master' | 'contratos' | 'apoio' | 'gestao' | 'fiscal' | 'bm4' | 'financeiro' | 'dga';
 
 export const PERFIL_LABELS: Record<Perfil, string> = {
   master: 'Master',
@@ -7,6 +7,8 @@ export const PERFIL_LABELS: Record<Perfil, string> = {
   gestao: 'Gestão de Contratos (Gestor e Auxiliares)',
   fiscal: 'Fiscal do Contrato',
   bm4: 'Planejamento (4ª Seção do EMG)',
+  financeiro: 'Financeiro (Diretoria de Finanças)',
+  dga: 'DGA (Departamento Geral de Administração)',
 };
 
 export interface Usuario {
@@ -557,6 +559,47 @@ export interface IRP {
   responsavelRespostaEmail?: string;
   /** Id do ProcedimentoLicitatorio criado automaticamente quando o status vira 'aderida' (ver AppContext.tsx `updateIrp`). */
   procedimentoVinculadoId?: string;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+/**
+ * Registro de dotação orçamentária (módulo Financeiro) — o saldo
+ * disponível é sempre calculado (nunca persistido) somando os
+ * `PagamentoContrato` que apontam pra ela (ver `saldoDaDotacao`,
+ * src/lib/financeiro.ts), no mesmo espírito de `calcularEconomicidade`.
+ */
+export interface DotacaoOrcamentaria {
+  id: string;
+  exercicio: number;
+  /** Código do elemento de despesa/programa orçamentário. */
+  codigo: string;
+  descricao: string;
+  fonteRecurso: string;
+  valorDotado: number;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+/**
+ * Pagamento efetuado a um fornecedor por um contrato (módulo Financeiro,
+ * alimentado pela Diretoria de Finanças) — complementa `ExecucaoContrato`
+ * (que já registra a NF/Fatura em si) com os dados de liquidação
+ * financeira: empenho, ordem de pagamento e dotação orçamentária.
+ */
+export interface PagamentoContrato {
+  id: string;
+  contratoId: string;
+  /** Execução (NF/Fatura/Recibo) já lançada em Gestão de Contratos à qual este pagamento se refere, se houver. */
+  execucaoId?: string;
+  numeroEmpenho: string;
+  numeroOrdemPagamento: string;
+  dotacaoId?: string;
+  fonteRecurso: string;
+  valorPago: number;
+  dataPagamento: string;
+  observacao?: string;
+  anexoLink?: string;
   criado_em: string;
   atualizado_em: string;
 }

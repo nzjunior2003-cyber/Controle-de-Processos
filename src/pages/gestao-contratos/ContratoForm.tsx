@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, FileText, PlusCircle, Save, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Contrato, ItemContrato } from '../../types';
@@ -183,7 +183,7 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
 export default function ContratoForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { contratos, addContrato, updateContrato, usuarioAtual } = useApp();
+  const { contratos, addContrato, updateContrato, usuarioAtual, pagamentos } = useApp();
 
   const contrato = id ? contratos.find((c) => c.id === id) ?? null : null;
   const emEdicao = !!id;
@@ -1117,6 +1117,45 @@ export default function ContratoForm() {
           </div>
         </form>
       </div>
+
+      {emEdicao && contrato && (
+        <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-medium text-gray-900">Pagamentos (Financeiro)</h2>
+            <Link
+              to={`/sistema/financeiro/pagamentos/novo?contratoId=${contrato.id}`}
+              className="text-sm font-medium text-red-700 hover:underline"
+            >
+              Lançar novo pagamento
+            </Link>
+          </div>
+          {(() => {
+            const pagamentosDoContrato = pagamentos
+              .filter((p) => p.contratoId === contrato.id)
+              .sort((a, b) => new Date(b.dataPagamento).getTime() - new Date(a.dataPagamento).getTime());
+            const total = pagamentosDoContrato.reduce((acc, p) => acc + (p.valorPago || 0), 0);
+            if (pagamentosDoContrato.length === 0) {
+              return <p className="text-sm text-gray-500">Nenhum pagamento lançado pra este contrato ainda.</p>;
+            }
+            return (
+              <div className="space-y-2">
+                {pagamentosDoContrato.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between text-sm border-b border-gray-100 pb-2">
+                    <div>
+                      <span className="font-medium text-gray-900">{formatarMoeda(p.valorPago)}</span>
+                      <span className="text-gray-500 ml-2">
+                        Empenho {p.numeroEmpenho} · OP {p.numeroOrdemPagamento} · {new Date(p.dataPagamento).toLocaleDateString('pt-BR')}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-400">{p.fonteRecurso}</span>
+                  </div>
+                ))}
+                <p className="text-sm font-semibold text-gray-900 pt-1">Total pago: {formatarMoeda(total)}</p>
+              </div>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }

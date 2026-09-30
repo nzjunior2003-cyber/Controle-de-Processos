@@ -22,6 +22,9 @@ import Planejamento from './pages/planejamento';
 import IrpForm from './pages/planejamento/IrpForm';
 import PlanoContratacaoAnual from './pages/pca';
 import PcaForm from './pages/pca/PcaForm';
+import Financeiro from './pages/financeiro';
+import PagamentoForm from './pages/financeiro/PagamentoForm';
+import DotacaoForm from './pages/financeiro/DotacaoForm';
 
 export default function App() {
   return (
@@ -56,6 +59,11 @@ export default function App() {
                 <Route path="pca" element={<PlanoContratacaoAnual />} />
                 <Route path="pca/novo" element={<PcaForm />} />
                 <Route path="pca/:id/editar" element={<PcaForm />} />
+                <Route path="financeiro" element={<Financeiro />} />
+                <Route path="financeiro/pagamentos/novo" element={<PagamentoForm />} />
+                <Route path="financeiro/pagamentos/:id/editar" element={<PagamentoForm />} />
+                <Route path="financeiro/dotacoes/novo" element={<DotacaoForm />} />
+                <Route path="financeiro/dotacoes/:id/editar" element={<DotacaoForm />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="usuarios" element={<Usuarios />} />
                 <Route path="auditoria" element={<Auditoria />} />

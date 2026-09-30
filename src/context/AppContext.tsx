@@ -89,6 +89,8 @@ import {
   ProcessoSancionatorio,
   PortariaFiscal,
   IRP,
+  DotacaoOrcamentaria,
+  PagamentoContrato,
 } from '../types';
 
 const URL_PLANILHA_PCA =
@@ -111,6 +113,8 @@ interface AppContextData {
   sancionatorios: ProcessoSancionatorio[];
   portarias: PortariaFiscal[];
   irps: IRP[];
+  pagamentos: PagamentoContrato[];
+  dotacoes: DotacaoOrcamentaria[];
   /** Só é populado para o perfil 'master' (mesma restrição das firestore.rules). */
   logsAcesso: LogAcesso[];
   /** Só é populado para o perfil 'master' (mesma restrição das firestore.rules). */
@@ -180,6 +184,12 @@ interface AppContextData {
   addPca: (dados: Omit<PCA, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
   updatePca: (id: string, dados: Partial<PCA>) => Promise<void>;
   deletePca: (id: string) => Promise<void>;
+  addPagamento: (dados: Omit<PagamentoContrato, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
+  updatePagamento: (id: string, dados: Partial<PagamentoContrato>) => Promise<void>;
+  deletePagamento: (id: string) => Promise<void>;
+  addDotacao: (dados: Omit<DotacaoOrcamentaria, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
+  updateDotacao: (id: string, dados: Partial<DotacaoOrcamentaria>) => Promise<void>;
+  deleteDotacao: (id: string) => Promise<void>;
 }
 
 /**
@@ -310,6 +320,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const sancionatorios = useColecao<ProcessoSancionatorio>('sancionatorios', isAuthenticated);
   const portarias = useColecao<PortariaFiscal>('portarias', isAuthenticated);
   const irps = useColecao<IRP>('irps', isAuthenticated);
+  const pagamentos = useColecao<PagamentoContrato>('pagamentos', isAuthenticated);
+  const dotacoes = useColecao<DotacaoOrcamentaria>('dotacoes', isAuthenticated);
   // Leitura restrita a 'master' nas firestore.rules — só assina quando fizer
   // sentido, para não gerar erros de permissão para os demais perfis.
   const podeVerLogs = isAuthenticated && usuarioAtual?.perfil === 'master';
@@ -1412,6 +1424,58 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [pcas, registrarAuditoria],
   );
 
+  const addPagamento = useCallback(
+    async (dados: Omit<PagamentoContrato, 'id' | 'criado_em' | 'atualizado_em'>) => {
+      const id = await criarEm('pagamentos', dados);
+      await registrarAuditoria('pagamentos', id, 'CREATE', dados);
+      return id;
+    },
+    [criarEm, registrarAuditoria],
+  );
+  const updatePagamento = useCallback(
+    async (id: string, dados: Partial<PagamentoContrato>) => {
+      const anterior = pagamentos.find((p) => p.id === id);
+      await atualizarEm('pagamentos', id, dados);
+      await registrarAuditoria('pagamentos', id, 'UPDATE', dados, anterior);
+    },
+    [atualizarEm, registrarAuditoria, pagamentos],
+  );
+  const deletePagamento = useCallback(
+    async (id: string) => {
+      const db = requireDb();
+      const anterior = pagamentos.find((p) => p.id === id);
+      await deleteDoc(doc(db, 'pagamentos', id));
+      await registrarAuditoria('pagamentos', id, 'DELETE', {}, anterior);
+    },
+    [pagamentos, registrarAuditoria],
+  );
+
+  const addDotacao = useCallback(
+    async (dados: Omit<DotacaoOrcamentaria, 'id' | 'criado_em' | 'atualizado_em'>) => {
+      const id = await criarEm('dotacoes', dados);
+      await registrarAuditoria('dotacoes', id, 'CREATE', dados);
+      return id;
+    },
+    [criarEm, registrarAuditoria],
+  );
+  const updateDotacao = useCallback(
+    async (id: string, dados: Partial<DotacaoOrcamentaria>) => {
+      const anterior = dotacoes.find((d) => d.id === id);
+      await atualizarEm('dotacoes', id, dados);
+      await registrarAuditoria('dotacoes', id, 'UPDATE', dados, anterior);
+    },
+    [atualizarEm, registrarAuditoria, dotacoes],
+  );
+  const deleteDotacao = useCallback(
+    async (id: string) => {
+      const db = requireDb();
+      const anterior = dotacoes.find((d) => d.id === id);
+      await deleteDoc(doc(db, 'dotacoes', id));
+      await registrarAuditoria('dotacoes', id, 'DELETE', {}, anterior);
+    },
+    [dotacoes, registrarAuditoria],
+  );
+
   const valor = useMemo<AppContextData>(
     () => ({
       setores: SETORES,
@@ -1430,6 +1494,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       sancionatorios,
       portarias,
       irps,
+      pagamentos,
+      dotacoes,
       logsAcesso,
       logsAuditoria,
       usuarioAtual,
@@ -1470,6 +1536,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addPca,
       updatePca,
       deletePca,
+      addPagamento,
+      updatePagamento,
+      deletePagamento,
+      addDotacao,
+      updateDotacao,
+      deleteDotacao,
     }),
     [
       usuarios,
@@ -1487,6 +1559,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       sancionatorios,
       portarias,
       irps,
+      pagamentos,
+      dotacoes,
       logsAcesso,
       logsAuditoria,
       usuarioAtual,
@@ -1526,6 +1600,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addPca,
       updatePca,
       deletePca,
+      addPagamento,
+      updatePagamento,
+      deletePagamento,
+      addDotacao,
+      updateDotacao,
+      deleteDotacao,
     ],
   );
 

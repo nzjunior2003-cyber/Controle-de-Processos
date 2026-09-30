@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Package, FileText, CheckSquare, Search, Users, FileCheck, ClipboardList, ClipboardCheck } from 'lucide-react';
+import { Package, FileText, CheckSquare, Search, Users, FileCheck, ClipboardList, ClipboardCheck, DollarSign } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function SistemaHome() {
@@ -75,6 +75,16 @@ export default function SistemaHome() {
           <h3 className="text-base sm:text-lg font-bold text-gray-900 group-hover:text-red-700">Plano de Contratação Anual</h3>
           <p className="text-xs sm:text-sm text-gray-500 mt-1">Itens planejados do PCA e seus vínculos com processos.</p>
         </Link>
+
+        {(isMaster || perfil === 'financeiro') && (
+          <Link to="/sistema/financeiro" className="bg-white group rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 hover:shadow-md hover:border-red-300 hover:ring-1 hover:ring-red-100 transition-all flex flex-col items-center text-center">
+            <div className="bg-lime-50 text-lime-600 p-3 rounded-full group-hover:bg-lime-600 group-hover:text-white transition-colors mb-2 sm:mb-3">
+              <DollarSign className="w-6 h-6 sm:w-8 sm:h-8" />
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 group-hover:text-red-700">Financeiro</h3>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">Pagamentos aos fornecedores e dotações orçamentárias.</p>
+          </Link>
+        )}
 
         {isMaster && (
           <Link to="/sistema/usuarios" className="bg-white group rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 hover:shadow-md hover:border-red-300 hover:ring-1 hover:ring-red-100 transition-all flex flex-col items-center text-center">
