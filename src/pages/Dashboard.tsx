@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { FileCheck, FileText, Package, CheckSquare } from 'lucide-react';
+import { FileCheck, FileText, Package, CheckSquare, LayoutDashboard } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import DashboardApoio from './dashboards/DashboardApoio';
 import DashboardContratosArps from './dashboards/DashboardContratosArps';
 import DashboardGestaoContratos from './dashboards/DashboardGestaoContratos';
 import DashboardFiscalContrato from './dashboards/DashboardFiscalContrato';
+import DashboardDga from './dashboards/DashboardDga';
 
 /**
  * Dashboard Corporativo: um dashboard distinto por módulo, cada um com
@@ -22,6 +23,7 @@ export default function Dashboard() {
     { id: 'contratos-arps', nome: "Contratos e ARP's", icon: FileText, show: isMaster || perfil === 'contratos', Componente: DashboardContratosArps },
     { id: 'gestao-contratos', nome: 'Gestão de Contratos', icon: CheckSquare, show: isMaster || perfil === 'gestao', Componente: DashboardGestaoContratos },
     { id: 'fiscal-contrato', nome: 'Fiscal do Contrato', icon: FileCheck, show: isMaster || perfil === 'fiscal', Componente: DashboardFiscalContrato },
+    { id: 'dga', nome: 'Executivo (DGA)', icon: LayoutDashboard, show: isMaster || perfil === 'dga', Componente: DashboardDga },
   ].filter((aba) => aba.show);
 
   const [abaAtiva, setAbaAtiva] = useState(abas[0]?.id);
