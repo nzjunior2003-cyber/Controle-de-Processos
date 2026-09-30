@@ -7,7 +7,7 @@ import { useApp } from '../../context/AppContext';
 import { useEtapasPorRito } from '../../hooks/useEtapasPorRito';
 import { calcularProgressoChecklist } from '../../lib/fluxoProcesso';
 import { calcularDataPrevista } from '../../lib/prazosProcesso';
-import { calcularStatusContrato, encontrarVinculosPorPae, formatarMoeda, marcoAlertaVencimento } from '../../lib/contratos';
+import { encontrarVinculosPorPae, formatarMoeda, marcoAlertaVencimento } from '../../lib/contratos';
 import { totalPagoPorFonte } from '../../lib/financeiro';
 
 const TOOLTIP_STYLE = { borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' };
@@ -90,21 +90,55 @@ export default function DashboardDga() {
     (c) => c.valorGlobal > 0 && ((c.saldoAtualFinanceiro ?? 0) / c.valorGlobal) * 100 <= 20,
   );
 
-  // Bloco 5: vigências próximas do vencimento
-  const contratosComStatus = useMemo(() => contratos.map((c) => calcularStatusContrato(c)), [contratos]);
+  // Saldo quantitativo: só contratos com controle por quantidade. Quantidades
+  // de contratos diferentes não são somáveis (unidades distintas), então o
+  // indicador é o percentual que ainda resta de cada um.
+  const saldosQuantitativos = useMemo(
+    () =>
+      contratosAtivos
+        .filter((c) => (c.saldoInicialQuantitativo ?? 0) > 0)
+        .map((c) => {
+          const inicial = c.saldoInicialQuantitativo as number;
+          const atual = c.saldoAtualQuantitativo ?? 0;
+          return { id: c.id, numero: c.numero, empresa: c.empresa, inicial, atual, percentual: (atual / inicial) * 100 };
+        })
+        .sort((a, b) => a.percentual - b.percentual),
+    [contratosAtivos],
+  );
+  const quantitativoBaixo = saldosQuantitativos.filter((s) => s.percentual <= 20).length;
+
+  // Bloco 5: vigências próximas do vencimento (contratos e ARPs)
   const vigenciasProximas = useMemo(() => {
     const hoje = new Date();
-    return contratosComStatus
+    const diasAte = (data: string | undefined) => {
+      if (!data) return null;
+      const fim = new Date(data);
+      return Number.isNaN(fim.getTime()) ? null : Math.ceil((fim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+    };
+
+    const docontratos = contratos
       .filter((c) => !c.concluido)
-      .map((c) => {
-        const fim = new Date(c.fimVigencia);
-        const dias = Number.isNaN(fim.getTime()) ? null : Math.ceil((fim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
-        const marco = dias != null ? marcoAlertaVencimento(dias) : null;
-        return { ...c, diasRestantes: dias, marco };
-      })
-      .filter((c) => c.marco !== null)
-      .sort((a, b) => (a.diasRestantes ?? 0) - (b.diasRestantes ?? 0));
-  }, [contratosComStatus]);
+      .map((c) => ({
+        chave: `contrato-${c.id}`,
+        tipo: 'Contrato' as const,
+        identificacao: `${c.numero} — ${c.empresa}`,
+        fim: c.fimVigencia,
+        dias: diasAte(c.fimVigencia),
+      }));
+    const dasArps = procedimentos
+      .filter((p) => !!p.vigenciaArp)
+      .map((p) => ({
+        chave: `arp-${p.id}`,
+        tipo: 'ARP' as const,
+        identificacao: `${p.numero} — ${p.orgaoGerenciador || p.objeto}`,
+        fim: p.vigenciaArp as string,
+        dias: diasAte(p.vigenciaArp),
+      }));
+
+    return [...docontratos, ...dasArps]
+      .filter((item) => item.dias !== null && marcoAlertaVencimento(item.dias) !== null)
+      .sort((a, b) => (a.dias ?? 0) - (b.dias ?? 0));
+  }, [contratos, procedimentos]);
 
   // Bloco 6: andamento dos processos (percentual do checklist)
   const processosAtivos = useMemo(() => processos.filter((p) => p.status === 'em_andamento'), [processos]);
@@ -120,6 +154,34 @@ export default function DashboardDga() {
     });
     return Object.entries(faixas).map(([name, Quantidade]) => ({ name, Quantidade }));
   }, [processosAtivos, etapasPorRito]);
+
+  // Tempo de andamento de cada processo ativo (dias desde a entrada), do mais antigo pro mais novo.
+  const temposDosProcessos = useMemo(() => {
+    const hoje = new Date();
+    return processosAtivos
+      .map((proc) => {
+        const entrada = proc.data_entrada ? new Date(proc.data_entrada) : null;
+        const dias =
+          entrada && !Number.isNaN(entrada.getTime())
+            ? Math.max(0, Math.floor((hoje.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24)))
+            : null;
+        const prevista = calcularDataPrevista(proc.data_entrada, proc.rito_processual);
+        return {
+          id: proc.id,
+          numero: proc.numero_processo,
+          unidade: proc.unidade_demandante,
+          localizacao: proc.localizacao_atual,
+          dias,
+          percentual: calcularProgressoChecklist(proc, etapasPorRito),
+          foraDoPrazo: prevista ? hoje > prevista : null,
+        };
+      })
+      .filter((p) => p.dias !== null)
+      .sort((a, b) => (b.dias ?? 0) - (a.dias ?? 0));
+  }, [processosAtivos, etapasPorRito]);
+  const mediaDiasAndamento = temposDosProcessos.length
+    ? Math.round(temposDosProcessos.reduce((acc, p) => acc + (p.dias ?? 0), 0) / temposDosProcessos.length)
+    : 0;
 
   // Bloco 7: previsão de execução no prazo
   const previsaoExecucao = useMemo(() => {
@@ -219,41 +281,88 @@ export default function DashboardDga() {
         )}
       </div>
 
-      {/* Bloco 4: Saldos de contratos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Bloco 4: Saldos de contratos (financeiro e quantitativo) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
           <p className="text-xs font-medium text-gray-500 uppercase">Saldo Financeiro em Aberto (Contratos Ativos)</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{formatarMoeda(saldoTotalFinanceiro)}</p>
         </div>
         <div className="bg-white p-4 rounded-lg border border-amber-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Contratos com Saldo ≤ 20%</p>
+          <p className="text-xs font-medium text-gray-500 uppercase">Contratos com Saldo Financeiro ≤ 20%</p>
           <p className="text-2xl font-bold text-amber-700 mt-1">{contratosComSaldoBaixo.length}</p>
+        </div>
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+          <p className="text-xs font-medium text-gray-500 uppercase">Contratos com Controle Quantitativo</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{saldosQuantitativos.length}</p>
+        </div>
+        <div className="bg-white p-4 rounded-lg border border-amber-200 shadow-sm">
+          <p className="text-xs font-medium text-gray-500 uppercase">Com Saldo Quantitativo ≤ 20%</p>
+          <p className="text-2xl font-bold text-amber-700 mt-1">{quantitativoBaixo}</p>
         </div>
       </div>
 
-      {/* Bloco 5: Vigências próximas */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <h2 className="text-lg font-medium text-gray-900 p-6 pb-0">Vigências Próximas do Vencimento</h2>
+        <h2 className="text-lg font-medium text-gray-900 p-6 pb-0">Saldo Quantitativo — Menores Saldos Restantes</h2>
         <div className="overflow-x-auto mt-4">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contrato</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Quantidade Restante</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">% Restante</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {saldosQuantitativos.slice(0, 10).map((s) => (
+                <tr key={s.id}>
+                  <td className="px-4 py-3 text-sm text-gray-900">{s.numero} — {s.empresa}</td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-700">
+                    {s.atual.toLocaleString('pt-BR')} de {s.inicial.toLocaleString('pt-BR')}
+                  </td>
+                  <td className={`px-4 py-3 text-sm text-right font-medium ${s.percentual <= 20 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                    {s.percentual.toFixed(1)}%
+                  </td>
+                </tr>
+              ))}
+              {saldosQuantitativos.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-500">Nenhum contrato ativo com controle por quantidade.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Bloco 5: Vigências próximas */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        <h2 className="text-lg font-medium text-gray-900 p-6 pb-0">Vigências Próximas do Vencimento (Contratos e ARP's)</h2>
+        <div className="overflow-x-auto mt-4">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Identificação</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fim da Vigência</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Dias Restantes</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {vigenciasProximas.slice(0, 15).map((c) => (
-                <tr key={c.id}>
-                  <td className="px-4 py-3 text-sm text-gray-900">{c.numero} — {c.empresa}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{new Date(c.fimVigencia).toLocaleDateString('pt-BR')}</td>
-                  <td className="px-4 py-3 text-sm text-right font-medium text-amber-700">{c.diasRestantes} dias</td>
+              {vigenciasProximas.slice(0, 20).map((item) => (
+                <tr key={item.chave}>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${item.tipo === 'ARP' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                      {item.tipo}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{item.identificacao}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{new Date(item.fim).toLocaleDateString('pt-BR')}</td>
+                  <td className="px-4 py-3 text-sm text-right font-medium text-amber-700">{item.dias} dias</td>
                 </tr>
               ))}
               {vigenciasProximas.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-500">Nenhuma vigência próxima do vencimento.</td>
+                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">Nenhuma vigência próxima do vencimento.</td>
                 </tr>
               )}
             </tbody>
@@ -273,6 +382,58 @@ export default function DashboardDga() {
             <Bar dataKey="Quantidade" fill="#2563eb" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Tempo de andamento de cada processo */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-6 pb-0 flex items-center justify-between">
+          <h2 className="text-lg font-medium text-gray-900">Tempo de Andamento dos Processos Ativos</h2>
+          <p className="text-sm text-gray-500">Média: <span className="font-semibold text-gray-900">{mediaDiasAndamento} dias</span></p>
+        </div>
+        <div className="overflow-x-auto mt-4">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Processo</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Setor Demandante</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Setor Atual</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Dias</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Andamento</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Prazo</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {temposDosProcessos.slice(0, 10).map((p) => (
+                <tr key={p.id}>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{p.numero}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{p.unidade || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{p.localizacao || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">{p.dias}</td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-700">{p.percentual != null ? `${p.percentual}%` : '-'}</td>
+                  <td className="px-4 py-3 text-center text-xs">
+                    {p.foraDoPrazo === null ? (
+                      <span className="text-gray-400">Sem meta</span>
+                    ) : p.foraDoPrazo ? (
+                      <span className="inline-flex px-2 py-0.5 rounded bg-red-50 text-red-700 font-medium">Fora do prazo</span>
+                    ) : (
+                      <span className="inline-flex px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">No prazo</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {temposDosProcessos.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">Nenhum processo ativo com data de entrada.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {temposDosProcessos.length > 10 && (
+          <p className="px-6 py-3 text-xs text-gray-500 border-t border-gray-100">
+            Mostrando os 10 mais antigos de {temposDosProcessos.length} processos ativos.
+          </p>
+        )}
       </div>
 
       {/* Bloco 7: Previsão de execução no prazo */}
