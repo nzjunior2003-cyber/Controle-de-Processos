@@ -66,6 +66,8 @@ export default function Usuarios() {
         perfil: usuarioEditando.perfil,
         ativo: usuarioEditando.ativo,
         mf: usuarioEditando.mf || '',
+        setor_id: usuarioEditando.setor_id,
+        ubm: usuarioEditando.ubm || '',
         unidadeDemandante: usuarioEditando.unidadeDemandante || '',
       });
       setUsuarioEditando(null);
@@ -251,6 +253,33 @@ export default function Usuarios() {
                 </select>
                 <p className="mt-2 text-xs text-gray-500">
                   Define qual módulo este usuário poderá acessar e editar. Administradores Master têm acesso total.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Setor</label>
+                <select
+                  value={usuarioEditando.setor_id}
+                  onChange={(e) => setUsuarioEditando({ ...usuarioEditando, setor_id: e.target.value })}
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm rounded-md border"
+                >
+                  {setores.map((setor) => (
+                    <option key={setor.id} value={setor.id}>{setor.sigla} - {setor.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">UBM / Unidade</label>
+                <input
+                  type="text"
+                  value={usuarioEditando.ubm ?? ''}
+                  onChange={(e) => setUsuarioEditando({ ...usuarioEditando, ubm: e.target.value })}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                  placeholder="Ex.: QCG, CFAE"
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  Se preenchida, é a UBM/Unidade que aparece na coluna "Setor" da lista; em branco, aparece o Setor acima.
                 </p>
               </div>
 
