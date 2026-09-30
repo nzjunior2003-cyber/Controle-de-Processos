@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, FileText, PieChart, Package, CheckSquare, Users, Menu, FileCheck, History, ClipboardList } from 'lucide-react';
+import { Home, FileText, PieChart, Package, CheckSquare, Users, Menu, FileCheck, History, ClipboardList, ClipboardCheck } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useApp } from '../../context/AppContext';
 
@@ -28,6 +28,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     { name: 'Gestão de Contratos', href: '/sistema/gestao-contratos', icon: CheckSquare, show: true },
     { name: 'Fiscal do Contrato', href: '/sistema/fiscal-contrato', icon: FileCheck, show: true },
     { name: 'Planejamento', href: '/sistema/planejamento', icon: ClipboardList, show: true },
+    { name: 'Plano de Contratação Anual', href: '/sistema/pca', icon: ClipboardCheck, show: true },
     { name: 'Dashboard Corporativo', href: '/sistema/dashboard', icon: PieChart, show: true },
     { name: 'Usuários', href: '/sistema/usuarios', icon: Users, show: isMaster },
     { name: 'Auditoria', href: '/sistema/auditoria', icon: History, show: isMaster },

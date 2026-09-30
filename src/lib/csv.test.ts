@@ -55,6 +55,15 @@ describe('mapSheetRowToPca', () => {
         ITEM: 'Item 3',
         GRUPO: 'Grupo 1',
         'FONTE DO RECURSO': 'Tesouro Estadual',
+        ORIGEM: 'DGCEP',
+        SUBITEM: 'PERMANENTE',
+        QUANTIDADE: '18',
+        'VALOR UNITÁRIO\nESTIMADO ()': 'R$ 1.300,00',
+        PRIORIDADE: 'ALTA',
+        'DATA \nDESEJADA': '1º QDQQ',
+        'CONTRATO \nNOVO': 'SIM',
+        '*PROVÁVEL MODALIDADE DE LICITAÇÃO OU DE RITO PROCESSUAL': 'PREGÃO ELETRÔNICO',
+        'Nº DO PAE': 'E-2026/2741168',
       },
       4,
       2026,
@@ -70,6 +79,15 @@ describe('mapSheetRowToPca', () => {
       item_pca: 'Item 3',
       grupo_pca: 'Grupo 1',
       fonte_recurso: 'Tesouro Estadual',
+      origem: 'DGCEP',
+      subitem: 'PERMANENTE',
+      quantidade: '18',
+      valor_unitario_estimado: 1300,
+      prioridade: 'ALTA',
+      data_desejada: '1º QDQQ',
+      contrato_novo: true,
+      modalidade_licitacao: 'PREGÃO ELETRÔNICO',
+      numero_pae: 'E-2026/2741168',
     });
   });
 
@@ -78,6 +96,8 @@ describe('mapSheetRowToPca', () => {
     expect(pca.codigo_pca).toBe('');
     expect(pca.valor_previsto).toBe(0);
     expect(pca.exercicio).toBe(2025);
+    expect(pca.origem).toBeUndefined();
+    expect(pca.contrato_novo).toBeUndefined();
   });
 });
 

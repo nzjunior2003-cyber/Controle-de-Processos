@@ -20,6 +20,7 @@ import GerenciarExecucaoFiscal from './pages/fiscal-contrato/GerenciarExecucao';
 import Auditoria from './pages/auditoria';
 import Planejamento from './pages/planejamento';
 import IrpForm from './pages/planejamento/IrpForm';
+import PlanoContratacaoAnual from './pages/pca';
 
 export default function App() {
   return (
@@ -51,6 +52,7 @@ export default function App() {
                 <Route path="planejamento" element={<Planejamento />} />
                 <Route path="planejamento/novo" element={<IrpForm />} />
                 <Route path="planejamento/:id/editar" element={<IrpForm />} />
+                <Route path="pca" element={<PlanoContratacaoAnual />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="usuarios" element={<Usuarios />} />
                 <Route path="auditoria" element={<Auditoria />} />

@@ -75,6 +75,20 @@ export function mapSheetRowToPca(
     item_pca: valor('ITEM'),
     grupo_pca: valor('GRUPO'),
     fonte_recurso: valor('FONTE DO RECURSO'),
+    origem: celula(linha, 'ORIGEM') || undefined,
+    subitem: celula(linha, 'SUBITEM') || undefined,
+    quantidade: celula(linha, 'QUANTIDADE') || undefined,
+    valor_unitario_estimado: celula(linha, 'VALOR UNITÁRIO ESTIMADO ()')
+      ? parseCurrencyBR(celula(linha, 'VALOR UNITÁRIO ESTIMADO ()'))
+      : undefined,
+    prioridade: celula(linha, 'PRIORIDADE') || undefined,
+    data_desejada: celula(linha, 'DATA DESEJADA') || undefined,
+    contrato_novo: celula(linha, 'CONTRATO NOVO')
+      ? celula(linha, 'CONTRATO NOVO').toUpperCase() === 'SIM'
+      : undefined,
+    modalidade_licitacao:
+      celula(linha, '*PROVÁVEL MODALIDADE DE LICITAÇÃO OU DE RITO PROCESSUAL') || undefined,
+    numero_pae: celula(linha, 'Nº DO PAE') || undefined,
   };
 }
 
@@ -93,10 +107,15 @@ export function parseDataBR(entrada: unknown): string | undefined {
   return Number.isNaN(data.getTime()) ? undefined : data.toISOString();
 }
 
-/** Lê uma célula da linha por nome de coluna, tolerando espaços extras no cabeçalho. */
+/**
+ * Lê uma célula da linha por nome de coluna, tolerando espaços extras (e
+ * quebras de linha, comuns em cabeçalhos exportados do Google Sheets com
+ * quebra de texto habilitada) no cabeçalho.
+ */
 export function celula(linha: LinhaPlanilha, nomeColuna: string): string {
-  const normalizado = nomeColuna.trim().toLowerCase();
-  const chave = Object.keys(linha).find((k) => k.trim().toLowerCase() === normalizado);
+  const normalizar = (texto: string) => texto.trim().replace(/\s+/g, ' ').toLowerCase();
+  const normalizado = normalizar(nomeColuna);
+  const chave = Object.keys(linha).find((k) => normalizar(k) === normalizado);
   return chave ? (linha[chave] ?? '').toString().trim() : '';
 }
 

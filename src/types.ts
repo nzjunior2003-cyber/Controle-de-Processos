@@ -242,6 +242,15 @@ export interface PCA {
   item_pca: string; // Will map to "Item"
   grupo_pca: string; // Will map to "Grupo"
   fonte_recurso: string; // Will map to "Fonte de Recurso"
+  origem?: string; // "Origem" — setor que originou o pedido
+  subitem?: string; // "Subitem"
+  quantidade?: string; // "Quantidade" — texto (nem sempre é um número)
+  valor_unitario_estimado?: number; // "Valor Unitário Estimado"
+  prioridade?: string; // "Prioridade" — ALTA/MÉDIA/BAIXA
+  data_desejada?: string; // "Data Desejada" — texto livre (ex.: "1º QDQQ")
+  contrato_novo?: boolean; // "Contrato Novo" — SIM/NÃO
+  modalidade_licitacao?: string; // "*Provável Modalidade de Licitação ou de Rito Processual"
+  numero_pae?: string; // "Nº do PAE"
 }
 
 export type TipoAlerta = 'prazo' | 'pendencia' | 'gargalo';
