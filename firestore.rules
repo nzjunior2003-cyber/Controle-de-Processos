@@ -169,6 +169,27 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'observacaoResposta', 'responsavelRespostaNome', 'responsavelRespostaEmail', 'procedimentoVinculadoId', 'atualizado_em']);
     }
+    match /notificacoes/{documento} {
+      // Cada usuário só lê as próprias notificações (o cliente que dispara
+      // o evento grava um doc por destinatário — ver
+      // `dispararNotificacoesProcesso`, AppContext.tsx).
+      allow read: if ativo() && resource.data.destinatarioId == request.auth.uid;
+      allow create: if ativo();
+      // Só marca como lida (nenhum outro campo pode mudar).
+      allow update: if ativo()
+        && resource.data.destinatarioId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lida']);
+      allow delete: if false;
+    }
+    match /push_subscriptions/{documento} {
+      // Leitura liberada a qualquer usuário ativo: quem dispara um evento
+      // precisa localizar as inscrições dos destinatários pra repassar ao
+      // /api/send-push — não são dados sensíveis (só endpoint/keys de
+      // push), só o dono pode criar/alterar/remover a própria inscrição.
+      allow read: if ativo();
+      allow create, update: if ativo() && request.resource.data.usuarioId == request.auth.uid;
+      allow delete: if ativo() && resource.data.usuarioId == request.auth.uid;
+    }
     match /pagamentos/{documento} {
       allow read: if ativo();
       allow write: if ativo() && perfilDoc().perfil in ['master', 'financeiro'];

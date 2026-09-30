@@ -22,7 +22,9 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
+  orderBy,
   query,
   runTransaction,
   serverTimestamp,
@@ -69,6 +71,7 @@ import {
   type ExecucaoContrato,
   type Ocorrencia,
 } from '../lib/contratos';
+import { destinatariosEventoProcesso, montarNotificacao } from '../lib/notificacoesProcesso';
 import {
   resumirAuditoria,
   type AcaoAuditoria,
@@ -91,6 +94,9 @@ import {
   IRP,
   DotacaoOrcamentaria,
   PagamentoContrato,
+  Notificacao,
+  PushSubscriptionRegistro,
+  TipoEventoNotificacao,
 } from '../types';
 
 const URL_PLANILHA_PCA =
@@ -115,6 +121,9 @@ interface AppContextData {
   irps: IRP[];
   pagamentos: PagamentoContrato[];
   dotacoes: DotacaoOrcamentaria[];
+  /** Só as últimas 50 do usuário logado (ver `useNotificacoesDoUsuario`). */
+  notificacoes: Notificacao[];
+  pushSubscriptions: PushSubscriptionRegistro[];
   /** Só é populado para o perfil 'master' (mesma restrição das firestore.rules). */
   logsAcesso: LogAcesso[];
   /** Só é populado para o perfil 'master' (mesma restrição das firestore.rules). */
@@ -190,6 +199,9 @@ interface AppContextData {
   addDotacao: (dados: Omit<DotacaoOrcamentaria, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
   updateDotacao: (id: string, dados: Partial<DotacaoOrcamentaria>) => Promise<void>;
   deleteDotacao: (id: string) => Promise<void>;
+  marcarNotificacaoLida: (id: string) => Promise<void>;
+  registrarPushSubscription: (dados: Omit<PushSubscriptionRegistro, 'id' | 'criado_em'>) => Promise<void>;
+  removerPushSubscription: (endpoint: string) => Promise<void>;
 }
 
 /**
@@ -241,6 +253,50 @@ function useColecao<T extends { id: string }>(nome: string, ativo: boolean): T[]
 
     return () => cancelar();
   }, [nome, ativo]);
+
+  return dados;
+}
+
+/**
+ * Assina só as notificações do usuário logado (últimas 50), em vez de
+ * trazer a coleção `notificacoes` inteira como o `useColecao` genérico
+ * faria — evita que o cliente de um usuário receba notificações de outro
+ * pela rede.
+ */
+function useNotificacoesDoUsuario(usuarioId: string | undefined, ativo: boolean): Notificacao[] {
+  const [dados, setDados] = useState<Notificacao[]>([]);
+
+  useEffect(() => {
+    const db = getDb();
+    if (!ativo || !db || !usuarioId) {
+      setDados([]);
+      return;
+    }
+
+    const consulta = query(
+      collection(db, 'notificacoes'),
+      where('destinatarioId', '==', usuarioId),
+      orderBy('criado_em', 'desc'),
+      limit(50),
+    );
+
+    const cancelar = onSnapshot(
+      consulta,
+      (snapshot) => {
+        setDados(
+          snapshot.docs.map((documento) => ({
+            ...(documento.data() as object),
+            id: documento.id,
+          })) as Notificacao[],
+        );
+      },
+      (erro) => {
+        console.error('Erro ao carregar notificações:', erro);
+      },
+    );
+
+    return () => cancelar();
+  }, [usuarioId, ativo]);
 
   return dados;
 }
@@ -322,6 +378,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const irps = useColecao<IRP>('irps', isAuthenticated);
   const pagamentos = useColecao<PagamentoContrato>('pagamentos', isAuthenticated);
   const dotacoes = useColecao<DotacaoOrcamentaria>('dotacoes', isAuthenticated);
+  const notificacoes = useNotificacoesDoUsuario(usuarioAtual?.id, isAuthenticated);
+  const pushSubscriptions = useColecao<PushSubscriptionRegistro>('push_subscriptions', isAuthenticated);
   // Leitura restrita a 'master' nas firestore.rules — só assina quando fizer
   // sentido, para não gerar erros de permissão para os demais perfis.
   const podeVerLogs = isAuthenticated && usuarioAtual?.perfil === 'master';
@@ -613,6 +671,54 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 
   /**
+   * Dispara as notificações (central interna + push best-effort) de um
+   * evento-chave de processo. Sem Cloud Functions neste projeto: é sempre
+   * o cliente que fez a escrita que monta e envia — por isso nunca lança
+   * (erro só logado, pra não quebrar a ação principal que originou o
+   * evento).
+   */
+  const dispararNotificacoesProcesso = useCallback(
+    async (
+      tipo: TipoEventoNotificacao,
+      processo: Pick<Processo, 'id' | 'numero_processo' | 'objeto' | 'localizacao_atual' | 'unidade_demandante'>,
+    ) => {
+      try {
+        const db = requireDb();
+        const destinatarios = destinatariosEventoProcesso(tipo, processo, usuarios);
+        if (destinatarios.length === 0) return;
+
+        const lote = writeBatch(db);
+        destinatarios.forEach((destinatario) => {
+          const ref = doc(collection(db, 'notificacoes'));
+          lote.set(ref, montarNotificacao(tipo, processo, destinatario.id));
+        });
+        await lote.commit();
+
+        const auth = getFirebaseAuth();
+        const idToken = await auth?.currentUser?.getIdToken();
+        if (!idToken) return;
+
+        destinatarios.forEach((destinatario) => {
+          const inscricoes = pushSubscriptions.filter((s) => s.usuarioId === destinatario.id);
+          if (inscricoes.length === 0) return;
+          const notificacao = montarNotificacao(tipo, processo, destinatario.id);
+          fetch('/api/send-push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+            body: JSON.stringify({
+              subscriptions: inscricoes.map((s) => ({ endpoint: s.endpoint, keys: s.keys })),
+              payload: { title: notificacao.titulo, body: notificacao.corpo, url: notificacao.url },
+            }),
+          }).catch((erro) => console.error('Erro ao enviar push:', erro));
+        });
+      } catch (erro) {
+        console.error('Erro ao disparar notificações do processo:', erro);
+      }
+    },
+    [usuarios, pushSubscriptions],
+  );
+
+  /**
    * Sincroniza os processos com a planilha de controle da equipe (a mesma
    * atualizada pelo RPA de acompanhamento no PAE): casa cada linha pelo
    * número do processo — atualiza o que já existe (status, localização
@@ -647,8 +753,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         data_fim: null,
         criado_em: new Date().toISOString(),
       });
+
+      // Só notifica numa mudança de verdade (havia uma estada anterior
+      // diferente) — não no primeiro registro de localização de um
+      // processo recém-criado/importado.
+      if (aberta) {
+        const processo = processos.find((p) => p.id === processoId);
+        if (processo) {
+          dispararNotificacoesProcesso('mudanca_setor', {
+            id: processo.id,
+            numero_processo: processo.numero_processo,
+            objeto: processo.objeto,
+            localizacao_atual: novaLocalizacao,
+            unidade_demandante: processo.unidade_demandante,
+          });
+        }
+      }
     },
-    [estadasProcesso],
+    [estadasProcesso, processos, dispararNotificacoesProcesso],
   );
 
   const syncProcessosDaPlanilha = useCallback(
@@ -694,6 +816,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         localizacao: string;
         dataMudanca: string;
       }> = [];
+      const mudancasDeFase: Array<{
+        tipo: 'mudanca_fase' | 'conclusao';
+        dados: { id: string; numero_processo: string; objeto: string; localizacao_atual?: string; unidade_demandante: string };
+      }> = [];
 
       for (let inicio = 0; inicio < validas.length; inicio += 400) {
         const lote = writeBatch(db);
@@ -705,9 +831,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             Object.entries(resto).filter(([, v]) => v !== undefined),
           );
 
-          const idExistente =
-            processos.find((p) => p.numero_processo === numero_processo)?.id ??
-            idsCriadosNestaSincronizacao.get(numero_processo);
+          const processoExistente = processos.find((p) => p.numero_processo === numero_processo);
+          const idExistente = processoExistente?.id ?? idsCriadosNestaSincronizacao.get(numero_processo);
 
           if (idExistente) {
             lote.set(
@@ -722,6 +847,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 localizacao: dados.localizacao_atual,
                 dataMudanca: dados.ultima_tramitacao || agora,
               });
+            }
+            if (processoExistente) {
+              const dadosNotificacao = {
+                id: idExistente,
+                numero_processo,
+                objeto: dados.objeto || processoExistente.objeto,
+                localizacao_atual: dados.localizacao_atual ?? processoExistente.localizacao_atual,
+                unidade_demandante: dados.unidade_demandante || processoExistente.unidade_demandante,
+              };
+              if (dados.status === 'concluido' && processoExistente.status !== 'concluido') {
+                mudancasDeFase.push({ tipo: 'conclusao', dados: dadosNotificacao });
+              } else if (
+                (dados.fase_processo !== undefined && dados.fase_processo !== processoExistente.fase_processo) ||
+                (dados.subfase_processo !== undefined && dados.subfase_processo !== processoExistente.subfase_processo)
+              ) {
+                mudancasDeFase.push({ tipo: 'mudanca_fase', dados: dadosNotificacao });
+              }
             }
           } else {
             const novaRef = doc(collection(db, 'processos'));
@@ -760,9 +902,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         await sincronizarEstada(mudanca.processoId, mudanca.localizacao, mudanca.dataMudanca);
       }
 
+      mudancasDeFase.forEach((mudanca) => {
+        dispararNotificacoesProcesso(mudanca.tipo, mudanca.dados);
+      });
+
       return { criados, atualizados, ignorados: linhas.length - validas.length };
     },
-    [processos, sincronizarEstada],
+    [processos, sincronizarEstada, dispararNotificacoesProcesso],
   );
 
   /**
@@ -1002,9 +1148,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         await sincronizarEstada(id, novaLocalizacao, new Date().toISOString());
       }
 
+      if (anterior) {
+        const processoAtualizado = { ...anterior, ...dados };
+        const dadosNotificacao = {
+          id,
+          numero_processo: processoAtualizado.numero_processo,
+          objeto: processoAtualizado.objeto,
+          localizacao_atual: processoAtualizado.localizacao_atual,
+          unidade_demandante: processoAtualizado.unidade_demandante,
+        };
+        if (dados.status === 'concluido' && anterior.status !== 'concluido') {
+          dispararNotificacoesProcesso('conclusao', dadosNotificacao);
+        } else if (
+          (dados.fase_processo !== undefined && dados.fase_processo !== anterior.fase_processo) ||
+          (dados.subfase_processo !== undefined && dados.subfase_processo !== anterior.subfase_processo)
+        ) {
+          dispararNotificacoesProcesso('mudanca_fase', dadosNotificacao);
+        }
+      }
+
       await registrarAuditoria('processos', id, 'UPDATE', dados, anterior);
     },
-    [processos, sincronizarEstada, registrarAuditoria],
+    [processos, sincronizarEstada, registrarAuditoria, dispararNotificacoesProcesso],
   );
 
   const updateProcessoStatus = useCallback(
@@ -1476,6 +1641,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [dotacoes, registrarAuditoria],
   );
 
+  // --- Notificações ---------------------------------------------------------
+  const marcarNotificacaoLida = useCallback(async (id: string) => {
+    const db = requireDb();
+    await updateDoc(doc(db, 'notificacoes', id), { lida: true });
+  }, []);
+
+  const registrarPushSubscription = useCallback(
+    async (dados: Omit<PushSubscriptionRegistro, 'id' | 'criado_em'>) => {
+      const db = requireDb();
+      const existente = pushSubscriptions.find((s) => s.endpoint === dados.endpoint);
+      if (existente) {
+        await updateDoc(doc(db, 'push_subscriptions', existente.id), { ...dados });
+        return;
+      }
+      await addDoc(collection(db, 'push_subscriptions'), {
+        ...dados,
+        criado_em: new Date().toISOString(),
+      });
+    },
+    [pushSubscriptions],
+  );
+
+  const removerPushSubscription = useCallback(
+    async (endpoint: string) => {
+      const db = requireDb();
+      const existente = pushSubscriptions.find((s) => s.endpoint === endpoint);
+      if (!existente) return;
+      await deleteDoc(doc(db, 'push_subscriptions', existente.id));
+    },
+    [pushSubscriptions],
+  );
+
   const valor = useMemo<AppContextData>(
     () => ({
       setores: SETORES,
@@ -1496,6 +1693,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       irps,
       pagamentos,
       dotacoes,
+      notificacoes,
+      pushSubscriptions,
       logsAcesso,
       logsAuditoria,
       usuarioAtual,
@@ -1542,6 +1741,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addDotacao,
       updateDotacao,
       deleteDotacao,
+      marcarNotificacaoLida,
+      registrarPushSubscription,
+      removerPushSubscription,
     }),
     [
       usuarios,
@@ -1561,6 +1763,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       irps,
       pagamentos,
       dotacoes,
+      notificacoes,
+      pushSubscriptions,
       logsAcesso,
       logsAuditoria,
       usuarioAtual,
@@ -1606,6 +1810,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addDotacao,
       updateDotacao,
       deleteDotacao,
+      marcarNotificacaoLida,
+      registrarPushSubscription,
+      removerPushSubscription,
     ],
   );
 
