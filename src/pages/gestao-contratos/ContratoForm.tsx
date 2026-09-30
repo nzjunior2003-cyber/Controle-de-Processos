@@ -1134,12 +1134,14 @@ export default function ContratoForm() {
         <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-medium text-gray-900">Pagamentos (Financeiro)</h2>
-            <Link
-              to={`/sistema/financeiro/pagamentos/novo?contratoId=${contrato.id}`}
-              className="text-sm font-medium text-red-700 hover:underline"
-            >
-              Lançar novo pagamento
-            </Link>
+            {(usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'financeiro') && (
+              <Link
+                to={`/sistema/financeiro/pagamentos/novo?contratoId=${contrato.id}`}
+                className="text-sm font-medium text-red-700 hover:underline"
+              >
+                Lançar novo pagamento
+              </Link>
+            )}
           </div>
           {(() => {
             const pagamentosDoContrato = pagamentos
