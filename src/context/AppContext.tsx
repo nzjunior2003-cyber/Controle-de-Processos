@@ -22,9 +22,7 @@ import {
   doc,
   getDoc,
   getDocs,
-  limit,
   onSnapshot,
-  orderBy,
   query,
   runTransaction,
   serverTimestamp,
@@ -273,22 +271,19 @@ function useNotificacoesDoUsuario(usuarioId: string | undefined, ativo: boolean)
       return;
     }
 
-    const consulta = query(
-      collection(db, 'notificacoes'),
-      where('destinatarioId', '==', usuarioId),
-      orderBy('criado_em', 'desc'),
-      limit(50),
-    );
+    // Só filtro por igualdade (sem orderBy no servidor): filtro + ordenação
+    // em campos diferentes exigiria um índice composto no Firestore, e sem
+    // ele a consulta falha silenciosamente. Ordena e limita no cliente.
+    const consulta = query(collection(db, 'notificacoes'), where('destinatarioId', '==', usuarioId));
 
     const cancelar = onSnapshot(
       consulta,
       (snapshot) => {
-        setDados(
-          snapshot.docs.map((documento) => ({
-            ...(documento.data() as object),
-            id: documento.id,
-          })) as Notificacao[],
-        );
+        const todas = snapshot.docs.map((documento) => ({
+          ...(documento.data() as object),
+          id: documento.id,
+        })) as Notificacao[];
+        setDados(todas.sort((a, b) => b.criado_em.localeCompare(a.criado_em)).slice(0, 50));
       },
       (erro) => {
         console.error('Erro ao carregar notificações:', erro);
