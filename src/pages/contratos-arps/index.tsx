@@ -4,8 +4,11 @@ import { Download, Filter, PlusCircle, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useMilitares } from '../../hooks/useMilitares';
 import FiltroAno from '../../components/contratos/FiltroAno';
+import ExecucaoModal from '../../components/contratos/ExecucaoModal';
+import { pushSaldoNaPlanilha } from '../../lib/saldoPlanilha';
 import {
   buscarContratos,
+  calcularStatusContrato,
   extrairAnosDisponiveis,
   filtrarContratosPorAno,
   linhasCsvContratos,
@@ -37,6 +40,11 @@ export default function ContratosArps() {
     pcas,
     usuarioAtual,
     contratos,
+    aditivos,
+    addAditivo,
+    execucoes,
+    ocorrencias,
+    addExecucao,
     procedimentos,
     sancionatorios,
     portarias,
@@ -56,9 +64,17 @@ export default function ContratosArps() {
   const [modalOpen, setModalOpen] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [formData, setFormData] = useState<RegistroFormData>({});
+  const [contratoAditivosId, setContratoAditivosId] = useState<string | null>(null);
 
   const isMasterOrContratos =
     usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'contratos';
+
+  // Sempre a versão mais atual do contrato aberto (reflete na hora um
+  // aditivo recém lançado, sem precisar fechar e reabrir o modal).
+  const contratoAditivos = useMemo(() => {
+    const contrato = contratos.find((c) => c.id === contratoAditivosId);
+    return contrato ? calcularStatusContrato(contrato) : null;
+  }, [contratos, contratoAditivosId]);
 
   const getPcaTitleByProcesso = (numeroProcesso: string) => {
     const processo = processos.find((p) => p.numero_processo === numeroProcesso);
@@ -357,6 +373,7 @@ export default function ContratosArps() {
                   ? (contrato) => navigate(`/sistema/gestao-contratos/${contrato.id}/editar`)
                   : undefined
               }
+              onAditivos={isMasterOrContratos ? (contrato) => setContratoAditivosId(contrato.id) : undefined}
             />
           )}
 
@@ -399,6 +416,33 @@ export default function ContratosArps() {
           salvando={salvando}
           onFechar={() => setModalOpen(false)}
           onSalvar={handleSalvarRegistro}
+        />
+      )}
+
+      {contratoAditivos && (
+        <ExecucaoModal
+          contrato={contratoAditivos}
+          execucoes={execucoes.filter((e) => e.contratoId === contratoAditivos.id)}
+          ocorrencias={ocorrencias.filter((o) => o.contratoId === contratoAditivos.id)}
+          aditivos={aditivos.filter((a) => a.contratoId === contratoAditivos.id)}
+          comAditivos
+          somenteAditivos
+          onAddExecucao={async (execucao) => {
+            const novoSaldo = await addExecucao(execucao);
+            await pushSaldoNaPlanilha(contratoAditivos, novoSaldo);
+          }}
+          onAddAditivo={async (dados) => {
+            const atualizacao = await addAditivo({
+              ...dados,
+              contratoId: contratoAditivos.id,
+              registradoPorId: usuarioAtual?.id ?? '',
+              registradoPorNome: usuarioAtual?.nome ?? '',
+            });
+            if (Object.keys(atualizacao).length > 0) {
+              await pushSaldoNaPlanilha(contratoAditivos, atualizacao);
+            }
+          }}
+          onFechar={() => setContratoAditivosId(null)}
         />
       )}
     </div>

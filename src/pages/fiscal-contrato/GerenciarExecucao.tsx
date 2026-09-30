@@ -1,31 +1,9 @@
 import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
-import { getAccessToken } from '../../lib/googleAuth';
-import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
-import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
 import ExecucaoModal from '../../components/contratos/ExecucaoModal';
-import { calcularStatusContrato, type ContratoComStatus } from '../../lib/contratos';
-import type { Contrato } from '../../types';
-
-async function pushSaldoNaPlanilha(
-  contrato: ContratoComStatus,
-  atualizacao: Partial<Pick<Contrato, 'valorGlobal' | 'saldoAtualFinanceiro'>>,
-): Promise<void> {
-  try {
-    const googleToken = await getAccessToken();
-    if (!googleToken) return;
-    await sincronizarContratoNaPlanilha(
-      googleToken,
-      ID_PLANILHA_CONTRATOS,
-      contratoParaDadosPlanilha({ ...contrato, ...atualizacao }),
-      contrato.planilha_linha,
-    );
-  } catch (erro) {
-    console.error('Erro ao sincronizar saldo do contrato com a planilha:', erro);
-  }
-}
+import { calcularStatusContrato } from '../../lib/contratos';
+import { pushSaldoNaPlanilha } from '../../lib/saldoPlanilha';
 
 /** Página (não popup) de gerenciamento de execução/notificações do Fiscal do Contrato. */
 export default function GerenciarExecucaoFiscal() {

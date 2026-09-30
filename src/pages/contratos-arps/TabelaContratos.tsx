@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { ChevronDown, ChevronUp, FilePlus2, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Contrato } from '../../types';
 import { formatarMoeda } from '../../lib/contratos';
@@ -13,9 +13,11 @@ const formatarData = (valor?: string) => {
 export default function TabelaContratos({
   dados,
   onEditar,
+  onAditivos,
 }: {
   dados: Contrato[];
   onEditar?: (contrato: Contrato) => void;
+  onAditivos?: (contrato: Contrato) => void;
 }) {
   const [expandido, setExpandido] = useState<string | null>(null);
 
@@ -82,6 +84,15 @@ export default function TabelaContratos({
                       >
                         <Pencil className="w-3.5 h-3.5 mr-1.5" />
                         Editar Contrato
+                      </button>
+                    )}
+                    {onAditivos && (
+                      <button
+                        onClick={() => onAditivos(item)}
+                        className="inline-flex items-center text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-md shadow-sm text-xs font-medium transition-colors"
+                      >
+                        <FilePlus2 className="w-3.5 h-3.5 mr-1.5" />
+                        Aditivos
                       </button>
                     )}
                     </div>

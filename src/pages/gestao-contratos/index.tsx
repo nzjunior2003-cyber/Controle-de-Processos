@@ -6,11 +6,9 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
-import type { Contrato } from '../../types';
-import { ID_PLANILHA_CONTRATOS, URL_PLANILHA_CONTRATOS } from '../../lib/csv';
-import { getAccessToken, initAuth } from '../../lib/googleAuth';
-import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
-import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
+import { URL_PLANILHA_CONTRATOS } from '../../lib/csv';
+import { initAuth } from '../../lib/googleAuth';
+import { pushSaldoNaPlanilha } from '../../lib/saldoPlanilha';
 import { enviarEmail } from '../../lib/emailService';
 import { AlertasModal } from '../../components/AlertasModal';
 import KpisContratos, { type FiltroKpi } from '../../components/contratos/KpisContratos';
@@ -30,30 +28,6 @@ import {
   type ContratoComStatus,
 } from '../../lib/contratos';
 import { exportarCsv } from '../../lib/exportarCsv';
-
-/**
- * Depois de uma execução (NF) ou aditivo lançado no app mudar o saldo/
- * valor global do contrato, empurra esses campos de volta pra planilha —
- * só se já houver uma sessão Google autenticada (não força um popup de
- * login no meio do lançamento); falha aqui não deve travar o fluxo.
- */
-async function pushSaldoNaPlanilha(
-  contrato: ContratoComStatus,
-  atualizacao: Partial<Pick<Contrato, 'valorGlobal' | 'saldoAtualFinanceiro'>>,
-): Promise<void> {
-  try {
-    const googleToken = await getAccessToken();
-    if (!googleToken) return;
-    await sincronizarContratoNaPlanilha(
-      googleToken,
-      ID_PLANILHA_CONTRATOS,
-      contratoParaDadosPlanilha({ ...contrato, ...atualizacao }),
-      contrato.planilha_linha,
-    );
-  } catch (erro) {
-    console.error('Erro ao sincronizar saldo do contrato com a planilha:', erro);
-  }
-}
 
 export default function GestaoContratos() {
   const {

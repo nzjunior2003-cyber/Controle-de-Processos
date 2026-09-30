@@ -86,6 +86,8 @@ interface Props {
   comOcorrencias?: boolean;
   /** Exibe a aba de aditivos (apenas Gestão/Master/Contratos). */
   comAditivos?: boolean;
+  /** Abre direto na aba de aditivos, sem as abas de execução/ocorrências (uso em Contratos e ARP's). */
+  somenteAditivos?: boolean;
   /** Tipos de ocorrência que este usuário pode registrar (varia por perfil). */
   tiposOcorrenciaPermitidos?: TipoOcorrencia[];
   /** Exibe os campos de abatimento por quantidade (módulo Fiscal). */
@@ -109,12 +111,15 @@ export default function ExecucaoModal({
   onAddAditivo,
   comOcorrencias = false,
   comAditivos = false,
+  somenteAditivos = false,
   tiposOcorrenciaPermitidos = TIPOS_OCORRENCIA_PADRAO,
   comQuantidade = false,
   modoPagina = false,
   onFechar,
 }: Props) {
-  const [aba, setAba] = useState<'execucao' | 'ocorrencias' | 'aditivos'>('execucao');
+  const [aba, setAba] = useState<'execucao' | 'ocorrencias' | 'aditivos'>(
+    somenteAditivos ? 'aditivos' : 'execucao',
+  );
   const [novaExecucao, setNovaExecucao] = useState<NovaExecucao>(EXECUCAO_VAZIA);
   const [novaDescricao, setNovaDescricao] = useState('');
   const [novoTipo, setNovoTipo] = useState<TipoOcorrencia>(
@@ -341,7 +346,7 @@ export default function ExecucaoModal({
           </div>
         </div>
 
-        {(comOcorrencias || comAditivos) && (
+        {(comOcorrencias || comAditivos) && !somenteAditivos && (
           <div className="flex border-b border-gray-200 mb-4">
             <button
               className={`py-2 px-4 font-medium text-sm border-b-2 ${aba === 'execucao' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
