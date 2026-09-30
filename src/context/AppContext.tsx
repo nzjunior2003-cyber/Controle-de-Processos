@@ -87,6 +87,7 @@ import {
   ProcedimentoLicitatorio,
   ProcessoSancionatorio,
   PortariaFiscal,
+  IRP,
 } from '../types';
 
 const URL_PLANILHA_PCA =
@@ -108,6 +109,7 @@ interface AppContextData {
   procedimentos: ProcedimentoLicitatorio[];
   sancionatorios: ProcessoSancionatorio[];
   portarias: PortariaFiscal[];
+  irps: IRP[];
   /** Só é populado para o perfil 'master' (mesma restrição das firestore.rules). */
   logsAcesso: LogAcesso[];
   /** Só é populado para o perfil 'master' (mesma restrição das firestore.rules). */
@@ -171,6 +173,9 @@ interface AppContextData {
   updateSancionatorio: (id: string, dados: Partial<ProcessoSancionatorio>) => Promise<void>;
   addPortaria: (dados: Omit<PortariaFiscal, 'id'>) => Promise<void>;
   updatePortaria: (id: string, dados: Partial<PortariaFiscal>) => Promise<void>;
+  addIrp: (dados: Omit<IRP, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
+  updateIrp: (id: string, dados: Partial<IRP>) => Promise<void>;
+  deleteIrp: (id: string) => Promise<void>;
 }
 
 /**
@@ -300,6 +305,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const procedimentos = useColecao<ProcedimentoLicitatorio>('procedimentos', isAuthenticated);
   const sancionatorios = useColecao<ProcessoSancionatorio>('sancionatorios', isAuthenticated);
   const portarias = useColecao<PortariaFiscal>('portarias', isAuthenticated);
+  const irps = useColecao<IRP>('irps', isAuthenticated);
   // Leitura restrita a 'master' nas firestore.rules — só assina quando fizer
   // sentido, para não gerar erros de permissão para os demais perfis.
   const podeVerLogs = isAuthenticated && usuarioAtual?.perfil === 'master';
@@ -1339,6 +1345,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [atualizarEm, registrarAuditoria, portarias],
   );
 
+  const addIrp = useCallback(
+    async (dados: Omit<IRP, 'id' | 'criado_em' | 'atualizado_em'>) => {
+      const id = await criarEm('irps', dados);
+      await registrarAuditoria('irps', id, 'CREATE', dados);
+      return id;
+    },
+    [criarEm, registrarAuditoria],
+  );
+  const updateIrp = useCallback(
+    async (id: string, dados: Partial<IRP>) => {
+      const anterior = irps.find((i) => i.id === id);
+      await atualizarEm('irps', id, dados);
+      await registrarAuditoria('irps', id, 'UPDATE', dados, anterior);
+    },
+    [atualizarEm, registrarAuditoria, irps],
+  );
+  const deleteIrp = useCallback(
+    async (id: string) => {
+      const db = requireDb();
+      const anterior = irps.find((i) => i.id === id);
+      await deleteDoc(doc(db, 'irps', id));
+      await registrarAuditoria('irps', id, 'DELETE', {}, anterior);
+    },
+    [irps, registrarAuditoria],
+  );
+
   const valor = useMemo<AppContextData>(
     () => ({
       setores: SETORES,
@@ -1356,6 +1388,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       procedimentos,
       sancionatorios,
       portarias,
+      irps,
       logsAcesso,
       logsAuditoria,
       usuarioAtual,
@@ -1390,6 +1423,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       updateSancionatorio,
       addPortaria,
       updatePortaria,
+      addIrp,
+      updateIrp,
+      deleteIrp,
     }),
     [
       usuarios,
@@ -1406,6 +1442,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       procedimentos,
       sancionatorios,
       portarias,
+      irps,
       logsAcesso,
       logsAuditoria,
       usuarioAtual,
@@ -1439,6 +1476,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       updateSancionatorio,
       addPortaria,
       updatePortaria,
+      addIrp,
+      updateIrp,
+      deleteIrp,
     ],
   );
 

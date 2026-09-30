@@ -148,6 +148,10 @@ service cloud.firestore {
       allow read: if ativo();
       allow write: if ativo() && perfilDoc().perfil in ['master', 'contratos'];
     }
+    match /irps/{documento} {
+      allow read: if ativo();
+      allow write: if ativo() && perfilDoc().perfil in ['master', 'bm4'];
+    }
 
     // Índice mínimo e público de busca (número + objeto de processos,
     // número + empresa + objeto de contratos) — mantido só por um script

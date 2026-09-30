@@ -18,6 +18,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import FiscalContrato from './pages/fiscal-contrato';
 import GerenciarExecucaoFiscal from './pages/fiscal-contrato/GerenciarExecucao';
 import Auditoria from './pages/auditoria';
+import Planejamento from './pages/planejamento';
+import IrpForm from './pages/planejamento/IrpForm';
 
 export default function App() {
   return (
@@ -46,6 +48,9 @@ export default function App() {
                 <Route path="processos/novo" element={<NovoProcesso />} />
                 <Route path="processos/:id/editar" element={<NovoProcesso />} />
                 <Route path="processos/:id" element={<DetalheProcesso />} />
+                <Route path="planejamento" element={<Planejamento />} />
+                <Route path="planejamento/novo" element={<IrpForm />} />
+                <Route path="planejamento/:id/editar" element={<IrpForm />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="usuarios" element={<Usuarios />} />
                 <Route path="auditoria" element={<Auditoria />} />

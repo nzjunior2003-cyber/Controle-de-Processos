@@ -28,6 +28,24 @@ export const OPCOES_FONTE_PROCESSO = [
   'TESOURO',
 ];
 
+/** Unidades demandantes — mesma lista usada no cadastro de processo e no de IRP (Planejamento). */
+export const OPCOES_UNIDADE_DEMANDANTE = [
+  'AASINT/PEV',
+  'AJG',
+  'ASCOM',
+  'CEDEC',
+  'CEINT',
+  'CENTROPAT',
+  'COP',
+  'COP/GMAF',
+  'COP/GSE',
+  'CSMV/MOP',
+  'DAL',
+  'DGCEP',
+  'DS',
+  'DTIC',
+];
+
 /** Rótulo gravado na coluna Q (Subfase do Processo) ao marcar um processo como contratado/aditivado pelo app. */
 export const SUBFASE_CONTRATADO = 'CONTRATADO';
 

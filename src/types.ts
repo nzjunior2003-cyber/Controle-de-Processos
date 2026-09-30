@@ -1,4 +1,4 @@
-export type Perfil = 'master' | 'contratos' | 'apoio' | 'gestao' | 'fiscal';
+export type Perfil = 'master' | 'contratos' | 'apoio' | 'gestao' | 'fiscal' | 'bm4';
 
 export const PERFIL_LABELS: Record<Perfil, string> = {
   master: 'Master',
@@ -6,6 +6,7 @@ export const PERFIL_LABELS: Record<Perfil, string> = {
   apoio: 'Apoio e Suprimento',
   gestao: 'Gestão de Contratos (Gestor e Auxiliares)',
   fiscal: 'Fiscal do Contrato',
+  bm4: 'Planejamento (4ª Seção do EMG)',
 };
 
 export interface Usuario {
@@ -487,4 +488,61 @@ export interface PortariaFiscal {
   substituicoes?: SubstituicaoFiscal[];
   criado_em?: string;
   atualizado_em?: string;
+}
+
+/* ------------------------------------------------------------------ *
+ * Planejamento (IRP) — módulo restrito à 4ª Seção do Estado-Maior
+ * Geral (perfil `bm4`): Intenções de Registro de Preços publicadas por
+ * outros órgãos, que o CBMPA pode manifestar interesse em aderir.
+ * ------------------------------------------------------------------ */
+
+export type EsferaOrgaoIrp = 'Federal' | 'Distrital' | 'Estadual';
+
+export type StatusIrp =
+  | 'aberta'
+  | 'em_analise'
+  | 'manifestado_interesse'
+  | 'sem_interesse'
+  | 'prazo_expirado'
+  | 'aderida';
+
+export const STATUS_IRP_LABELS: Record<StatusIrp, string> = {
+  aberta: 'Aberta',
+  em_analise: 'Em análise pelo setor',
+  manifestado_interesse: 'Manifestado interesse',
+  sem_interesse: 'Não há interesse',
+  prazo_expirado: 'Prazo expirado',
+  aderida: 'Aderida',
+};
+
+export const STATUS_IRP_CORES: Record<StatusIrp, string> = {
+  aberta: 'bg-blue-50 text-blue-700 outline-blue-200',
+  em_analise: 'bg-amber-50 text-amber-700 outline-amber-200',
+  manifestado_interesse: 'bg-emerald-50 text-emerald-700 outline-emerald-200',
+  sem_interesse: 'bg-gray-100 text-gray-600 outline-gray-300',
+  prazo_expirado: 'bg-red-50 text-red-700 outline-red-200',
+  aderida: 'bg-purple-50 text-purple-700 outline-purple-200',
+};
+
+export interface IRP {
+  id: string;
+  esferaOrgao: EsferaOrgaoIrp;
+  orgaoGerenciador: string;
+  numeroIrp: string;
+  processoOrigem?: string;
+  objeto: string;
+  dataPublicacao: string;
+  prazoManifestacao: string;
+  /** Unidades demandantes vinculadas ao tipo de objeto (uma IRP pode interessar a mais de um setor). */
+  setoresDemandantes: string[];
+  status: StatusIrp;
+  linkEdital?: string;
+  observacaoResposta?: string;
+  responsavelCadastroId: string;
+  responsavelCadastroNome: string;
+  /** Contato do setor demandante que deve se manifestar sobre o interesse — usado no alerta de prazo. */
+  responsavelRespostaNome?: string;
+  responsavelRespostaEmail?: string;
+  criado_em: string;
+  atualizado_em: string;
 }
