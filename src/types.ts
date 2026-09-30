@@ -555,6 +555,8 @@ export interface IRP {
   /** Contato do setor demandante que deve se manifestar sobre o interesse — usado no alerta de prazo. */
   responsavelRespostaNome?: string;
   responsavelRespostaEmail?: string;
+  /** Id do ProcedimentoLicitatorio criado automaticamente quando o status vira 'aderida' (ver AppContext.tsx `updateIrp`). */
+  procedimentoVinculadoId?: string;
   criado_em: string;
   atualizado_em: string;
 }

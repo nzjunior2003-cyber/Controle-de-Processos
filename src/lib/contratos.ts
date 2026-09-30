@@ -3,7 +3,7 @@
  * FiscalContrato (antes duplicadas nas duas páginas).
  */
 import { differenceInDays, format } from 'date-fns';
-import type { Contrato, HistoricoFiscalContrato, ItemContrato, ProcedimentoLicitatorio } from '../types';
+import type { Contrato, HistoricoFiscalContrato, IRP, ItemContrato, ProcedimentoLicitatorio } from '../types';
 
 /** Opções fixas de Natureza de Despesa exibidas no cadastro/filtro de contratos. */
 export const OPCOES_NATUREZA_DESPESA_CONTRATO = ['CONSUMO', 'PERMANENTE', 'SERVIÇO'];
@@ -553,6 +553,27 @@ export function calcularEconomicidade(
   if (!valorEstimado || valorEstimado <= 0) return null;
   const valor = valorEstimado - valorContratado;
   return { valor, percentual: (valor / valorEstimado) * 100 };
+}
+
+/**
+ * Monta o ProcedimentoLicitatorio a ser criado automaticamente em
+ * "Contratos e ARP's" quando uma IRP (módulo Planejamento) tem o status
+ * alterado para "aderida" — reaproveita os dados já cadastrados na IRP em
+ * vez de exigir redigitação. `pae` usa `processoOrigem` quando existir
+ * (um Processo de Apoio e Suprimento já aberto pra essa adesão) ou, na
+ * falta dele, o próprio número da IRP como identificador provisório.
+ */
+export function criarProcedimentoDeIrp(irp: IRP): Omit<ProcedimentoLicitatorio, 'id'> {
+  return {
+    pae: irp.processoOrigem || irp.numeroIrp,
+    numero: irp.numeroIrp,
+    modalidade: 'Adesão',
+    objeto: irp.objeto,
+    fase: 'Pendente',
+    dataPublicacao: irp.dataPublicacao,
+    previsaoAbertura: irp.dataPublicacao,
+    orgaoGerenciador: irp.orgaoGerenciador,
+  };
 }
 
 const COLUNAS_CSV_CONTRATOS = [

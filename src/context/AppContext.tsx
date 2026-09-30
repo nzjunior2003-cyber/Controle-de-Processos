@@ -60,6 +60,7 @@ import {
   abaterSaldo,
   aplicarAditivoFinanceiro,
   aplicarAditivoQuantidade,
+  criarProcedimentoDeIrp,
   devolverItens,
   devolverSaldo,
   registrarTrocaFiscal,
@@ -1361,8 +1362,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const anterior = irps.find((i) => i.id === id);
       await atualizarEm('irps', id, dados);
       await registrarAuditoria('irps', id, 'UPDATE', dados, anterior);
+
+      // Quando a IRP passa a "aderida" pela primeira vez, cria
+      // automaticamente o procedimento correspondente em Contratos e
+      // ARP's (aba "ARP's"), reaproveitando os dados já cadastrados —
+      // sem exigir redigitação manual (item 16 do plano de melhorias).
+      if (dados.status === 'aderida' && anterior && anterior.status !== 'aderida' && !anterior.procedimentoVinculadoId) {
+        const dadosProcedimento = criarProcedimentoDeIrp({ ...anterior, ...dados });
+        const procedimentoId = await criarEm('procedimentos', dadosProcedimento);
+        await registrarAuditoria('procedimentos', procedimentoId, 'CREATE', dadosProcedimento);
+        await atualizarEm('irps', id, { procedimentoVinculadoId: procedimentoId });
+      }
     },
-    [atualizarEm, registrarAuditoria, irps],
+    [atualizarEm, criarEm, registrarAuditoria, irps],
   );
   const deleteIrp = useCallback(
     async (id: string) => {

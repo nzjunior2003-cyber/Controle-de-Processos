@@ -9,6 +9,7 @@ import {
   devolverItens,
   devolverSaldo,
   calcularEconomicidade,
+  criarProcedimentoDeIrp,
   encontrarVinculosPorPae,
   extrairAnoNumeroContrato,
   extrairAnosDisponiveis,
@@ -25,7 +26,7 @@ import {
   somaValorItens,
   validarLimiteFiscal,
 } from './contratos';
-import type { Contrato, ItemContrato } from '../types';
+import type { Contrato, IRP, ItemContrato } from '../types';
 
 const base: Contrato = {
   id: 'c1',
@@ -605,6 +606,39 @@ describe('calcularEconomicidade', () => {
   it('devolve null sem valor estimado', () => {
     expect(calcularEconomicidade(undefined, 800)).toBeNull();
     expect(calcularEconomicidade(0, 800)).toBeNull();
+  });
+});
+
+describe('criarProcedimentoDeIrp', () => {
+  const irp: IRP = {
+    id: 'irp-1',
+    esferaOrgao: 'Federal',
+    orgaoGerenciador: 'Ministério da Defesa',
+    numeroIrp: 'IRP-042/2026',
+    objeto: 'Aquisição de viaturas',
+    dataPublicacao: '2026-01-10T00:00:00.000Z',
+    prazoManifestacao: '2026-01-20T00:00:00.000Z',
+    setoresDemandantes: ['DGCEP'],
+    status: 'aderida',
+    responsavelCadastroId: 'user-1',
+    responsavelCadastroNome: 'Fulano',
+    criado_em: '2026-01-01T00:00:00.000Z',
+    atualizado_em: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('monta o procedimento com modalidade Adesão e dados da IRP', () => {
+    const procedimento = criarProcedimentoDeIrp(irp);
+    expect(procedimento.modalidade).toBe('Adesão');
+    expect(procedimento.numero).toBe('IRP-042/2026');
+    expect(procedimento.objeto).toBe('Aquisição de viaturas');
+    expect(procedimento.orgaoGerenciador).toBe('Ministério da Defesa');
+    expect(procedimento.fase).toBe('Pendente');
+    expect(procedimento.pae).toBe('IRP-042/2026');
+  });
+
+  it('usa processoOrigem como pae quando existir', () => {
+    const procedimento = criarProcedimentoDeIrp({ ...irp, processoOrigem: 'E-2026/123456' });
+    expect(procedimento.pae).toBe('E-2026/123456');
   });
 });
 

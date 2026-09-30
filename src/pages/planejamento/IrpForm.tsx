@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, ExternalLink, Save, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { OPCOES_UNIDADE_DEMANDANTE } from '../../lib/planilhaProcessos';
 import { STATUS_IRP_LABELS, type EsferaOrgaoIrp, type StatusIrp } from '../../types';
@@ -130,6 +130,18 @@ export default function IrpForm() {
           </button>
         )}
       </div>
+
+      {irp?.procedimentoVinculadoId && (
+        <div className="rounded-md bg-purple-50 border border-purple-200 p-3 text-sm text-purple-800 flex items-center justify-between">
+          <span>Esta IRP já foi vinculada automaticamente a um procedimento em Contratos e ARP's.</span>
+          <Link
+            to="/sistema/contratos-arps"
+            className="inline-flex items-center font-medium hover:underline whitespace-nowrap ml-3"
+          >
+            Ver em Contratos e ARP's <ExternalLink className="ml-1 h-4 w-4" />
+          </Link>
+        </div>
+      )}
 
       <div className="bg-white shadow-sm rounded-lg border border-gray-200">
         <form onSubmit={handleSalvar} className="p-6 space-y-6">
