@@ -3,6 +3,7 @@
  * Lógica pura, extraída do AppContext para poder ser testada isoladamente.
  */
 import type { PCA, StatusProcesso } from '../types';
+import { normalizarRito } from './ritosProcessuais';
 
 /**
  * Converte um valor monetário no formato brasileiro para número.
@@ -169,7 +170,7 @@ export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha 
     fonte: celula(linha, 'FONTE') || undefined,
     natureza_despesa: celula(linha, 'NATUREZA DE DESPESA') || undefined,
     valor_estimado: celula(linha, 'V. ESTIMADO') ? parseCurrencyBR(celula(linha, 'V. ESTIMADO')) : undefined,
-    rito_processual: celula(linha, 'RITO PROCESSUAL') || undefined,
+    rito_processual: normalizarRito(celula(linha, 'RITO PROCESSUAL')) || undefined,
     fase_processo: celula(linha, 'FASE DO PROCESSO') || undefined,
     subfase_processo: subfase || undefined,
     localizacao_atual: celula(linha, 'SETOR ATUAL') || undefined,

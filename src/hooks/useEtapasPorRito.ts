@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CHECKLISTS_RITOS } from '../types';
+import { unificarEtapasPorRito } from '../lib/ritosProcessuais';
 import { ABA_RITO_DE_PROCESSOS, ID_PLANILHA_PROCESSOS, mapAbaRitoDeProcessos } from '../lib/csv';
 
 /**
@@ -41,5 +42,6 @@ export function useEtapasPorRito(): Record<string, string[]> {
     };
   }, []);
 
-  return { ...CHECKLISTS_RITOS, ...etapasDaPlanilha };
+  // Ritos unificados por nome canônico; em cada um fica o checklist com mais itens (planilha ou código).
+  return useMemo(() => unificarEtapasPorRito(CHECKLISTS_RITOS, etapasDaPlanilha), [etapasDaPlanilha]);
 }

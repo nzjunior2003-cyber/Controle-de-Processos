@@ -16,7 +16,7 @@ import { getAccessToken, googleSignIn } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
 import { processoParaDadosPlanilha, SUBFASE_CONTRATADO } from '../lib/planilhaProcessos';
 import { calcularEconomicidade, encontrarVinculosPorPae, formatarMoeda } from '../lib/contratos';
-import { calcularDataPrevista, PRAZOS_ALVO_POR_RITO } from '../lib/prazosProcesso';
+import { calcularDataPrevista, prazoAlvoDoRito } from '../lib/prazosProcesso';
 
 const CORES_GANTT = [
   'bg-blue-400', 'bg-indigo-400', 'bg-purple-400', 'bg-emerald-400',
@@ -352,7 +352,7 @@ export default function DetalheProcesso() {
                     <dt className="text-sm font-medium text-gray-500">Previsão de Efetivação do Contrato</dt>
                     <dd className="mt-1 text-sm text-gray-900">{format(dataPrevistaEfetivacao, 'dd/MM/yyyy')}</dd>
                     <dd className="mt-0.5 text-xs text-gray-500">
-                      Com base no prazo-alvo do rito ({PRAZOS_ALVO_POR_RITO[processo.rito_processual ?? '']} dias
+                      Com base no prazo-alvo do rito ({prazoAlvoDoRito(processo.rito_processual)} dias
                       a partir da abertura)
                     </dd>
                   </div>

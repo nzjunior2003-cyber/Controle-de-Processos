@@ -101,6 +101,19 @@ describe('mapSheetRowToPca', () => {
   });
 });
 
+describe('mapSheetRowToProcesso — rito unificado', () => {
+  it('converte a grafia da planilha pro nome canônico do rito', () => {
+    const processo = mapSheetRowToProcesso({
+      'N° PAE': 'E-2026/1',
+      'RITO PROCESSUAL': 'Dispensa por Valor irrisório R$ 2.995,30 \n(Dec. N°2.787/22, Art. 3º, §6º)',
+    });
+    expect(processo?.rito_processual).toBe('Dispensa por valor irrisório (Dec. N°2.787/22, Art. 3º, §6º)');
+    expect(mapSheetRowToProcesso({ 'N° PAE': 'E-2026/2', 'RITO PROCESSUAL': 'Adesão ARP' })?.rito_processual).toBe(
+      'Adesão à ata de registro de preços',
+    );
+  });
+});
+
 describe('parseDataBR', () => {
   it('converte datas no formato d/m/aaaa para ISO', () => {
     expect(parseDataBR('27/08/2026')).toBe(new Date(2026, 7, 27).toISOString());

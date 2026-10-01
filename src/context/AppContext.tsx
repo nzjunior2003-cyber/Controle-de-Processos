@@ -73,6 +73,7 @@ import {
   type Ocorrencia,
 } from '../lib/contratos';
 import { destinatariosEventoProcesso, montarNotificacao } from '../lib/notificacoesProcesso';
+import { normalizarRito } from '../lib/ritosProcessuais';
 import {
   resumirAuditoria,
   type AcaoAuditoria,
@@ -201,6 +202,8 @@ interface AppContextData {
   updateDotacao: (id: string, dados: Partial<DotacaoOrcamentaria>) => Promise<void>;
   deleteDotacao: (id: string) => Promise<void>;
   marcarNotificacaoLida: (id: string) => Promise<void>;
+  excluirNotificacao: (id: string) => Promise<void>;
+  limparNotificacoesLidas: () => Promise<void>;
   registrarPushSubscription: (dados: Omit<PushSubscriptionRegistro, 'id' | 'criado_em'>) => Promise<void>;
   removerPushSubscription: (endpoint: string) => Promise<void>;
 }
@@ -372,7 +375,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Coleções -----------------------------------------------------------
   const usuarios = useColecao<Usuario>('usuarios', isAuthenticated);
-  const processos = useColecao<Processo>('processos', isAuthenticated);
+  const processosBrutos = useColecao<Processo>('processos', isAuthenticated);
+  // Todo o sistema enxerga o rito pelo nome canônico (ritos unificados — ver
+  // src/lib/ritosProcessuais.ts), mesmo que o documento ainda guarde um nome
+  // antigo ou a grafia da planilha; o documento é regravado com o nome
+  // canônico na próxima edição/sincronização.
+  const processos = useMemo(
+    () =>
+      processosBrutos.map((p) =>
+        p.rito_processual ? { ...p, rito_processual: normalizarRito(p.rito_processual) } : p,
+      ),
+    [processosBrutos],
+  );
   const estadasProcesso = useColecao<EstadaProcesso>('estadas_processo', isAuthenticated);
   const movimentacoes = useColecao<MovimentacaoProcesso>('movimentacoes', isAuthenticated);
   const pcas = useColecao<PCA>('pcas', isAuthenticated);
@@ -1681,6 +1695,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await updateDoc(doc(db, 'notificacoes', id), { lida: true });
   }, []);
 
+  // Só notificações já lidas podem ser apagadas (as regras do Firestore
+  // também exigem isso) — uma não lida nunca some sem o usuário ter visto.
+  const excluirNotificacao = useCallback(async (id: string) => {
+    const db = requireDb();
+    await deleteDoc(doc(db, 'notificacoes', id));
+  }, []);
+
+  const limparNotificacoesLidas = useCallback(async () => {
+    const db = requireDb();
+    const lidas = notificacoes.filter((n) => n.lida);
+    for (let inicio = 0; inicio < lidas.length; inicio += 400) {
+      const lote = writeBatch(db);
+      lidas.slice(inicio, inicio + 400).forEach((n) => lote.delete(doc(db, 'notificacoes', n.id)));
+      await lote.commit();
+    }
+  }, [notificacoes]);
+
   const registrarPushSubscription = useCallback(
     async (dados: Omit<PushSubscriptionRegistro, 'id' | 'criado_em'>) => {
       const db = requireDb();
@@ -1776,6 +1807,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       updateDotacao,
       deleteDotacao,
       marcarNotificacaoLida,
+      excluirNotificacao,
+      limparNotificacoesLidas,
       registrarPushSubscription,
       removerPushSubscription,
     }),
@@ -1845,6 +1878,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       updateDotacao,
       deleteDotacao,
       marcarNotificacaoLida,
+      excluirNotificacao,
+      limparNotificacoesLidas,
       registrarPushSubscription,
       removerPushSubscription,
     ],

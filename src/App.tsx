@@ -22,6 +22,7 @@ import Planejamento from './pages/planejamento';
 import IrpForm from './pages/planejamento/IrpForm';
 import PlanoContratacaoAnual from './pages/pca';
 import PcaForm from './pages/pca/PcaForm';
+import RelatorioPca from './pages/pca/RelatorioPca';
 import Financeiro from './pages/financeiro';
 import PagamentoForm from './pages/financeiro/PagamentoForm';
 import DotacaoForm from './pages/financeiro/DotacaoForm';
@@ -40,6 +41,7 @@ export default function App() {
                 path="gestao-contratos/:id/relatorio"
                 element={<RelatorioAuditoriaContrato />}
               />
+              <Route path="pca/relatorio" element={<RelatorioPca />} />
               <Route element={<Layout />}>
                 <Route index element={<SistemaHome />} />
                 <Route path="apoio" element={<Aquisicoes />} />

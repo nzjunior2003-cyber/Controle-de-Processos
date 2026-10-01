@@ -6,6 +6,7 @@ import { differenceInDays } from 'date-fns';
 import { PcaAutocomplete } from '../components/PcaAutocomplete';
 import { useEtapasPorRito } from '../hooks/useEtapasPorRito';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
+import { normalizarRito, RITO_ADESAO_ARP } from '../lib/ritosProcessuais';
 import { encontrarObjetosSemelhantes, type CandidatoObjeto } from '../lib/correspondenciaTexto';
 import { getAccessToken, googleSignIn, initAuth } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
@@ -55,7 +56,7 @@ export default function NovoProcesso() {
     pcaVinculado ? `${pcaVinculado.codigo_pca} - ${pcaVinculado.objeto_pca}` : '',
   );
 
-  const [ritoProcessual, setRitoProcessual] = useState(processo?.rito_processual ?? '');
+  const [ritoProcessual, setRitoProcessual] = useState(normalizarRito(processo?.rito_processual) ?? '');
   const [checklistLocal, setChecklistLocal] = useState<string[]>(processo?.checklist_rito ?? []);
   const [orgaoGerenciadorArp, setOrgaoGerenciadorArp] = useState(processo?.orgaoGerenciadorArp ?? '');
   const [fornecedorArp, setFornecedorArp] = useState(processo?.fornecedorArp ?? '');
@@ -210,7 +211,7 @@ export default function NovoProcesso() {
         natureza_despesa: naturezaDespesa,
         fonte,
         valor_estimado: valorEstimadoNumero ?? 0,
-        ...(ritoProcessual === 'Adesão ARP'
+        ...(ritoProcessual === RITO_ADESAO_ARP
           ? { orgaoGerenciadorArp, fornecedorArp }
           : { orgaoGerenciadorArp: '', fornecedorArp: '' }),
       };
@@ -447,7 +448,7 @@ export default function NovoProcesso() {
                 </div>
               )}
 
-              {ritoProcessual === 'Adesão ARP' && (
+              {ritoProcessual === RITO_ADESAO_ARP && (
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="orgaoGerenciadorArp" className="block text-sm font-medium text-gray-700">

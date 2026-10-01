@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcularDataPrevista, PRAZOS_ALVO_POR_RITO } from './prazosProcesso';
+import { calcularDataPrevista, prazoAlvoDoRito, PRAZOS_ALVO_POR_RITO } from './prazosProcesso';
 
 describe('calcularDataPrevista', () => {
   it('soma o prazo-alvo do rito à data de abertura', () => {
@@ -14,6 +14,15 @@ describe('calcularDataPrevista', () => {
   it('devolve null sem data de entrada ou sem rito', () => {
     expect(calcularDataPrevista(undefined, 'Pregão Eletrônico')).toBeNull();
     expect(calcularDataPrevista('2026-01-01T00:00:00.000Z', undefined)).toBeNull();
+  });
+
+  it('aceita também os nomes antigos do rito e o valor em reais na dispensa por valor', () => {
+    expect(calcularDataPrevista('2026-01-01T00:00:00.000Z', 'Adesão ARP')?.toISOString().slice(0, 10)).toBe('2026-01-31');
+    expect(prazoAlvoDoRito('Pregão Eletrônico (SRP)')).toBe(120);
+    expect(
+      prazoAlvoDoRito('Dispensa por valor R$ 62.000,00\n(Decreto 2.787, Art. 3º, II. Lei 14.133, Art. 75, II.)'),
+    ).toBe(30);
+    expect(prazoAlvoDoRito('Rito Inexistente')).toBeUndefined();
   });
 
   it('tem prazo definido pros 14 ritos com meta acordada', () => {

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardCheck, PlusCircle, Search } from 'lucide-react';
+import { ClipboardCheck, FileDown, PlusCircle, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { formatarMoeda } from '../../lib/contratos';
 import { corDoSetor } from '../../lib/coresSetor';
+import { filtrarItensPca } from '../../lib/pca';
 
 /**
  * Plano de Contratação Anual — listagem dos itens do PCA (importados da
@@ -35,18 +36,10 @@ export default function PlanoContratacaoAnual() {
     }, {});
   }, [processos]);
 
-  const itensFiltrados = useMemo(() => {
-    const buscaNormalizada = busca.toLowerCase();
-    return pcas
-      .filter((p) => (exercicio === '' ? true : p.exercicio === exercicio))
-      .filter((p) => (filtroPrioridade ? p.prioridade === filtroPrioridade : true))
-      .filter((p) => {
-        if (!buscaNormalizada) return true;
-        return [p.codigo_pca, p.objeto_pca, p.unidade_responsavel, p.origem, p.numero_pae]
-          .some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
-      })
-      .sort((a, b) => Number(a.codigo_pca) - Number(b.codigo_pca));
-  }, [pcas, exercicio, filtroPrioridade, busca]);
+  const itensFiltrados = useMemo(
+    () => filtrarItensPca(pcas, { exercicio, prioridade: filtroPrioridade, busca }),
+    [pcas, exercicio, filtroPrioridade, busca],
+  );
 
   const valorTotalFiltrado = itensFiltrados.reduce((acc, p) => acc + (p.valor_previsto || 0), 0);
 
@@ -63,15 +56,31 @@ export default function PlanoContratacaoAnual() {
             indicação dos processos já abertos para cada um.
           </p>
         </div>
-        {isMasterOuBm4 && (
+        <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => navigate('/sistema/pca/novo')}
-            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800"
+            onClick={() => {
+              const parametros = new URLSearchParams();
+              if (exercicio !== '') parametros.set('exercicio', String(exercicio));
+              if (filtroPrioridade) parametros.set('prioridade', filtroPrioridade);
+              if (busca) parametros.set('busca', busca);
+              navigate(`/sistema/pca/relatorio?${parametros.toString()}`);
+            }}
+            title="Abre o PCA com o cabeçalho institucional, nos filtros atuais, pronto pra salvar em PDF"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
           >
-            <PlusCircle className="-ml-1 mr-2 h-5 w-5" />
-            Novo Item do PCA
+            <FileDown className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
+            Gerar PDF
           </button>
-        )}
+          {isMasterOuBm4 && (
+            <button
+              onClick={() => navigate('/sistema/pca/novo')}
+              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800"
+            >
+              <PlusCircle className="-ml-1 mr-2 h-5 w-5" />
+              Novo Item do PCA
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white p-4 shadow-sm rounded-lg border border-gray-200 flex flex-col sm:flex-row gap-4 justify-between items-center">

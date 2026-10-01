@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, BellRing } from 'lucide-react';
+import { Bell, BellRing, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 
@@ -17,13 +17,14 @@ const formatarQuando = (iso: string) => {
  * lidas. Clicar marca como lida e navega pra `url`, quando houver.
  */
 export default function NotificacaoSino() {
-  const { notificacoes, marcarNotificacaoLida } = useApp();
+  const { notificacoes, marcarNotificacaoLida, excluirNotificacao, limparNotificacoesLidas } = useApp();
   const navigate = useNavigate();
   const [aberto, setAberto] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { suportado, ativando, erro, ativar } = usePushNotifications();
 
   const naoLidas = notificacoes.filter((n) => !n.lida).length;
+  const lidas = notificacoes.length - naoLidas;
   const podeAtivarPush =
     suportado && typeof Notification !== 'undefined' && Notification.permission === 'default';
 
@@ -50,6 +51,24 @@ export default function NotificacaoSino() {
     if (url) navigate(url);
   };
 
+  const handleExcluir = async (id: string) => {
+    try {
+      await excluirNotificacao(id);
+    } catch (erro) {
+      console.error('Erro ao excluir notificação:', erro);
+      alert('Não foi possível excluir a notificação.');
+    }
+  };
+
+  const handleLimparLidas = async () => {
+    try {
+      await limparNotificacoesLidas();
+    } catch (erro) {
+      console.error('Erro ao limpar notificações lidas:', erro);
+      alert('Não foi possível limpar as notificações lidas.');
+    }
+  };
+
   return (
     <div className="relative" ref={containerRef}>
       <button
@@ -69,7 +88,18 @@ export default function NotificacaoSino() {
         <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-md shadow-lg border border-gray-200 z-50 text-gray-900">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <span className="text-sm font-semibold">Notificações</span>
-            {naoLidas > 0 && <span className="text-xs text-gray-500">{naoLidas} não lida(s)</span>}
+            <div className="flex items-center gap-3">
+              {naoLidas > 0 && <span className="text-xs text-gray-500">{naoLidas} não lida(s)</span>}
+              {lidas > 0 && (
+                <button
+                  onClick={handleLimparLidas}
+                  className="text-xs font-medium text-red-700 hover:underline"
+                  title="Apaga todas as notificações já lidas"
+                >
+                  Limpar lidas ({lidas})
+                </button>
+              )}
+            </div>
           </div>
           {podeAtivarPush && (
             <div className="px-4 py-3 border-b border-gray-100 bg-amber-50">
@@ -89,15 +119,24 @@ export default function NotificacaoSino() {
           ) : (
             <ul className="divide-y divide-gray-100">
               {notificacoes.map((n) => (
-                <li key={n.id}>
+                <li key={n.id} className={`flex items-start ${n.lida ? '' : 'bg-red-50'}`}>
                   <button
                     onClick={() => handleClicarNotificacao(n.id, n.lida, n.url)}
-                    className={`block w-full text-left px-4 py-3 hover:bg-gray-50 ${n.lida ? '' : 'bg-red-50'}`}
+                    className="block flex-1 text-left px-4 py-3 hover:bg-gray-50"
                   >
                     <p className={`text-sm ${n.lida ? 'text-gray-700' : 'font-semibold text-gray-900'}`}>{n.titulo}</p>
                     <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.corpo}</p>
                     <p className="text-[11px] text-gray-400 mt-1">{formatarQuando(n.criado_em)}</p>
                   </button>
+                  {n.lida && (
+                    <button
+                      onClick={() => handleExcluir(n.id)}
+                      className="p-3 text-gray-400 hover:text-red-600"
+                      title="Excluir notificação"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

@@ -6,7 +6,8 @@
  * estimativas de tempo por setor/tipo de contratação.
  */
 import { differenceInDays } from 'date-fns';
-import { CHECKLISTS_RITOS, type Processo } from '../types';
+import type { Processo } from '../types';
+import { ETAPAS_PADRAO, normalizarRito } from './ritosProcessuais';
 
 /** Um período em que o processo ficou numa localização (setor/unidade). */
 export interface EstadaProcesso {
@@ -145,10 +146,10 @@ export function localizacaoEfetiva(
  */
 export function calcularProgressoChecklist(
   processo: Pick<Processo, 'rito_processual' | 'checklist_rito'>,
-  checklistsPorRito: Record<string, string[]> = CHECKLISTS_RITOS,
+  checklistsPorRito: Record<string, string[]> = ETAPAS_PADRAO,
 ): number | null {
   if (!processo.rito_processual) return null;
-  const checklistDoRito = checklistsPorRito[processo.rito_processual];
+  const checklistDoRito = checklistsPorRito[normalizarRito(processo.rito_processual) as string];
   if (!checklistDoRito || checklistDoRito.length === 0) return null;
   const concluidas = processo.checklist_rito?.length ?? 0;
   return Math.round((concluidas / checklistDoRito.length) * 100);

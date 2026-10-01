@@ -14,6 +14,7 @@ import {
   linhasCsvContratos,
 } from '../../lib/contratos';
 import { exportarCsv } from '../../lib/exportarCsv';
+import { RITO_ADESAO_ARP, RITO_GERENCIADOR_ARP, RITO_PARTICIPE_ARP } from '../../lib/ritosProcessuais';
 import type {
   PortariaFiscal,
   ProcedimentoLicitatorio,
@@ -94,9 +95,9 @@ export default function ContratosArps() {
         .filter((p) => {
           if (procedimentos.some((proc) => proc.pae === p.numero_processo)) return false;
           return (
-            p.rito_processual === 'Adesão ARP' ||
-            p.rito_processual === 'Gerenciador da ARP' ||
-            p.rito_processual === 'Partícipe de ARP' ||
+            p.rito_processual === RITO_ADESAO_ARP ||
+            p.rito_processual === RITO_GERENCIADOR_ARP ||
+            p.rito_processual === RITO_PARTICIPE_ARP ||
             !!p.rito_processual?.includes('Pregão') ||
             !!p.rito_processual?.includes('Dispensa') ||
             !!p.rito_processual?.includes('Inexigibilidade')
@@ -104,9 +105,9 @@ export default function ContratosArps() {
         })
         .map((p) => {
           let modalidade = '';
-          if (p.rito_processual === 'Adesão ARP') modalidade = 'Adesão';
-          else if (p.rito_processual === 'Gerenciador da ARP') modalidade = 'Pregão Eletrônico (Gerenciador)';
-          else if (p.rito_processual === 'Partícipe de ARP') modalidade = 'Partícipe';
+          if (p.rito_processual === RITO_ADESAO_ARP) modalidade = 'Adesão';
+          else if (p.rito_processual === RITO_GERENCIADOR_ARP) modalidade = 'Pregão Eletrônico (Gerenciador)';
+          else if (p.rito_processual === RITO_PARTICIPE_ARP) modalidade = 'Partícipe';
           else if (p.rito_processual?.includes('Pregão')) modalidade = 'Pregão Eletrônico';
           else if (p.rito_processual?.includes('Dispensa')) modalidade = 'Dispensa';
           else if (p.rito_processual?.includes('Inexigibilidade')) modalidade = 'Inexigibilidade';
