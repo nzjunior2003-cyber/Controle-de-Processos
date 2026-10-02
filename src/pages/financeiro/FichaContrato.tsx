@@ -141,41 +141,59 @@ export default function FichaContrato({ contratoIdInicial = '' }: { contratoIdIn
                       </tr>
                     );
                   }
-                  return doMes.map((p, linha) => {
+                  // Uma linha por NF (como na planilha); fatura sem NF informada ocupa uma linha só.
+                  let primeiraDoMes = true;
+                  return doMes.flatMap((p) => {
                     const arquivado = statusDoPagamento(p) === 'arquivado';
                     const diferenca = diferencaDocumentos(p);
                     const numerosNe = (p.empenhoIds ?? []).map((idNe) => empenhoPorId.get(idNe)?.numero).filter(Boolean);
                     if (numerosNe.length === 0 && p.numeroEmpenho) numerosNe.push(p.numeroEmpenho);
-                    const numerosOb = (p.ordensBancarias ?? []).map((o) => o.numero);
-                    if (numerosOb.length === 0 && p.numeroOrdemPagamento) numerosOb.push(p.numeroOrdemPagamento);
-                    const documentos = (p.documentos ?? []).map((d) => `${d.tipo} ${d.numero}`).join(', ');
-                    return (
-                      <tr key={p.id} className={`border-b border-gray-100 align-top ${arquivado ? 'bg-gray-50 text-gray-400 line-through' : ''}`}>
-                        <td className="px-2 py-1.5 font-semibold no-underline">{linha === 0 ? nomeMes : ''}</td>
-                        <td className="px-2 py-1.5">{p.paeFatura || '-'}</td>
-                        <td className="px-2 py-1.5">
-                          {documentos || '-'}
-                          {diferenca !== null && diferenca !== 0 && (
-                            <span className="ml-1 inline-block px-1 rounded bg-amber-100 text-amber-800 no-underline" title="A soma das NFs não bate com o valor da fatura">
-                              NFs somam {formatarMoeda(Math.abs((valorDoPagamento(p) - diferenca)))}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap">{formatarMoeda(valorDoPagamento(p))}</td>
-                        <td className="px-2 py-1.5">{numerosNe.join(' / ') || '-'}</td>
-                        <td className="px-2 py-1.5">{numerosOb.join(' / ') || '-'}</td>
-                        <td className={`px-2 py-1.5 ${statusDoPagamento(p) === 'em_tramitacao' && p.etapa ? 'text-amber-800 font-medium' : ''}`}>
-                          {arquivado ? 'ARQUIVADO (fora da soma)' : descreverAndamento(p)}
-                          {podeEditar && (
-                            <Link to={`/sistema/financeiro/pagamentos/${p.id}/editar`} className="ml-2 text-red-700 no-underline hover:underline">editar</Link>
-                          )}
-                        </td>
-                        <td className="px-2 py-1.5 text-right whitespace-nowrap font-semibold no-underline">
-                          {linha === 0 ? formatarMoeda(totalMes?.total ?? 0) : ''}
-                        </td>
-                        <td className="px-2 py-1.5 text-center">{p.autenticado ? 'SIM' : ''}</td>
-                      </tr>
-                    );
+                    const ordens = p.ordensBancarias?.length
+                      ? p.ordensBancarias
+                      : p.numeroOrdemPagamento ? [{ numero: p.numeroOrdemPagamento }] : [];
+                    const documentos = p.documentos ?? [];
+                    const linhasDoc = documentos.length > 0 ? documentos : [undefined];
+                    const algumValorPorNf = documentos.some((d) => d.valor !== undefined);
+                    // OBs sem NF indicada valem pra fatura toda e aparecem na 1ª linha.
+                    const obsGerais = ordens.filter((o) => !('documento' in o) || !o.documento || !documentos.some((d) => d.numero === o.documento));
+                    return linhasDoc.map((d, linhaDoc) => {
+                      const primeira = linhaDoc === 0;
+                      const obsDaNf = d
+                        ? ordens.filter((o) => 'documento' in o && o.documento === d.numero).map((o) => o.numero)
+                        : [];
+                      const obs = [...obsDaNf, ...(primeira ? obsGerais.map((o) => o.numero) : [])];
+                      const mostraMes = primeiraDoMes;
+                      primeiraDoMes = false;
+                      return (
+                        <tr key={`${p.id}-${linhaDoc}`} className={`border-b border-gray-100 align-top ${arquivado ? 'bg-gray-50 text-gray-400 line-through' : ''}`}>
+                          <td className="px-2 py-1.5 font-semibold no-underline">{mostraMes ? nomeMes : ''}</td>
+                          <td className="px-2 py-1.5">{p.paeFatura || '-'}</td>
+                          <td className="px-2 py-1.5">
+                            {d ? `${d.tipo} ${d.numero}` : '-'}
+                            {primeira && diferenca !== null && diferenca !== 0 && (
+                              <span className="ml-1 inline-block px-1 rounded bg-amber-100 text-amber-800 no-underline" title="A soma das NFs não bate com o valor da fatura">
+                                NFs somam {formatarMoeda(Math.abs(valorDoPagamento(p) - diferenca))}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                            {d && algumValorPorNf ? (d.valor !== undefined ? formatarMoeda(d.valor) : '-') : primeira ? formatarMoeda(valorDoPagamento(p)) : ''}
+                          </td>
+                          <td className="px-2 py-1.5">{primeira ? numerosNe.join(' / ') || '-' : ''}</td>
+                          <td className="px-2 py-1.5">{obs.join(' / ') || '-'}</td>
+                          <td className={`px-2 py-1.5 ${statusDoPagamento(p) === 'em_tramitacao' && p.etapa ? 'text-amber-800 font-medium' : ''}`}>
+                            {primeira ? (arquivado ? 'ARQUIVADO (fora da soma)' : descreverAndamento(p)) : ''}
+                            {primeira && podeEditar && (
+                              <Link to={`/sistema/financeiro/pagamentos/${p.id}/editar`} className="ml-2 text-red-700 no-underline hover:underline">editar</Link>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-right whitespace-nowrap font-semibold no-underline">
+                            {mostraMes ? formatarMoeda(totalMes?.total ?? 0) : ''}
+                          </td>
+                          <td className="px-2 py-1.5 text-center">{primeira && p.autenticado ? 'SIM' : ''}</td>
+                        </tr>
+                      );
+                    });
                   });
                 })}
               </tbody>

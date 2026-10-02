@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, PlusCircle, Save, Trash2, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { OPCOES_FONTE_PROCESSO } from '../../lib/planilhaProcessos';
-import { formatarMoeda } from '../../lib/contratos';
+import { formatarMoeda, type ExecucaoContrato } from '../../lib/contratos';
+import BuscaContrato from './BuscaContrato';
 import {
   ETAPAS_PAGAMENTO,
   SETORES_PAGAMENTO,
@@ -13,6 +14,8 @@ import {
   saldoDoExercicio,
   somaDocumentos,
   statusDoPagamento,
+  totaisPorMes,
+  valorAPagarDoContrato,
   valorDoPagamento,
 } from '../../lib/financeiro';
 import {
@@ -40,6 +43,7 @@ interface LinhaDocumento {
 }
 interface LinhaOb {
   numero: string;
+  documento: string;
   valor: string;
   data: string;
 }
@@ -79,8 +83,8 @@ export default function PagamentoForm() {
   const [valorTotal, setValorTotal] = useState(pagamento ? numeroOuVazio(valorDoPagamento(pagamento)) : '');
   const [empenhoIds, setEmpenhoIds] = useState<string[]>(pagamento?.empenhoIds ?? []);
   const [ordens, setOrdens] = useState<LinhaOb[]>(
-    pagamento?.ordensBancarias?.map((o) => ({ numero: o.numero, valor: numeroOuVazio(o.valor), data: paraDataInput(o.data) })) ??
-      (pagamento?.numeroOrdemPagamento ? [{ numero: pagamento.numeroOrdemPagamento, valor: '', data: paraDataInput(pagamento.dataPagamento) }] : []),
+    pagamento?.ordensBancarias?.map((o) => ({ numero: o.numero, documento: o.documento ?? '', valor: numeroOuVazio(o.valor), data: paraDataInput(o.data) })) ??
+      (pagamento?.numeroOrdemPagamento ? [{ numero: pagamento.numeroOrdemPagamento, documento: '', valor: '', data: paraDataInput(pagamento.dataPagamento) }] : []),
   );
   const [setorAtual, setSetorAtual] = useState(pagamento?.setorAtual ?? '');
   const [etapa, setEtapa] = useState(pagamento?.etapa ?? '');
@@ -93,8 +97,13 @@ export default function PagamentoForm() {
   const [salvando, setSalvando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
 
-  const contratosOrdenados = useMemo(() => [...contratos].sort((a, b) => a.numero.localeCompare(b.numero)), [contratos]);
+  const contrato = contratos.find((c) => c.id === contratoId);
   const exercicio = Number(competencia.slice(0, 4)) || new Date().getFullYear();
+
+  const escolherContrato = (c: { id: string; fonteRecurso?: string }) => {
+    setContratoId(c.id);
+    if (c.fonteRecurso) setFonteRecurso(c.fonteRecurso);
+  };
 
   // NEs do contrato no exercício da fatura.
   const empenhosDoContrato = empenhos.filter((e) => e.contratoId === contratoId && e.exercicio === exercicio);
@@ -120,6 +129,28 @@ export default function PagamentoForm() {
     [contratoId, exercicio, empenhos, pagamentos, id],
   );
   const faltaReforco = reforcoNecessario(valorTotalNumero, saldoNe.saldo);
+
+  // Faturas do mesmo contrato por mês — pra saber quanto já foi lançado/pago em cada um.
+  const totaisMeses = useMemo(
+    () =>
+      totaisPorMes(pagamentos.filter((p) => p.contratoId === contratoId && p.id !== id)).filter((m) =>
+        m.mes.startsWith(String(exercicio)),
+      ),
+    [pagamentos, contratoId, id, exercicio],
+  );
+  const doMesEscolhido = totaisMeses.find((m) => m.mes === competencia);
+  const aPagar = contratoId
+    ? valorAPagarDoContrato(contratoId, execucoes, pagamentos.filter((p) => p.id !== id))
+    : 0;
+  const incluirNf = (x: ExecucaoContrato) =>
+    setDocumentos((anterior) =>
+      anterior.some((d) => d.execucaoId === x.id)
+        ? anterior
+        : [
+            ...anterior.filter((d) => d.numero.trim() !== '' || d.execucaoId),
+            { tipo: 'NF', numero: x.nf, valor: String(x.valor), execucaoId: x.id },
+          ],
+    );
 
   const atualizarDocumento = (indice: number, mudanca: Partial<LinhaDocumento>) =>
     setDocumentos((anterior) => anterior.map((d, i) => (i === indice ? { ...d, ...mudanca } : d)));
@@ -160,6 +191,7 @@ export default function PagamentoForm() {
           const valor = paraNumero(o.valor);
           return {
             numero: o.numero.trim(),
+            ...(o.documento ? { documento: o.documento } : {}),
             ...(valor !== undefined ? { valor } : {}),
             ...(o.data ? { data: new Date(o.data).toISOString() } : {}),
           };
@@ -225,6 +257,23 @@ export default function PagamentoForm() {
     return <div className="p-6">Pagamento não encontrado.</div>;
   }
 
+  if (!emEdicao && !contratoId) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center space-x-4">
+          <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100">
+            <ArrowLeft className="h-6 w-6" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Novo Pagamento (Fatura)</h1>
+            <p className="mt-1 text-sm text-gray-500">Comece pelo contrato — o resto vem dos demais módulos.</p>
+          </div>
+        </div>
+        <BuscaContrato onSelecionar={escolherContrato} />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
@@ -259,17 +308,33 @@ export default function PagamentoForm() {
         <section className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
           <h2 className="text-sm font-semibold text-gray-900 mb-4">Contrato e fatura</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <label htmlFor="contratoId" className="block text-sm font-medium text-gray-700">
-                Contrato <span className="text-red-500">*</span>
-              </label>
-              <select id="contratoId" required value={contratoId} onChange={(e) => setContratoId(e.target.value)} className={`${CLASSE_INPUT} bg-white`}>
-                <option value="">Selecione o contrato...</option>
-                {contratosOrdenados.map((c) => (
-                  <option key={c.id} value={c.id}>{c.numero} — {c.empresa}</option>
-                ))}
-              </select>
-            </div>
+            {contrato && (
+              <div className="md:col-span-2 rounded-md bg-gray-50 border border-gray-200 p-4 text-sm space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-semibold text-gray-900">Contrato {contrato.numero} — {contrato.empresa}</p>
+                  {!emEdicao && (
+                    <button type="button" onClick={() => setContratoId('')} className="text-xs font-medium text-red-700 hover:underline whitespace-nowrap">
+                      Trocar contrato
+                    </button>
+                  )}
+                </div>
+                <p className="text-gray-600">{contrato.objeto}</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 text-xs text-gray-600">
+                  <div><span className="block text-gray-400 uppercase">CNPJ</span>{contrato.cnpj || '-'}</div>
+                  <div><span className="block text-gray-400 uppercase">PAE do contrato</span>{contrato.pae || '-'}</div>
+                  <div><span className="block text-gray-400 uppercase">Vigência</span>{new Date(contrato.inicioVigencia).toLocaleDateString('pt-BR')} a {new Date(contrato.fimVigencia).toLocaleDateString('pt-BR')}</div>
+                  <div><span className="block text-gray-400 uppercase">Fonte</span>{contrato.fonteRecurso || '-'}</div>
+                  <div><span className="block text-gray-400 uppercase">Fiscal titular</span>{contrato.fiscalTitular || '-'}</div>
+                  <div><span className="block text-gray-400 uppercase">Fiscal suplente</span>{contrato.fiscalSuplente || '-'}</div>
+                  <div><span className="block text-gray-400 uppercase">Valor global</span>{formatarMoeda(contrato.valorGlobal || 0)}</div>
+                  <div>
+                    <span className="block text-gray-400 uppercase">Saldo (após pagamentos)</span>
+                    <strong className="text-gray-900">{formatarMoeda(contrato.saldoAtualFinanceiro ?? 0)}</strong>
+                    {aPagar > 0 && <span className="block text-amber-700">{formatarMoeda(aPagar)} a pagar</span>}
+                  </div>
+                </div>
+              </div>
+            )}
             <div>
               <label htmlFor="paeFatura" className="block text-sm font-medium text-gray-700">PAE (protocolo) da fatura</label>
               <input type="text" id="paeFatura" value={paeFatura} onChange={(e) => setPaeFatura(e.target.value)} className={CLASSE_INPUT} placeholder="Ex.: 2026/2328415" />
@@ -279,6 +344,11 @@ export default function PagamentoForm() {
                 Mês <span className="text-red-500">*</span>
               </label>
               <input type="month" id="competencia" required value={competencia} onChange={(e) => setCompetencia(e.target.value)} className={CLASSE_INPUT} />
+              {doMesEscolhido && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Neste mês já há {doMesEscolhido.quantidade} fatura(s): {formatarMoeda(doMesEscolhido.total)} lançado, {formatarMoeda(doMesEscolhido.pago)} pago.
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="fonteRecurso" className="block text-sm font-medium text-gray-700">Fonte do Recurso</label>
@@ -339,9 +409,28 @@ export default function PagamentoForm() {
             ))}
           </div>
           {contratoId && (
-            <p className="mt-3 text-xs text-gray-500">
-              {execucoesDisponiveis.length} NF(s) lançada(s) pelo fiscal neste contrato ainda sem pagamento — escolha na lista para preencher número e valor.
-            </p>
+            <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-medium text-amber-900">
+                NFs lançadas pelo fiscal e ainda sem pagamento ({execucoesDisponiveis.length})
+              </p>
+              {execucoesDisponiveis.length === 0 ? (
+                <p className="text-xs text-amber-800 mt-1">Nenhuma pendente — digite a NF manualmente acima.</p>
+              ) : (
+                <ul className="mt-2 space-y-1">
+                  {execucoesDisponiveis.map((x) => {
+                    const incluida = documentos.some((d) => d.execucaoId === x.id);
+                    return (
+                      <li key={x.id} className="flex items-center justify-between text-xs text-gray-700">
+                        <span>NF {x.nf} — {formatarMoeda(x.valor)} <span className="text-gray-400">({new Date(x.data).toLocaleDateString('pt-BR')})</span></span>
+                        <button type="button" disabled={incluida} onClick={() => incluirNf(x)} className="font-medium text-red-700 hover:underline disabled:text-gray-400 disabled:no-underline">
+                          {incluida ? 'incluída' : 'incluir'}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           )}
 
           <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -409,7 +498,7 @@ export default function PagamentoForm() {
         <section className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-900">Ordens Bancárias (OB)</h2>
-            <button type="button" onClick={() => setOrdens((anterior) => [...anterior, { numero: '', valor: '', data: '' }])} className="inline-flex items-center text-sm font-medium text-red-700 hover:underline">
+            <button type="button" onClick={() => setOrdens((anterior) => [...anterior, { numero: '', documento: '', valor: '', data: '' }])} className="inline-flex items-center text-sm font-medium text-red-700 hover:underline">
               <PlusCircle className="h-4 w-4 mr-1" /> Adicionar OB
             </button>
           </div>
@@ -417,9 +506,15 @@ export default function PagamentoForm() {
           <div className="space-y-3">
             {ordens.map((o, i) => (
               <div key={i} className="grid grid-cols-12 gap-2 items-start">
-                <input type="text" value={o.numero} onChange={(e) => atualizarOb(i, { numero: e.target.value })} className={`${CLASSE_INPUT_LINHA} col-span-12 md:col-span-4`} placeholder="Nº da OB" aria-label="Número da OB" />
+                <input type="text" value={o.numero} onChange={(e) => atualizarOb(i, { numero: e.target.value })} className={`${CLASSE_INPUT_LINHA} col-span-12 md:col-span-2`} placeholder="Nº da OB" aria-label="Número da OB" />
+                <select value={o.documento} onChange={(e) => atualizarOb(i, { documento: e.target.value })} className={`${CLASSE_INPUT_LINHA} bg-white col-span-12 md:col-span-3`} aria-label="NF desta OB">
+                  <option value="">Fatura toda</option>
+                  {documentos.filter((d) => d.numero.trim() !== '').map((d) => (
+                    <option key={d.numero} value={d.numero.trim()}>{d.tipo} {d.numero}</option>
+                  ))}
+                </select>
                 <input type="number" step="0.01" min="0" value={o.valor} onChange={(e) => atualizarOb(i, { valor: e.target.value })} className={`${CLASSE_INPUT_LINHA} col-span-5 md:col-span-3`} placeholder="Valor (R$)" aria-label="Valor da OB" />
-                <input type="date" value={o.data} onChange={(e) => atualizarOb(i, { data: e.target.value })} className={`${CLASSE_INPUT_LINHA} col-span-6 md:col-span-4`} aria-label="Data da OB" />
+                <input type="date" value={o.data} onChange={(e) => atualizarOb(i, { data: e.target.value })} className={`${CLASSE_INPUT_LINHA} col-span-6 md:col-span-3`} aria-label="Data da OB" />
                 <button type="button" onClick={() => setOrdens((anterior) => anterior.filter((_, idx) => idx !== i))} className="col-span-1 p-1.5 text-gray-400 hover:text-red-600" title="Remover">
                   <X className="h-4 w-4" />
                 </button>

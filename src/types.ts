@@ -688,6 +688,8 @@ export interface DocumentoPagamento {
 /** Ordem Bancária (OB) de um pagamento — pode haver mais de uma (ex.: pagamento + retenção). */
 export interface OrdemBancaria {
   numero: string;
+  /** Nº do documento (NF) a que esta OB se refere — na planilha cada NF tem a sua OB. Vazio = vale pra fatura toda. */
+  documento?: string;
   valor?: number;
   data?: string;
 }
