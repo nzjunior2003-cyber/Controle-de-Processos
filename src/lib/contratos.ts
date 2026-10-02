@@ -647,14 +647,17 @@ export function aditivoDuplicado(
  * repetição, então nunca conta como duplicado.
  */
 export function execucaoDuplicada(
-  execucoes: Pick<ExecucaoContrato, 'contratoId' | 'tipo' | 'nf'>[],
+  execucoes: Pick<ExecucaoContrato, 'id' | 'contratoId' | 'tipo' | 'nf'>[],
   nova: Pick<ExecucaoContrato, 'contratoId' | 'tipo' | 'nf'>,
+  /** Execuções a desconsiderar — as NFs arquivadas pelo Financeiro, que podem ser reemitidas com o mesmo nº. */
+  ignorar: ReadonlySet<string> = new Set(),
 ): boolean {
   const nf = normalizarIdentificador(nova.nf);
   if (!nf) return false;
   const tipo = normalizarIdentificador(nova.tipo ?? 'NF/Fatura');
   return execucoes.some(
     (e) =>
+      !ignorar.has(e.id) &&
       e.contratoId === nova.contratoId &&
       normalizarIdentificador(e.tipo ?? 'NF/Fatura') === tipo &&
       normalizarIdentificador(e.nf) === nf,

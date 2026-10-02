@@ -9,6 +9,7 @@ import {
   ETAPAS_PAGAMENTO,
   SETORES_PAGAMENTO,
   diferencaDocumentos,
+  execucoesArquivadas,
   reforcoNecessario,
   registrarAndamento,
   saldoDoExercicio,
@@ -116,7 +117,8 @@ export default function PagamentoForm() {
         .flatMap((p) => (p.documentos ?? []).map((d) => d.execucaoId))
         .filter(Boolean),
     );
-    return execucoes.filter((e) => e.contratoId === contratoId && !jaVinculadas.has(e.id));
+    const canceladas = execucoesArquivadas(pagamentos.filter((p) => p.id !== id));
+    return execucoes.filter((e) => e.contratoId === contratoId && !jaVinculadas.has(e.id) && !canceladas.has(e.id));
   }, [execucoes, pagamentos, contratoId, id]);
 
   const valorTotalNumero = paraNumero(valorTotal) ?? 0;

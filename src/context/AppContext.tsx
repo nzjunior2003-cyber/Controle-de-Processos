@@ -103,7 +103,7 @@ import {
   PushSubscriptionRegistro,
   TipoEventoNotificacao,
 } from '../types';
-import { valorASerAbatido, valorJaAbatido } from '../lib/financeiro';
+import { execucoesArquivadas, valorASerAbatido, valorJaAbatido } from '../lib/financeiro';
 
 const URL_PLANILHA_PCA =
   'https://docs.google.com/spreadsheets/d/1-XrRG5oLqrcMPLNHePm3KS4671vCp1r0/gviz/tq?tqx=out:csv&sheet=GERAL%20PCA';
@@ -1387,7 +1387,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
    * lançadas ao mesmo tempo.
    */
   const addExecucao = useCallback(async (dados: Omit<ExecucaoContrato, 'id'>) => {
-    if (execucaoDuplicada(execucoes, dados)) {
+    if (execucaoDuplicada(execucoes, dados, execucoesArquivadas(pagamentos))) {
       throw new Error(
         `Já existe um lançamento de ${dados.tipo ?? 'NF/Fatura'} com o nº ${dados.nf} neste contrato.`,
       );
@@ -1430,7 +1430,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     await registrarAuditoria('execucoes', execucaoRef.id, 'CREATE', dados);
     return novoSaldo;
-  }, [execucoes, registrarAuditoria]);
+  }, [execucoes, pagamentos, registrarAuditoria]);
 
   /** Remove uma execução e devolve valor/quantidade ao saldo atual do contrato. */
   const deleteExecucao = useCallback(async (id: string, contratoId: string) => {

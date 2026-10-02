@@ -211,6 +211,23 @@ export function valorJaAbatido(
 }
 
 /**
+ * Execuções (NFs) que só estão em faturas **arquivadas** — a NF foi cancelada
+ * pelo Financeiro (ex.: NF 37775 da OI, reemitida depois). Não contam como a
+ * pagar e o mesmo número pode ser lançado de novo.
+ */
+export function execucoesArquivadas(
+  pagamentos: Pick<PagamentoContrato, 'status' | 'documentos'>[],
+): Set<string> {
+  const ids = (arquivado: boolean) =>
+    pagamentos
+      .filter((p) => (statusDoPagamento(p) === 'arquivado') === arquivado)
+      .flatMap((p) => (p.documentos ?? []).map((d) => d.execucaoId))
+      .filter((x): x is string => !!x);
+  const emUso = new Set(ids(false));
+  return new Set(ids(true).filter((x) => !emUso.has(x)));
+}
+
+/**
  * NFs lançadas pelo fiscal (modelo novo) cujo pagamento ainda não foi
  * registrado como pago — o valor "comprometido" que ainda não saiu do saldo.
  */
@@ -219,12 +236,13 @@ export function valorAPagarDoContrato(
   execucoes: Pick<ExecucaoContrato, 'id' | 'contratoId' | 'valor' | 'saldoFinanceiroAbatido'>[],
   pagamentos: Pick<PagamentoContrato, 'status' | 'documentos'>[],
 ): number {
+  const arquivadas = execucoesArquivadas(pagamentos);
   const pagas = new Set(
     pagamentos
       .filter((p) => statusDoPagamento(p) === 'pago')
       .flatMap((p) => (p.documentos ?? []).map((d) => d.execucaoId)),
   );
   return execucoes
-    .filter((e) => e.contratoId === contratoId && e.saldoFinanceiroAbatido === false && !pagas.has(e.id))
+    .filter((e) => e.contratoId === contratoId && e.saldoFinanceiroAbatido === false && !pagas.has(e.id) && !arquivadas.has(e.id))
     .reduce((acc, e) => acc + (e.valor || 0), 0);
 }

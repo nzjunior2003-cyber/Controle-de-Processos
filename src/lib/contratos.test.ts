@@ -681,7 +681,7 @@ describe('aditivoDuplicado', () => {
 });
 
 describe('execucaoDuplicada', () => {
-  const execucoes = [{ contratoId: 'c1', tipo: 'NF/Fatura', nf: '1234' }];
+  const execucoes = [{ id: 'e0', contratoId: 'c1', tipo: 'NF/Fatura', nf: '1234' }];
 
   it('detecta mesmo contrato, tipo e nº de documento', () => {
     expect(execucaoDuplicada(execucoes, { contratoId: 'c1', tipo: 'NF/Fatura', nf: ' 1234' })).toBe(true);
@@ -697,6 +697,13 @@ describe('execucaoDuplicada', () => {
 
   it('nunca acusa duplicidade sem nº de documento', () => {
     expect(execucaoDuplicada(execucoes, { contratoId: 'c1', tipo: 'NF/Fatura', nf: '' })).toBe(false);
+  });
+
+  it('permite reemitir uma NF cuja versão anterior foi arquivada', () => {
+    const comId = [{ id: 'e1', contratoId: 'c1', tipo: 'NF/Fatura', nf: '37775' }];
+    const nova = { contratoId: 'c1', tipo: 'NF/Fatura', nf: '37775' };
+    expect(execucaoDuplicada(comId, nova)).toBe(true);
+    expect(execucaoDuplicada(comId, nova, new Set(['e1']))).toBe(false);
   });
 });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  execucoesArquivadas,
   valorASerAbatido,
   valorAPagarDoContrato,
   valorJaAbatido,
@@ -284,6 +285,14 @@ describe('saldo do contrato só cai com o pagamento', () => {
     expect(valorJaAbatido({ valorAbatidoSaldo: 500 }, [])).toBe(500);
     expect(valorJaAbatido({ valorPago: 1000 }, [])).toBe(1000);
     expect(valorJaAbatido({ status: 'em_tramitacao', valorTotal: 9 }, [])).toBe(0);
+  });
+
+  it('NF só de fatura arquivada: fora do a pagar e liberada pra reemissão', () => {
+    const arquivada = { status: 'arquivado' as const, documentos: [{ tipo: 'NF' as const, numero: '1', execucaoId: 'e1' }] };
+    expect(execucoesArquivadas([arquivada])).toEqual(new Set(['e1']));
+    const emUso = { status: 'em_tramitacao' as const, documentos: [{ tipo: 'NF' as const, numero: '1', execucaoId: 'e1' }] };
+    expect(execucoesArquivadas([arquivada, emUso]).size).toBe(0);
+    expect(valorAPagarDoContrato('c1', [novaNf], [arquivada])).toBe(0);
   });
 
   it('a pagar: NFs novas sem pagamento pago', () => {
