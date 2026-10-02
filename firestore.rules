@@ -212,6 +212,10 @@ service cloud.firestore {
       allow read: if ativo();
       allow write: if ativo() && perfilDoc().perfil in ['master', 'financeiro'];
     }
+    match /empenhos/{documento} {
+      allow read: if ativo();
+      allow write: if ativo() && perfilDoc().perfil in ['master', 'financeiro'];
+    }
     match /dotacoes/{documento} {
       allow read: if ativo();
       allow write: if ativo() && perfilDoc().perfil in ['master', 'financeiro'];

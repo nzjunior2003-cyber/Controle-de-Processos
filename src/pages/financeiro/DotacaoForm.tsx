@@ -19,13 +19,19 @@ export default function DotacaoForm() {
   const [descricao, setDescricao] = useState(dotacao?.descricao ?? '');
   const [fonteRecurso, setFonteRecurso] = useState(dotacao?.fonteRecurso ?? '');
   const [valorDotado, setValorDotado] = useState(dotacao?.valorDotado != null ? String(dotacao.valorDotado) : '');
+  const [funcionalProgramatica, setFuncionalProgramatica] = useState(dotacao?.funcionalProgramatica ?? '');
+  const [projetoAtividade, setProjetoAtividade] = useState(dotacao?.projetoAtividade ?? '');
+  const [naturezaDespesa, setNaturezaDespesa] = useState(dotacao?.naturezaDespesa ?? '');
+  const [fonteCodigo, setFonteCodigo] = useState(dotacao?.fonteCodigo ?? '');
+  const [detalhamento, setDetalhamento] = useState(dotacao?.detalhamento ?? '');
+  const [planoInterno, setPlanoInterno] = useState(dotacao?.planoInterno ?? '');
 
   const [salvando, setSalvando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
 
   const handleSalvar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!codigo || !descricao || !valorDotado) return;
+    if (!codigo || !descricao) return;
 
     setSalvando(true);
     try {
@@ -34,7 +40,15 @@ export default function DotacaoForm() {
         codigo,
         descricao,
         fonteRecurso,
-        valorDotado: Number(valorDotado.replace(',', '.')),
+        // Nas fichas de controle da Diretoria de Finanças não há valor dotado
+        // por linha; vazio vale 0 (o saldo da dotação só faz sentido com valor).
+        valorDotado: valorDotado ? Number(valorDotado.replace(',', '.')) : 0,
+        funcionalProgramatica,
+        projetoAtividade,
+        naturezaDespesa,
+        fonteCodigo,
+        detalhamento,
+        planoInterno,
       };
 
       if (emEdicao && id) {
@@ -167,12 +181,11 @@ export default function DotacaoForm() {
 
             <div>
               <label htmlFor="valorDotado" className="block text-sm font-medium text-gray-700">
-                Valor Dotado (R$) <span className="text-red-500">*</span>
+                Valor Dotado (R$)
               </label>
               <input
                 type="number"
                 id="valorDotado"
-                required
                 step="0.01"
                 min="0"
                 value={valorDotado}
@@ -180,6 +193,32 @@ export default function DotacaoForm() {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
               />
             </div>
+
+            <div className="md:col-span-2 pt-2 border-t border-gray-100">
+              <p className="text-sm font-medium text-gray-900">Ficha de controle da Diretoria de Finanças</p>
+              <p className="text-xs text-gray-500">Campos do cabeçalho da planilha de controle de cada contrato.</p>
+            </div>
+
+            {([
+              ['funcionalProgramatica', 'Funcional (programática)', funcionalProgramatica, setFuncionalProgramatica, 'Ex.: 06.122.1297-8338'],
+              ['projetoAtividade', 'Projeto-Atividade ou Operações Especiais', projetoAtividade, setProjetoAtividade, 'Ex.: Operacionalização das Ações Administrativas'],
+              ['naturezaDespesa', 'Natureza da Despesa', naturezaDespesa, setNaturezaDespesa, 'Ex.: 339033'],
+              ['fonteCodigo', 'Fonte (código)', fonteCodigo, setFonteCodigo, 'Ex.: 01500.000001'],
+              ['detalhamento', 'Detalhamento', detalhamento, setDetalhamento, 'Ex.: 006359'],
+              ['planoInterno', 'Plano Interno', planoInterno, setPlanoInterno, 'Ex.: 4110008338C'],
+            ] as const).map(([chave, rotulo, valor, definir, exemplo]) => (
+              <div key={chave} className={chave === 'projetoAtividade' ? 'md:col-span-2' : ''}>
+                <label htmlFor={chave} className="block text-sm font-medium text-gray-700">{rotulo}</label>
+                <input
+                  type="text"
+                  id={chave}
+                  value={valor}
+                  onChange={(e) => definir(e.target.value)}
+                  placeholder={exemplo}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+                />
+              </div>
+            ))}
           </div>
 
           <div className="pt-4 border-t border-gray-200 flex justify-end space-x-3">

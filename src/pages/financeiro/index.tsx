@@ -3,49 +3,101 @@ import { useNavigate } from 'react-router-dom';
 import { DollarSign, PlusCircle, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { formatarMoeda } from '../../lib/contratos';
-import { saldoDaDotacao } from '../../lib/financeiro';
+import {
+  competenciaDoPagamento,
+  descreverAndamento,
+  pagamentosAtivos,
+  saldoDaDotacao,
+  statusDoPagamento,
+  valorDoPagamento,
+} from '../../lib/financeiro';
+import { STATUS_PAGAMENTO_LABELS, type StatusPagamento } from '../../types';
+import FichaContrato from './FichaContrato';
 
-type Aba = 'pagamentos' | 'dotacoes';
+type Aba = 'pagamentos' | 'empenhos' | 'dotacoes' | 'ficha';
+
+const CORES_STATUS: Record<StatusPagamento, string> = {
+  em_tramitacao: 'bg-amber-50 text-amber-700',
+  pago: 'bg-emerald-50 text-emerald-700',
+  arquivado: 'bg-gray-100 text-gray-500',
+};
+
+const formatarMes = (competencia: string) => (competencia ? `${competencia.slice(5, 7)}/${competencia.slice(0, 4)}` : '-');
 
 /**
  * Módulo Financeiro — alimentado pela Diretoria de Finanças: pagamentos
- * efetuados aos fornecedores (vinculados por contrato/empenho/ordem de
- * pagamento) e dotações orçamentárias (saldo sempre calculado a partir dos
- * pagamentos, nunca persistido — ver `saldoDaDotacao`).
+ * (processo de cada fatura, com PAE, NFs, NEs, OBs e andamento), notas de
+ * empenho (origem e reforços), dotações orçamentárias e a ficha de controle
+ * por contrato. Saldos e totais são sempre calculados (src/lib/financeiro.ts).
  */
 export default function Financeiro() {
-  const { pagamentos, dotacoes, contratos, usuarioAtual } = useApp();
+  const { pagamentos, dotacoes, empenhos, contratos, usuarioAtual } = useApp();
   const navigate = useNavigate();
   const isMasterOuFinanceiro = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'financeiro';
 
   const [aba, setAba] = useState<Aba>('pagamentos');
   const [busca, setBusca] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState<StatusPagamento | ''>('');
 
   const contratoPorId = useMemo(() => new Map(contratos.map((c) => [c.id, c])), [contratos]);
+  const empenhoPorId = useMemo(() => new Map(empenhos.map((e) => [e.id, e])), [empenhos]);
+
+  const textoContrato = (contratoId: string) => {
+    const contrato = contratoPorId.get(contratoId);
+    return contrato ? `${contrato.numero} — ${contrato.empresa}` : 'Contrato não encontrado';
+  };
+  const numerosNe = (p: (typeof pagamentos)[number]) => {
+    const numeros = (p.empenhoIds ?? []).map((idNe) => empenhoPorId.get(idNe)?.numero).filter(Boolean);
+    return numeros.length > 0 ? numeros : p.numeroEmpenho ? [p.numeroEmpenho] : [];
+  };
+  const numerosOb = (p: (typeof pagamentos)[number]) => {
+    const numeros = (p.ordensBancarias ?? []).map((o) => o.numero);
+    return numeros.length > 0 ? numeros : p.numeroOrdemPagamento ? [p.numeroOrdemPagamento] : [];
+  };
 
   const pagamentosFiltrados = useMemo(() => {
     const buscaNormalizada = busca.toLowerCase();
     return pagamentos
+      .filter((p) => !filtroStatus || statusDoPagamento(p) === filtroStatus)
       .filter((p) => {
         if (!buscaNormalizada) return true;
         const contrato = contratoPorId.get(p.contratoId);
-        return [p.numeroEmpenho, p.numeroOrdemPagamento, p.fonteRecurso, contrato?.numero, contrato?.empresa]
+        const textos = [
+          p.paeFatura, p.fonteRecurso, p.setorAtual, p.etapa, contrato?.numero, contrato?.empresa,
+          ...(p.documentos ?? []).map((d) => d.numero),
+          ...numerosNe(p), ...numerosOb(p),
+        ];
+        return textos.some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
+      })
+      .sort((a, b) => competenciaDoPagamento(b).localeCompare(competenciaDoPagamento(a)));
+    // numerosNe/numerosOb dependem só de empenhoPorId, já listado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagamentos, busca, filtroStatus, contratoPorId, empenhoPorId]);
+
+  const empenhosFiltrados = useMemo(() => {
+    const buscaNormalizada = busca.toLowerCase();
+    return empenhos
+      .filter((e) => {
+        if (!buscaNormalizada) return true;
+        const contrato = contratoPorId.get(e.contratoId);
+        return [e.numero, e.prd, e.paeOrigem, contrato?.numero, contrato?.empresa]
           .some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
       })
-      .sort((a, b) => new Date(b.dataPagamento).getTime() - new Date(a.dataPagamento).getTime());
-  }, [pagamentos, busca, contratoPorId]);
+      .sort((a, b) => b.exercicio - a.exercicio || a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true }));
+  }, [empenhos, busca, contratoPorId]);
 
   const dotacoesFiltradas = useMemo(() => {
     const buscaNormalizada = busca.toLowerCase();
     return dotacoes
       .filter((d) => {
         if (!buscaNormalizada) return true;
-        return [d.codigo, d.descricao, d.fonteRecurso].some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
+        return [d.codigo, d.descricao, d.fonteRecurso, d.fonteCodigo, d.funcionalProgramatica, d.planoInterno]
+          .some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
       })
       .sort((a, b) => b.exercicio - a.exercicio || a.codigo.localeCompare(b.codigo));
   }, [dotacoes, busca]);
 
-  const totalPago = pagamentosFiltrados.reduce((acc, p) => acc + (p.valorPago || 0), 0);
+  const totalFiltrado = pagamentosAtivos(pagamentosFiltrados).reduce((acc, p) => acc + valorDoPagamento(p), 0);
 
   if (usuarioAtual?.perfil === 'demandante') {
     return (
@@ -54,6 +106,24 @@ export default function Financeiro() {
       </div>
     );
   }
+
+  const rotuloNovo =
+    aba === 'pagamentos' ? 'Novo Pagamento' : aba === 'empenhos' ? 'Nova NE' : aba === 'dotacoes' ? 'Nova Dotação' : '';
+  const rotaNovo =
+    aba === 'pagamentos'
+      ? '/sistema/financeiro/pagamentos/novo'
+      : aba === 'empenhos'
+        ? '/sistema/financeiro/empenhos/novo'
+        : '/sistema/financeiro/dotacoes/novo';
+
+  const abas: { id: Aba; nome: string }[] = [
+    { id: 'pagamentos', nome: 'Pagamentos' },
+    { id: 'empenhos', nome: 'Empenhos (NE)' },
+    { id: 'dotacoes', nome: 'Dotações' },
+    { id: 'ficha', nome: 'Ficha por contrato' },
+  ];
+
+  const CABECALHO = 'px-4 py-3 text-xs font-medium text-gray-500 uppercase';
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -64,142 +134,219 @@ export default function Financeiro() {
             Financeiro
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Pagamentos efetuados aos fornecedores e dotações orçamentárias, alimentados pela
-            Diretoria de Finanças.
+            Controle de pagamentos da Diretoria de Finanças: faturas (PAE), notas de empenho, ordens bancárias e dotações.
           </p>
         </div>
-        {isMasterOuFinanceiro && (
+        {isMasterOuFinanceiro && aba !== 'ficha' && (
           <button
-            onClick={() => navigate(aba === 'pagamentos' ? '/sistema/financeiro/pagamentos/novo' : '/sistema/financeiro/dotacoes/novo')}
+            onClick={() => navigate(rotaNovo)}
             className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800"
           >
             <PlusCircle className="-ml-1 mr-2 h-5 w-5" />
-            {aba === 'pagamentos' ? 'Novo Pagamento' : 'Nova Dotação'}
+            {rotuloNovo}
           </button>
         )}
       </div>
 
-      <div className="border-b border-gray-200 flex gap-6">
-        <button
-          onClick={() => setAba('pagamentos')}
-          className={`pb-3 text-sm font-medium border-b-2 ${aba === 'pagamentos' ? 'border-red-600 text-red-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-        >
-          Pagamentos
-        </button>
-        <button
-          onClick={() => setAba('dotacoes')}
-          className={`pb-3 text-sm font-medium border-b-2 ${aba === 'dotacoes' ? 'border-red-600 text-red-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-        >
-          Dotações Orçamentárias
-        </button>
+      <div className="border-b border-gray-200 flex gap-6 overflow-x-auto">
+        {abas.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setAba(item.id)}
+            className={`pb-3 text-sm font-medium border-b-2 whitespace-nowrap ${aba === item.id ? 'border-red-600 text-red-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            {item.nome}
+          </button>
+        ))}
       </div>
 
-      <div className="bg-white p-4 shadow-sm rounded-lg border border-gray-200">
-        <div className="relative max-w-lg">
-          <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center">
-            <Search className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className="block w-full rounded-md border-gray-300 pl-10 focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 border"
-            placeholder={aba === 'pagamentos' ? 'Buscar por empenho, OP, fonte ou contrato...' : 'Buscar por código, descrição ou fonte...'}
-          />
-        </div>
-      </div>
-
-      {aba === 'pagamentos' ? (
+      {aba === 'ficha' ? (
+        <FichaContrato />
+      ) : (
         <>
-          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex items-center justify-between">
-            <p className="text-sm text-gray-600">{pagamentosFiltrados.length} pagamento(s) encontrado(s)</p>
-            <p className="text-sm font-semibold text-gray-900">Total pago: {formatarMoeda(totalPago)}</p>
+          <div className="bg-white p-4 shadow-sm rounded-lg border border-gray-200 flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1 max-w-lg">
+              <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center">
+                <Search className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                className="block w-full rounded-md border-gray-300 pl-10 focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 border"
+                placeholder={
+                  aba === 'pagamentos'
+                    ? 'Buscar por PAE, NF, NE, OB, setor ou contrato...'
+                    : aba === 'empenhos'
+                      ? 'Buscar por NE, PRD, PAE ou contrato...'
+                      : 'Buscar por código, descrição, fonte ou plano interno...'
+                }
+              />
+            </div>
+            {aba === 'pagamentos' && (
+              <select
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value as StatusPagamento | '')}
+                className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
+              >
+                <option value="">Todas as situações</option>
+                {(Object.keys(STATUS_PAGAMENTO_LABELS) as StatusPagamento[]).map((s) => (
+                  <option key={s} value={s}>{STATUS_PAGAMENTO_LABELS[s]}</option>
+                ))}
+              </select>
+            )}
           </div>
-          <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contrato</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empenho / OP</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fonte</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor Pago</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data Pagamento</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {pagamentosFiltrados.map((p) => {
-                  const contrato = contratoPorId.get(p.contratoId);
-                  return (
+
+          {aba === 'pagamentos' && (
+            <>
+              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex items-center justify-between">
+                <p className="text-sm text-gray-600">{pagamentosFiltrados.length} fatura(s) encontrada(s)</p>
+                <p className="text-sm font-semibold text-gray-900" title="Soma das faturas não arquivadas">Total: {formatarMoeda(totalFiltrado)}</p>
+              </div>
+              <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className={`${CABECALHO} text-left`}>Contrato</th>
+                      <th className={`${CABECALHO} text-left`}>PAE / NFs</th>
+                      <th className={`${CABECALHO} text-left`}>NE / OB</th>
+                      <th className={`${CABECALHO} text-left`}>Andamento</th>
+                      <th className={`${CABECALHO} text-right`}>Valor</th>
+                      <th className={`${CABECALHO} text-center`}>Mês</th>
+                      <th className={`${CABECALHO} text-center`}>Situação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {pagamentosFiltrados.map((p) => {
+                      const status = statusDoPagamento(p);
+                      const documentos = (p.documentos ?? []).map((d) => d.numero).join(', ');
+                      return (
+                        <tr
+                          key={p.id}
+                          onClick={() => isMasterOuFinanceiro && navigate(`/sistema/financeiro/pagamentos/${p.id}/editar`)}
+                          className={`hover:bg-gray-50 ${isMasterOuFinanceiro ? 'cursor-pointer' : ''} ${status === 'arquivado' ? 'text-gray-400' : ''}`}
+                        >
+                          <td className="px-4 py-3 text-sm max-w-[16rem] truncate" title={textoContrato(p.contratoId)}>{textoContrato(p.contratoId)}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <div className="font-medium">{p.paeFatura || '-'}</div>
+                            {documentos && <div className="text-xs text-gray-500 max-w-[14rem] truncate" title={documentos}>NF {documentos}</div>}
+                          </td>
+                          <td className="px-4 py-3 text-sm whitespace-nowrap">
+                            <div>NE {numerosNe(p).join(' / ') || '-'}</div>
+                            <div className="text-xs text-gray-500">OB {numerosOb(p).join(' / ') || '-'}</div>
+                          </td>
+                          <td className="px-4 py-3 text-sm">{descreverAndamento(p)}</td>
+                          <td className="px-4 py-3 text-sm text-right whitespace-nowrap">{formatarMoeda(valorDoPagamento(p))}</td>
+                          <td className="px-4 py-3 text-sm text-center whitespace-nowrap">{formatarMes(competenciaDoPagamento(p))}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${CORES_STATUS[status]}`}>
+                              {STATUS_PAGAMENTO_LABELS[status]}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {pagamentosFiltrados.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500">Nenhum pagamento encontrado.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {aba === 'empenhos' && (
+            <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className={`${CABECALHO} text-left`}>NE</th>
+                    <th className={`${CABECALHO} text-left`}>Contrato</th>
+                    <th className={`${CABECALHO} text-left`}>Tipo</th>
+                    <th className={`${CABECALHO} text-left`}>PRD</th>
+                    <th className={`${CABECALHO} text-right`}>Valor</th>
+                    <th className={`${CABECALHO} text-center`}>Exercício</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {empenhosFiltrados.map((e) => (
                     <tr
-                      key={p.id}
-                      onClick={() => isMasterOuFinanceiro && navigate(`/sistema/financeiro/pagamentos/${p.id}/editar`)}
+                      key={e.id}
+                      onClick={() => isMasterOuFinanceiro && navigate(`/sistema/financeiro/empenhos/${e.id}/editar`)}
                       className={`hover:bg-gray-50 ${isMasterOuFinanceiro ? 'cursor-pointer' : ''}`}
                     >
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {contrato ? `${contrato.numero} — ${contrato.empresa}` : 'Contrato não encontrado'}
+                      <td className="px-4 py-3 text-sm font-medium">{e.numero}</td>
+                      <td className="px-4 py-3 text-sm max-w-[18rem] truncate" title={textoContrato(e.contratoId)}>{textoContrato(e.contratoId)}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {e.tipo === 'origem' ? 'Origem' : 'Reforço'}
+                        {e.tipo === 'origem' && e.estimativo ? <span className="text-xs text-gray-500"> (estimativa)</span> : null}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {p.numeroEmpenho} / {p.numeroOrdemPagamento}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{p.fonteRecurso}</td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right text-gray-900">{formatarMoeda(p.valorPago)}</td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {new Date(p.dataPagamento).toLocaleDateString('pt-BR')}
-                      </td>
+                      <td className="px-4 py-3 text-sm">{e.prd || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-right whitespace-nowrap">{formatarMoeda(e.valor)}</td>
+                      <td className="px-4 py-3 text-sm text-center">{e.exercicio}</td>
                     </tr>
-                  );
-                })}
-                {pagamentosFiltrados.length === 0 && (
+                  ))}
+                  {empenhosFiltrados.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">Nenhuma NE encontrada.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {aba === 'dotacoes' && (
+            <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-500">Nenhum pagamento encontrado.</td>
+                    <th className={`${CABECALHO} text-left`}>Código / Exercício</th>
+                    <th className={`${CABECALHO} text-left`}>Descrição</th>
+                    <th className={`${CABECALHO} text-left`}>Fonte</th>
+                    <th className={`${CABECALHO} text-left`}>Plano interno</th>
+                    <th className={`${CABECALHO} text-right`}>Valor Dotado</th>
+                    <th className={`${CABECALHO} text-right`}>Saldo Disponível</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {dotacoesFiltradas.map((d) => {
+                    const saldo = saldoDaDotacao(d, pagamentos);
+                    return (
+                      <tr
+                        key={d.id}
+                        onClick={() => isMasterOuFinanceiro && navigate(`/sistema/financeiro/dotacoes/${d.id}/editar`)}
+                        className={`hover:bg-gray-50 ${isMasterOuFinanceiro ? 'cursor-pointer' : ''}`}
+                      >
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          <div className="font-medium">{d.codigo}</div>
+                          <div className="text-xs text-gray-500">{d.exercicio}</div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{d.descricao}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                          {d.fonteRecurso}
+                          {d.fonteCodigo && <div className="text-xs text-gray-500">{d.fonteCodigo}</div>}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{d.planoInterno || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-right text-gray-900 whitespace-nowrap">{d.valorDotado ? formatarMoeda(d.valorDotado) : '-'}</td>
+                        <td className={`px-4 py-3 text-sm text-right font-medium whitespace-nowrap ${saldo < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                          {d.valorDotado ? formatarMoeda(saldo) : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {dotacoesFiltradas.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">Nenhuma dotação encontrada.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
-      ) : (
-        <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código / Exercício</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fonte</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor Dotado</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo Disponível</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {dotacoesFiltradas.map((d) => {
-                const saldo = saldoDaDotacao(d, pagamentos);
-                return (
-                  <tr
-                    key={d.id}
-                    onClick={() => isMasterOuFinanceiro && navigate(`/sistema/financeiro/dotacoes/${d.id}/editar`)}
-                    className={`hover:bg-gray-50 ${isMasterOuFinanceiro ? 'cursor-pointer' : ''}`}
-                  >
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="font-medium">{d.codigo}</div>
-                      <div className="text-xs text-gray-500">{d.exercicio}</div>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-700">{d.descricao}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{d.fonteRecurso}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-right text-gray-900">{formatarMoeda(d.valorDotado)}</td>
-                    <td className={`px-4 py-4 whitespace-nowrap text-sm text-right font-medium ${saldo < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
-                      {formatarMoeda(saldo)}
-                    </td>
-                  </tr>
-                );
-              })}
-              {dotacoesFiltradas.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-500">Nenhuma dotação encontrada.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
       )}
     </div>
   );

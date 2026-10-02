@@ -26,6 +26,7 @@ import RelatorioPca from './pages/pca/RelatorioPca';
 import Financeiro from './pages/financeiro';
 import PagamentoForm from './pages/financeiro/PagamentoForm';
 import DotacaoForm from './pages/financeiro/DotacaoForm';
+import EmpenhoForm from './pages/financeiro/EmpenhoForm';
 
 export default function App() {
   return (
@@ -64,6 +65,8 @@ export default function App() {
                 <Route path="financeiro" element={<Financeiro />} />
                 <Route path="financeiro/pagamentos/novo" element={<PagamentoForm />} />
                 <Route path="financeiro/pagamentos/:id/editar" element={<PagamentoForm />} />
+                <Route path="financeiro/empenhos/novo" element={<EmpenhoForm />} />
+                <Route path="financeiro/empenhos/:id/editar" element={<EmpenhoForm />} />
                 <Route path="financeiro/dotacoes/novo" element={<DotacaoForm />} />
                 <Route path="financeiro/dotacoes/:id/editar" element={<DotacaoForm />} />
                 <Route path="dashboard" element={<Dashboard />} />

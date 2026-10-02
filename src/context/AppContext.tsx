@@ -97,6 +97,7 @@ import {
   PortariaFiscal,
   IRP,
   DotacaoOrcamentaria,
+  Empenho,
   PagamentoContrato,
   Notificacao,
   PushSubscriptionRegistro,
@@ -125,6 +126,7 @@ interface AppContextData {
   irps: IRP[];
   pagamentos: PagamentoContrato[];
   dotacoes: DotacaoOrcamentaria[];
+  empenhos: Empenho[];
   /** Só as últimas 50 do usuário logado (ver `useNotificacoesDoUsuario`). */
   notificacoes: Notificacao[];
   pushSubscriptions: PushSubscriptionRegistro[];
@@ -203,6 +205,9 @@ interface AppContextData {
   addDotacao: (dados: Omit<DotacaoOrcamentaria, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
   updateDotacao: (id: string, dados: Partial<DotacaoOrcamentaria>) => Promise<void>;
   deleteDotacao: (id: string) => Promise<void>;
+  addEmpenho: (dados: Omit<Empenho, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
+  updateEmpenho: (id: string, dados: Partial<Empenho>) => Promise<void>;
+  deleteEmpenho: (id: string) => Promise<void>;
   marcarNotificacaoLida: (id: string) => Promise<void>;
   excluirNotificacao: (id: string) => Promise<void>;
   marcarTodasNotificacoesLidas: () => Promise<void>;
@@ -405,6 +410,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const irps = useColecao<IRP>('irps', isAuthenticated);
   const pagamentos = useColecao<PagamentoContrato>('pagamentos', isAuthenticated);
   const dotacoes = useColecao<DotacaoOrcamentaria>('dotacoes', isAuthenticated);
+  const empenhos = useColecao<Empenho>('empenhos', isAuthenticated);
   const notificacoes = useNotificacoesDoUsuario(usuarioAtual?.id, isAuthenticated);
   const pushSubscriptions = useColecao<PushSubscriptionRegistro>('push_subscriptions', isAuthenticated);
   // Leitura restrita a 'master' nas firestore.rules — só assina quando fizer
@@ -1705,6 +1711,41 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [dotacoes, registrarAuditoria],
   );
 
+  const addEmpenho = useCallback(
+    async (dados: Omit<Empenho, 'id' | 'criado_em' | 'atualizado_em'>) => {
+      const id = await criarEm('empenhos', dados);
+      await registrarAuditoria('empenhos', id, 'CREATE', dados);
+      return id;
+    },
+    [criarEm, registrarAuditoria],
+  );
+  const updateEmpenho = useCallback(
+    async (id: string, dados: Partial<Empenho>) => {
+      const anterior = empenhos.find((e) => e.id === id);
+      await atualizarEm('empenhos', id, dados);
+      await registrarAuditoria('empenhos', id, 'UPDATE', dados, anterior);
+    },
+    [atualizarEm, registrarAuditoria, empenhos],
+  );
+  // Uma NE em uso por algum pagamento não pode ser apagada (o pagamento ficaria
+  // apontando pra uma NE que não existe mais); arquive o pagamento antes.
+  const deleteEmpenho = useCallback(
+    async (id: string) => {
+      const emUso = pagamentos.filter((p) => (p.empenhoIds ?? []).includes(id));
+      if (emUso.length > 0) {
+        throw new Error(
+          `Esta NE está vinculada a ${emUso.length} pagamento(s) e não pode ser excluída. ` +
+            'Remova o vínculo (ou arquive os pagamentos) antes.',
+        );
+      }
+      const db = requireDb();
+      const anterior = empenhos.find((e) => e.id === id);
+      await deleteDoc(doc(db, 'empenhos', id));
+      await registrarAuditoria('empenhos', id, 'DELETE', {}, anterior);
+    },
+    [empenhos, pagamentos, registrarAuditoria],
+  );
+
   // --- Notificações ---------------------------------------------------------
   const marcarNotificacaoLida = useCallback(async (id: string) => {
     const db = requireDb();
@@ -1792,6 +1833,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       irps,
       pagamentos,
       dotacoes,
+      empenhos,
       notificacoes,
       pushSubscriptions,
       logsAcesso,
@@ -1840,6 +1882,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addDotacao,
       updateDotacao,
       deleteDotacao,
+      addEmpenho,
+      updateEmpenho,
+      deleteEmpenho,
       marcarNotificacaoLida,
       excluirNotificacao,
       marcarTodasNotificacoesLidas,
@@ -1865,6 +1910,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       irps,
       pagamentos,
       dotacoes,
+      empenhos,
       notificacoes,
       pushSubscriptions,
       logsAcesso,
@@ -1912,6 +1958,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addDotacao,
       updateDotacao,
       deleteDotacao,
+      addEmpenho,
+      updateEmpenho,
+      deleteEmpenho,
       marcarNotificacaoLida,
       excluirNotificacao,
       marcarTodasNotificacoesLidas,

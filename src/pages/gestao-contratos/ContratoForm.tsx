@@ -1,8 +1,10 @@
+import { competenciaDoPagamento, descreverAndamento, statusDoPagamento, totalPagoDoContrato, valorDoPagamento } from '../../lib/financeiro';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, FileText, PlusCircle, Save, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Contrato, ItemContrato } from '../../types';
+import { STATUS_PAGAMENTO_LABELS } from '../../types';
 import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
 import { uploadArquivoContrato } from '../../lib/driveUploadService';
@@ -1184,25 +1186,34 @@ export default function ContratoForm() {
           {(() => {
             const pagamentosDoContrato = pagamentos
               .filter((p) => p.contratoId === contrato.id)
-              .sort((a, b) => new Date(b.dataPagamento).getTime() - new Date(a.dataPagamento).getTime());
-            const total = pagamentosDoContrato.reduce((acc, p) => acc + (p.valorPago || 0), 0);
+              .sort((x, y) => competenciaDoPagamento(y).localeCompare(competenciaDoPagamento(x)));
+            const totalPago = totalPagoDoContrato(contrato.id, pagamentos);
             if (pagamentosDoContrato.length === 0) {
               return <p className="text-sm text-gray-500">Nenhum pagamento lançado pra este contrato ainda.</p>;
             }
             return (
               <div className="space-y-2">
-                {pagamentosDoContrato.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between text-sm border-b border-gray-100 pb-2">
-                    <div>
-                      <span className="font-medium text-gray-900">{formatarMoeda(p.valorPago)}</span>
-                      <span className="text-gray-500 ml-2">
-                        Empenho {p.numeroEmpenho} · OP {p.numeroOrdemPagamento} · {new Date(p.dataPagamento).toLocaleDateString('pt-BR')}
-                      </span>
+                {pagamentosDoContrato.map((p) => {
+                  const status = statusDoPagamento(p);
+                  const competencia = competenciaDoPagamento(p);
+                  const numerosOb = (p.ordensBancarias ?? []).map((o) => o.numero);
+                  if (numerosOb.length === 0 && p.numeroOrdemPagamento) numerosOb.push(p.numeroOrdemPagamento);
+                  return (
+                    <div key={p.id} className={`flex items-center justify-between text-sm border-b border-gray-100 pb-2 ${status === 'arquivado' ? 'text-gray-400' : ''}`}>
+                      <div>
+                        <span className="font-medium">{formatarMoeda(valorDoPagamento(p))}</span>
+                        <span className="text-gray-500 ml-2">
+                          {competencia ? `${competencia.slice(5, 7)}/${competencia.slice(0, 4)}` : '-'}
+                          {p.paeFatura ? ` · PAE ${p.paeFatura}` : ''}
+                          {numerosOb.length > 0 ? ` · OB ${numerosOb.join(' / ')}` : ''}
+                          {' · '}{status === 'em_tramitacao' ? descreverAndamento(p) : STATUS_PAGAMENTO_LABELS[status]}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-400">{p.fonteRecurso}</span>
                     </div>
-                    <span className="text-xs text-gray-400">{p.fonteRecurso}</span>
-                  </div>
-                ))}
-                <p className="text-sm font-semibold text-gray-900 pt-1">Total pago: {formatarMoeda(total)}</p>
+                  );
+                })}
+                <p className="text-sm font-semibold text-gray-900 pt-1">Total pago: {formatarMoeda(totalPago)}</p>
               </div>
             );
           })()}

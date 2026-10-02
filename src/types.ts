@@ -613,6 +613,50 @@ export interface DotacaoOrcamentaria {
   descricao: string;
   fonteRecurso: string;
   valorDotado: number;
+  /** Funcional programática (ex.: 06.122.1297-8338) — cabeçalho da ficha de controle da Diretoria de Finanças. */
+  funcionalProgramatica?: string;
+  /** Projeto-Atividade ou Operações Especiais (ex.: Operacionalização das Ações Administrativas). */
+  projetoAtividade?: string;
+  /** Natureza da despesa (ex.: 339033). */
+  naturezaDespesa?: string;
+  /** Código da fonte (ex.: 01500.000001), distinto do nome em `fonteRecurso` (TESOURO, FEBOM...). */
+  fonteCodigo?: string;
+  detalhamento?: string;
+  planoInterno?: string;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+/**
+ * Nota de Empenho (NE) de um contrato num exercício. Contratos com despesa
+ * estimativa têm uma NE de **origem** (valor simbólico, em geral R$ 1,00) e,
+ * a cada fatura, uma NE de **reforço** que cobre o valor antes do
+ * pagamento. O saldo é sempre calculado (ver `saldoDoExercicio`,
+ * src/lib/financeiro.ts), nunca persistido.
+ */
+export type TipoEmpenho = 'origem' | 'reforco';
+
+export interface Empenho {
+  id: string;
+  contratoId: string;
+  exercicio: number;
+  tipo: TipoEmpenho;
+  /** Número da NE. */
+  numero: string;
+  /** Só no reforço: a NE de origem que ele reforça. */
+  neOrigemId?: string;
+  valor: number;
+  dotacaoId?: string;
+  /** Só na origem: despesa estimativa (valor mensal não fixo, sujeita a reforço). */
+  estimativo?: boolean;
+  /** Só na origem: PRD do exercício (ex.: "10/2026"), validade e valor total reservado. */
+  prd?: string;
+  prdValidade?: string;
+  prdValor?: number;
+  /** Só na origem: PAE (protocolo) do PRD/empenho. */
+  paeOrigem?: string;
+  data?: string;
+  observacao?: string;
   criado_em: string;
   atualizado_em: string;
 }
@@ -623,19 +667,74 @@ export interface DotacaoOrcamentaria {
  * (que já registra a NF/Fatura em si) com os dados de liquidação
  * financeira: empenho, ordem de pagamento e dotação orçamentária.
  */
+export type StatusPagamento = 'em_tramitacao' | 'pago' | 'arquivado';
+
+export const STATUS_PAGAMENTO_LABELS: Record<StatusPagamento, string> = {
+  em_tramitacao: 'Em tramitação',
+  pago: 'Pago',
+  arquivado: 'Arquivado',
+};
+
+/** Documento de cobrança de um pagamento (uma NF, fatura ou recibo). */
+export interface DocumentoPagamento {
+  tipo: 'NF' | 'Fatura' | 'Recibo' | 'Outro';
+  numero: string;
+  /** Pode faltar: algumas faturas só têm o valor em bloco, não por NF. */
+  valor?: number;
+  /** Execução (NF) já lançada pelo fiscal/gestão à qual este documento corresponde. */
+  execucaoId?: string;
+}
+
+/** Ordem Bancária (OB) de um pagamento — pode haver mais de uma (ex.: pagamento + retenção). */
+export interface OrdemBancaria {
+  numero: string;
+  valor?: number;
+  data?: string;
+}
+
+/** Cada passagem do pagamento por um setor/etapa (histórico do "status do processo"). */
+export interface AndamentoPagamento {
+  setor: string;
+  etapa: string;
+  data: string;
+  porNome: string;
+}
+
+/**
+ * Processo de pagamento de uma fatura (controle da Diretoria de Finanças):
+ * cada fatura vem num PAE novo (`paeFatura`), pode reunir várias NFs, é
+ * coberta por uma ou mais NEs (origem/reforço) e termina em uma ou mais
+ * OBs. Os campos `numeroEmpenho`, `numeroOrdemPagamento`, `valorPago` e
+ * `dataPagamento` são do modelo anterior e continuam lidos como legado.
+ */
 export interface PagamentoContrato {
   id: string;
   contratoId: string;
-  /** Execução (NF/Fatura/Recibo) já lançada em Gestão de Contratos à qual este pagamento se refere, se houver. */
-  execucaoId?: string;
-  numeroEmpenho: string;
-  numeroOrdemPagamento: string;
+  paeFatura?: string;
+  documentos?: DocumentoPagamento[];
+  /** Valor da fatura inteira (soma das NFs). */
+  valorTotal?: number;
+  empenhoIds?: string[];
+  ordensBancarias?: OrdemBancaria[];
   dotacaoId?: string;
   fonteRecurso: string;
-  valorPago: number;
-  dataPagamento: string;
+  /** Mês de competência, 'AAAA-MM' (a coluna MÊS da planilha de controle). */
+  competencia?: string;
+  setorAtual?: string;
+  etapa?: string;
+  /** Ausente nos registros do modelo anterior (lidos como 'pago'). */
+  status?: StatusPagamento;
+  autenticado?: boolean;
+  autenticadoPor?: string;
+  historico?: AndamentoPagamento[];
   observacao?: string;
   anexoLink?: string;
+  /** Legado (modelo anterior). */
+  execucaoId?: string;
+  numeroEmpenho?: string;
+  numeroOrdemPagamento?: string;
+  valorPago?: number;
+  dataPagamento?: string;
   criado_em: string;
   atualizado_em: string;
 }

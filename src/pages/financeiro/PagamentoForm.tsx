@@ -1,58 +1,194 @@
-import React, { useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, PlusCircle, Save, Trash2, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { OPCOES_FONTE_PROCESSO } from '../../lib/planilhaProcessos';
+import { formatarMoeda } from '../../lib/contratos';
+import {
+  ETAPAS_PAGAMENTO,
+  SETORES_PAGAMENTO,
+  diferencaDocumentos,
+  reforcoNecessario,
+  registrarAndamento,
+  saldoDoExercicio,
+  somaDocumentos,
+  statusDoPagamento,
+  valorDoPagamento,
+} from '../../lib/financeiro';
+import {
+  STATUS_PAGAMENTO_LABELS,
+  type DocumentoPagamento,
+  type OrdemBancaria,
+  type StatusPagamento,
+} from '../../types';
 
+const CLASSE_INPUT =
+  'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border';
+const CLASSE_INPUT_LINHA =
+  'block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-1.5 px-2 border';
+
+const mesAtual = () => new Date().toISOString().slice(0, 7);
 const paraDataInput = (isoOuVazio?: string) => (isoOuVazio ? isoOuVazio.split('T')[0] : '');
+const numeroOuVazio = (n?: number) => (n === undefined ? '' : String(n));
+const paraNumero = (texto: string) => (texto.trim() === '' ? undefined : Number(texto.replace(',', '.')));
 
+interface LinhaDocumento {
+  tipo: DocumentoPagamento['tipo'];
+  numero: string;
+  valor: string;
+  execucaoId: string;
+}
+interface LinhaOb {
+  numero: string;
+  valor: string;
+  data: string;
+}
+
+/**
+ * Processo de pagamento de uma fatura (controle da Diretoria de Finanças):
+ * PAE da fatura, NFs (ligadas às execuções que o fiscal já lançou), NEs de
+ * origem/reforço que cobrem o valor, OBs e o andamento (setor + etapa).
+ */
 export default function PagamentoForm() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  const { pagamentos, contratos, dotacoes, addPagamento, updatePagamento, deletePagamento, usuarioAtual } = useApp();
+  const {
+    pagamentos, contratos, dotacoes, empenhos, execucoes,
+    addPagamento, updatePagamento, deletePagamento, usuarioAtual,
+  } = useApp();
   const navigate = useNavigate();
 
   const emEdicao = !!id;
   const pagamento = id ? pagamentos.find((p) => p.id === id) : undefined;
 
   const [contratoId, setContratoId] = useState(pagamento?.contratoId ?? searchParams.get('contratoId') ?? '');
-  const [numeroEmpenho, setNumeroEmpenho] = useState(pagamento?.numeroEmpenho ?? '');
-  const [numeroOrdemPagamento, setNumeroOrdemPagamento] = useState(pagamento?.numeroOrdemPagamento ?? '');
-  const [dotacaoId, setDotacaoId] = useState(pagamento?.dotacaoId ?? '');
+  const [competencia, setCompetencia] = useState(
+    pagamento?.competencia ?? (pagamento?.dataPagamento ? pagamento.dataPagamento.slice(0, 7) : mesAtual()),
+  );
   const [fonteRecurso, setFonteRecurso] = useState(pagamento?.fonteRecurso ?? '');
-  const [valorPago, setValorPago] = useState(pagamento?.valorPago != null ? String(pagamento.valorPago) : '');
-  const hoje = new Date().toISOString().split('T')[0];
-  const [dataPagamento, setDataPagamento] = useState(paraDataInput(pagamento?.dataPagamento) || hoje);
+  const [dotacaoId, setDotacaoId] = useState(pagamento?.dotacaoId ?? '');
+  const [paeFatura, setPaeFatura] = useState(pagamento?.paeFatura ?? '');
+  const [documentos, setDocumentos] = useState<LinhaDocumento[]>(
+    (pagamento?.documentos ?? []).map((d) => ({
+      tipo: d.tipo,
+      numero: d.numero,
+      valor: numeroOuVazio(d.valor),
+      execucaoId: d.execucaoId ?? '',
+    })),
+  );
+  const [valorTotal, setValorTotal] = useState(pagamento ? numeroOuVazio(valorDoPagamento(pagamento)) : '');
+  const [empenhoIds, setEmpenhoIds] = useState<string[]>(pagamento?.empenhoIds ?? []);
+  const [ordens, setOrdens] = useState<LinhaOb[]>(
+    pagamento?.ordensBancarias?.map((o) => ({ numero: o.numero, valor: numeroOuVazio(o.valor), data: paraDataInput(o.data) })) ??
+      (pagamento?.numeroOrdemPagamento ? [{ numero: pagamento.numeroOrdemPagamento, valor: '', data: paraDataInput(pagamento.dataPagamento) }] : []),
+  );
+  const [setorAtual, setSetorAtual] = useState(pagamento?.setorAtual ?? '');
+  const [etapa, setEtapa] = useState(pagamento?.etapa ?? '');
+  const [status, setStatus] = useState<StatusPagamento>(pagamento ? statusDoPagamento(pagamento) : 'em_tramitacao');
+  const [autenticado, setAutenticado] = useState(pagamento?.autenticado ?? false);
+  const [autenticadoPor, setAutenticadoPor] = useState(pagamento?.autenticadoPor ?? '');
   const [observacao, setObservacao] = useState(pagamento?.observacao ?? '');
   const [anexoLink, setAnexoLink] = useState(pagamento?.anexoLink ?? '');
 
   const [salvando, setSalvando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
 
-  const contratosOrdenados = [...contratos].sort((a, b) => a.numero.localeCompare(b.numero));
+  const contratosOrdenados = useMemo(() => [...contratos].sort((a, b) => a.numero.localeCompare(b.numero)), [contratos]);
+  const exercicio = Number(competencia.slice(0, 4)) || new Date().getFullYear();
+
+  // NEs do contrato no exercício da fatura.
+  const empenhosDoContrato = empenhos.filter((e) => e.contratoId === contratoId && e.exercicio === exercicio);
+
+  // Execuções (NFs) do contrato que ainda não estão em outra fatura.
+  const execucoesDisponiveis = useMemo(() => {
+    const jaVinculadas = new Set(
+      pagamentos
+        .filter((p) => p.id !== id && statusDoPagamento(p) !== 'arquivado')
+        .flatMap((p) => (p.documentos ?? []).map((d) => d.execucaoId))
+        .filter(Boolean),
+    );
+    return execucoes.filter((e) => e.contratoId === contratoId && !jaVinculadas.has(e.id));
+  }, [execucoes, pagamentos, contratoId, id]);
+
+  const valorTotalNumero = paraNumero(valorTotal) ?? 0;
+  const documentosParaValidar = documentos.map((d) => ({ tipo: d.tipo, numero: d.numero, valor: paraNumero(d.valor) }));
+  const diferenca = diferencaDocumentos({ valorTotal: paraNumero(valorTotal), documentos: documentosParaValidar });
+  const somaNfs = somaDocumentos({ documentos: documentosParaValidar });
+
+  const saldoNe = useMemo(
+    () => saldoDoExercicio(contratoId, exercicio, empenhos, pagamentos.filter((p) => p.id !== id)),
+    [contratoId, exercicio, empenhos, pagamentos, id],
+  );
+  const faltaReforco = reforcoNecessario(valorTotalNumero, saldoNe.saldo);
+
+  const atualizarDocumento = (indice: number, mudanca: Partial<LinhaDocumento>) =>
+    setDocumentos((anterior) => anterior.map((d, i) => (i === indice ? { ...d, ...mudanca } : d)));
+
+  const vincularExecucao = (indice: number, execucaoId: string) => {
+    const execucao = execucoes.find((e) => e.id === execucaoId);
+    if (!execucao) return atualizarDocumento(indice, { execucaoId: '' });
+    atualizarDocumento(indice, { execucaoId, numero: execucao.nf, valor: String(execucao.valor), tipo: 'NF' });
+  };
+
+  const atualizarOb = (indice: number, mudanca: Partial<LinhaOb>) =>
+    setOrdens((anterior) => anterior.map((o, i) => (i === indice ? { ...o, ...mudanca } : o)));
+
+  const alternarEmpenho = (empenhoId: string) =>
+    setEmpenhoIds((anterior) => (anterior.includes(empenhoId) ? anterior.filter((e) => e !== empenhoId) : [...anterior, empenhoId]));
 
   const handleSalvar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contratoId || !numeroEmpenho || !numeroOrdemPagamento || !valorPago) return;
+    if (!contratoId || !competencia || valorTotal === '') return;
 
     setSalvando(true);
     try {
-      const dadosComuns = {
+      // Objetos aninhados não podem levar `undefined` (o Firestore recusa): só entram as chaves preenchidas.
+      const documentosLimpos: DocumentoPagamento[] = documentos
+        .filter((d) => d.numero.trim() !== '')
+        .map((d) => {
+          const valor = paraNumero(d.valor);
+          return {
+            tipo: d.tipo,
+            numero: d.numero.trim(),
+            ...(valor !== undefined ? { valor } : {}),
+            ...(d.execucaoId ? { execucaoId: d.execucaoId } : {}),
+          };
+        });
+      const ordensLimpas: OrdemBancaria[] = ordens
+        .filter((o) => o.numero.trim() !== '')
+        .map((o) => {
+          const valor = paraNumero(o.valor);
+          return {
+            numero: o.numero.trim(),
+            ...(valor !== undefined ? { valor } : {}),
+            ...(o.data ? { data: new Date(o.data).toISOString() } : {}),
+          };
+        });
+
+      const dados = {
         contratoId,
-        numeroEmpenho,
-        numeroOrdemPagamento,
-        dotacaoId: dotacaoId || undefined,
+        paeFatura,
+        documentos: documentosLimpos,
+        valorTotal: valorTotalNumero,
+        empenhoIds,
+        ordensBancarias: ordensLimpas,
+        dotacaoId,
         fonteRecurso,
-        valorPago: Number(valorPago.replace(',', '.')),
-        dataPagamento: new Date(dataPagamento).toISOString(),
+        competencia,
+        setorAtual,
+        etapa,
+        status,
+        autenticado,
+        autenticadoPor,
+        historico: registrarAndamento(pagamento, { setorAtual, etapa }, usuarioAtual?.nome ?? ''),
         observacao,
         anexoLink,
       };
 
       if (emEdicao && id) {
-        await updatePagamento(id, dadosComuns);
+        await updatePagamento(id, dados);
       } else {
-        await addPagamento(dadosComuns);
+        await addPagamento(dados);
       }
 
       navigate('/sistema/financeiro');
@@ -65,7 +201,7 @@ export default function PagamentoForm() {
 
   const handleExcluir = async () => {
     if (!id) return;
-    if (!window.confirm('Excluir este pagamento? Esta ação não pode ser desfeita.')) return;
+    if (!window.confirm('Excluir este pagamento? Prefira marcá-lo como "Arquivado" — o arquivado não entra nas somas e fica no histórico.')) return;
     setExcluindo(true);
     try {
       await deletePagamento(id);
@@ -90,7 +226,7 @@ export default function PagamentoForm() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
         <button
           onClick={() => navigate(-1)}
@@ -100,9 +236,11 @@ export default function PagamentoForm() {
         </button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">
-            {emEdicao ? 'Editar Pagamento' : 'Novo Pagamento'}
+            {emEdicao ? 'Editar Pagamento' : 'Novo Pagamento (Fatura)'}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">Lançamento financeiro vinculado a um contrato.</p>
+          <p className="mt-1 text-sm text-gray-500">
+            Processo de pagamento de uma fatura: PAE, NFs, NEs, OBs e andamento.
+          </p>
         </div>
         {emEdicao && (
           <button
@@ -117,158 +255,253 @@ export default function PagamentoForm() {
         )}
       </div>
 
-      <div className="bg-white shadow-sm rounded-lg border border-gray-200">
-        <form onSubmit={handleSalvar} className="p-6 space-y-6">
+      <form onSubmit={handleSalvar} className="space-y-6">
+        <section className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Contrato e fatura</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label htmlFor="contratoId" className="block text-sm font-medium text-gray-700">
                 Contrato <span className="text-red-500">*</span>
               </label>
-              <select
-                id="contratoId"
-                required
-                value={contratoId}
-                onChange={(e) => setContratoId(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
-              >
+              <select id="contratoId" required value={contratoId} onChange={(e) => setContratoId(e.target.value)} className={`${CLASSE_INPUT} bg-white`}>
                 <option value="">Selecione o contrato...</option>
                 {contratosOrdenados.map((c) => (
                   <option key={c.id} value={c.id}>{c.numero} — {c.empresa}</option>
                 ))}
               </select>
             </div>
-
             <div>
-              <label htmlFor="numeroEmpenho" className="block text-sm font-medium text-gray-700">
-                Nº do Empenho <span className="text-red-500">*</span>
+              <label htmlFor="paeFatura" className="block text-sm font-medium text-gray-700">PAE (protocolo) da fatura</label>
+              <input type="text" id="paeFatura" value={paeFatura} onChange={(e) => setPaeFatura(e.target.value)} className={CLASSE_INPUT} placeholder="Ex.: 2026/2328415" />
+            </div>
+            <div>
+              <label htmlFor="competencia" className="block text-sm font-medium text-gray-700">
+                Mês <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                id="numeroEmpenho"
-                required
-                value={numeroEmpenho}
-                onChange={(e) => setNumeroEmpenho(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
-              />
+              <input type="month" id="competencia" required value={competencia} onChange={(e) => setCompetencia(e.target.value)} className={CLASSE_INPUT} />
             </div>
-
-            <div>
-              <label htmlFor="numeroOrdemPagamento" className="block text-sm font-medium text-gray-700">
-                Nº da Ordem de Pagamento <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="numeroOrdemPagamento"
-                required
-                value={numeroOrdemPagamento}
-                onChange={(e) => setNumeroOrdemPagamento(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="dotacaoId" className="block text-sm font-medium text-gray-700">Dotação Orçamentária</label>
-              <select
-                id="dotacaoId"
-                value={dotacaoId}
-                onChange={(e) => setDotacaoId(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
-              >
-                <option value="">Nenhuma</option>
-                {dotacoes.map((d) => (
-                  <option key={d.id} value={d.id}>{d.codigo} — {d.descricao} ({d.exercicio})</option>
-                ))}
-              </select>
-            </div>
-
             <div>
               <label htmlFor="fonteRecurso" className="block text-sm font-medium text-gray-700">Fonte do Recurso</label>
-              <select
-                id="fonteRecurso"
-                value={fonteRecurso}
-                onChange={(e) => setFonteRecurso(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
-              >
+              <select id="fonteRecurso" value={fonteRecurso} onChange={(e) => setFonteRecurso(e.target.value)} className={`${CLASSE_INPUT} bg-white`}>
                 <option value="">Selecione...</option>
                 {OPCOES_FONTE_PROCESSO.map((opcao) => (
                   <option key={opcao} value={opcao}>{opcao}</option>
                 ))}
               </select>
             </div>
-
             <div>
-              <label htmlFor="valorPago" className="block text-sm font-medium text-gray-700">
-                Valor Pago (R$) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                id="valorPago"
-                required
-                step="0.01"
-                min="0"
-                value={valorPago}
-                onChange={(e) => setValorPago(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="dataPagamento" className="block text-sm font-medium text-gray-700">
-                Data do Pagamento <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                id="dataPagamento"
-                required
-                value={dataPagamento}
-                onChange={(e) => setDataPagamento(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="anexoLink" className="block text-sm font-medium text-gray-700">Comprovante (link)</label>
-              <input
-                type="text"
-                id="anexoLink"
-                value={anexoLink}
-                onChange={(e) => setAnexoLink(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
-                placeholder="https://..."
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label htmlFor="observacao" className="block text-sm font-medium text-gray-700">Observação</label>
-              <textarea
-                id="observacao"
-                rows={3}
-                value={observacao}
-                onChange={(e) => setObservacao(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
-              />
+              <label htmlFor="dotacaoId" className="block text-sm font-medium text-gray-700">Dotação (ficha orçamentária)</label>
+              <select id="dotacaoId" value={dotacaoId} onChange={(e) => setDotacaoId(e.target.value)} className={`${CLASSE_INPUT} bg-white`}>
+                <option value="">Nenhuma</option>
+                {dotacoes.map((d) => (
+                  <option key={d.id} value={d.id}>{d.codigo} — {d.descricao} ({d.exercicio})</option>
+                ))}
+              </select>
             </div>
           </div>
+        </section>
 
-          <div className="pt-4 border-t border-gray-200 flex justify-end space-x-3">
+        <section className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900">Documentos de cobrança (NFs)</h2>
             <button
               type="button"
-              onClick={() => navigate(-1)}
-              className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              onClick={() => setDocumentos((anterior) => [...anterior, { tipo: 'NF', numero: '', valor: '', execucaoId: '' }])}
+              className="inline-flex items-center text-sm font-medium text-red-700 hover:underline"
             >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={salvando}
-              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
-              <Save className="-ml-1 mr-2 h-5 w-5" />
-              {salvando ? 'Salvando...' : emEdicao ? 'Salvar Alterações' : 'Salvar Pagamento'}
+              <PlusCircle className="h-4 w-4 mr-1" /> Adicionar NF
             </button>
           </div>
-        </form>
-      </div>
+          {documentos.length === 0 && (
+            <p className="text-sm text-gray-500">Nenhuma NF informada. Uma fatura pode reunir várias NFs sob o mesmo PAE.</p>
+          )}
+          <div className="space-y-3">
+            {documentos.map((d, i) => (
+              <div key={i} className="grid grid-cols-12 gap-2 items-start">
+                <select value={d.tipo} onChange={(e) => atualizarDocumento(i, { tipo: e.target.value as DocumentoPagamento['tipo'] })} className={`${CLASSE_INPUT_LINHA} bg-white col-span-6 md:col-span-2`} aria-label="Tipo do documento">
+                  {(['NF', 'Fatura', 'Recibo', 'Outro'] as const).map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <input type="text" value={d.numero} onChange={(e) => atualizarDocumento(i, { numero: e.target.value })} className={`${CLASSE_INPUT_LINHA} col-span-6 md:col-span-3`} placeholder="Nº" aria-label="Número do documento" />
+                <input type="number" step="0.01" min="0" value={d.valor} onChange={(e) => atualizarDocumento(i, { valor: e.target.value })} className={`${CLASSE_INPUT_LINHA} col-span-6 md:col-span-2`} placeholder="Valor (R$)" aria-label="Valor do documento" />
+                <select value={d.execucaoId} onChange={(e) => vincularExecucao(i, e.target.value)} className={`${CLASSE_INPUT_LINHA} bg-white col-span-5 md:col-span-4`} aria-label="Execução lançada pelo fiscal">
+                  <option value="">Sem vínculo com execução</option>
+                  {execucoes.filter((x) => x.id === d.execucaoId).map((x) => (
+                    <option key={x.id} value={x.id}>NF {x.nf} — {formatarMoeda(x.valor)}</option>
+                  ))}
+                  {execucoesDisponiveis.filter((x) => x.id !== d.execucaoId).map((x) => (
+                    <option key={x.id} value={x.id}>NF {x.nf} — {formatarMoeda(x.valor)}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => setDocumentos((anterior) => anterior.filter((_, idx) => idx !== i))} className="col-span-1 p-1.5 text-gray-400 hover:text-red-600" title="Remover">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+          {contratoId && (
+            <p className="mt-3 text-xs text-gray-500">
+              {execucoesDisponiveis.length} NF(s) lançada(s) pelo fiscal neste contrato ainda sem pagamento — escolha na lista para preencher número e valor.
+            </p>
+          )}
+
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="valorTotal" className="block text-sm font-medium text-gray-700">
+                Valor da fatura (R$) <span className="text-red-500">*</span>
+              </label>
+              <input type="number" id="valorTotal" required step="0.01" min="0" value={valorTotal} onChange={(e) => setValorTotal(e.target.value)} className={CLASSE_INPUT} />
+              {documentos.length > 0 && somaNfs > 0 && (
+                <button type="button" onClick={() => setValorTotal(String(Math.round(somaNfs * 100) / 100))} className="mt-1 text-xs text-red-700 hover:underline">
+                  Usar a soma das NFs ({formatarMoeda(somaNfs)})
+                </button>
+              )}
+            </div>
+            {diferenca !== null && diferenca !== 0 && (
+              <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 self-start">
+                O valor da fatura difere da soma das NFs em <strong>{formatarMoeda(Math.abs(diferenca))}</strong>{' '}
+                ({diferenca > 0 ? 'fatura maior' : 'NFs somam mais'}). Confira antes de salvar.
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900">Notas de Empenho (NE) que cobrem a fatura</h2>
+            {contratoId && (
+              <Link
+                to={`/sistema/financeiro/empenhos/novo?contratoId=${contratoId}`}
+                target="_blank"
+                className="text-sm font-medium text-red-700 hover:underline"
+              >
+                Cadastrar NE (nova aba)
+              </Link>
+            )}
+          </div>
+          {!contratoId ? (
+            <p className="text-sm text-gray-500">Selecione o contrato para ver as NEs do exercício {exercicio}.</p>
+          ) : empenhosDoContrato.length === 0 ? (
+            <p className="text-sm text-gray-500">Nenhuma NE cadastrada para este contrato em {exercicio}.</p>
+          ) : (
+            <div className="space-y-2">
+              {empenhosDoContrato.map((emp) => (
+                <label key={emp.id} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input type="checkbox" checked={empenhoIds.includes(emp.id)} onChange={() => alternarEmpenho(emp.id)} className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded cursor-pointer" />
+                  NE {emp.numero} — {emp.tipo === 'origem' ? 'origem' : 'reforço'} — {formatarMoeda(emp.valor)}
+                </label>
+              ))}
+              <div className="mt-3 rounded-md bg-gray-50 border border-gray-200 p-3 text-sm text-gray-700 space-y-1">
+                <p>Empenhado no exercício (origem + reforços): <strong>{formatarMoeda(saldoNe.empenhado)}</strong></p>
+                <p>Já comprometido por outras faturas: <strong>{formatarMoeda(saldoNe.comprometido)}</strong></p>
+                <p>Saldo de NE: <strong className={saldoNe.saldo < 0 ? 'text-red-700' : ''}>{formatarMoeda(saldoNe.saldo)}</strong></p>
+                {valorTotalNumero > 0 && (
+                  faltaReforco > 0 ? (
+                    <p className="text-amber-800">Para cobrir esta fatura falta reforçar <strong>{formatarMoeda(faltaReforco)}</strong>.</p>
+                  ) : (
+                    <p className="text-emerald-700">O saldo de NE cobre esta fatura.</p>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900">Ordens Bancárias (OB)</h2>
+            <button type="button" onClick={() => setOrdens((anterior) => [...anterior, { numero: '', valor: '', data: '' }])} className="inline-flex items-center text-sm font-medium text-red-700 hover:underline">
+              <PlusCircle className="h-4 w-4 mr-1" /> Adicionar OB
+            </button>
+          </div>
+          {ordens.length === 0 && <p className="text-sm text-gray-500">Nenhuma OB ainda (o pagamento só tem OB depois da assinatura).</p>}
+          <div className="space-y-3">
+            {ordens.map((o, i) => (
+              <div key={i} className="grid grid-cols-12 gap-2 items-start">
+                <input type="text" value={o.numero} onChange={(e) => atualizarOb(i, { numero: e.target.value })} className={`${CLASSE_INPUT_LINHA} col-span-12 md:col-span-4`} placeholder="Nº da OB" aria-label="Número da OB" />
+                <input type="number" step="0.01" min="0" value={o.valor} onChange={(e) => atualizarOb(i, { valor: e.target.value })} className={`${CLASSE_INPUT_LINHA} col-span-5 md:col-span-3`} placeholder="Valor (R$)" aria-label="Valor da OB" />
+                <input type="date" value={o.data} onChange={(e) => atualizarOb(i, { data: e.target.value })} className={`${CLASSE_INPUT_LINHA} col-span-6 md:col-span-4`} aria-label="Data da OB" />
+                <button type="button" onClick={() => setOrdens((anterior) => anterior.filter((_, idx) => idx !== i))} className="col-span-1 p-1.5 text-gray-400 hover:text-red-600" title="Remover">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Andamento</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label htmlFor="setorAtual" className="block text-sm font-medium text-gray-700">Setor atual</label>
+              <input type="text" id="setorAtual" list="setores-pagamento" value={setorAtual} onChange={(e) => setSetorAtual(e.target.value)} className={CLASSE_INPUT} placeholder="Ex.: GAB" />
+              <datalist id="setores-pagamento">
+                {SETORES_PAGAMENTO.map((s) => <option key={s} value={s} />)}
+              </datalist>
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="etapa" className="block text-sm font-medium text-gray-700">Etapa / o que falta</label>
+              <input type="text" id="etapa" list="etapas-pagamento" value={etapa} onChange={(e) => setEtapa(e.target.value)} className={CLASSE_INPUT} placeholder="Ex.: P/ ASS DE NE + OB" />
+              <datalist id="etapas-pagamento">
+                {ETAPAS_PAGAMENTO.map((x) => <option key={x} value={x} />)}
+              </datalist>
+            </div>
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700">Situação</label>
+              <select id="status" value={status} onChange={(e) => setStatus(e.target.value as StatusPagamento)} className={`${CLASSE_INPUT} bg-white`}>
+                {(Object.keys(STATUS_PAGAMENTO_LABELS) as StatusPagamento[]).map((s) => (
+                  <option key={s} value={s}>{STATUS_PAGAMENTO_LABELS[s]}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">Arquivado não entra em nenhuma soma.</p>
+            </div>
+            <div className="flex items-center md:pt-6">
+              <input id="autenticado" type="checkbox" checked={autenticado} onChange={(e) => setAutenticado(e.target.checked)} className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded cursor-pointer" />
+              <label htmlFor="autenticado" className="ml-2 block text-sm text-gray-700 cursor-pointer">Autenticação</label>
+            </div>
+            <div>
+              <label htmlFor="autenticadoPor" className="block text-sm font-medium text-gray-700">Autenticado por</label>
+              <input type="text" id="autenticadoPor" value={autenticadoPor} onChange={(e) => setAutenticadoPor(e.target.value)} className={CLASSE_INPUT} placeholder="Ex.: DTIC" />
+            </div>
+          </div>
+
+          {(pagamento?.historico ?? []).length > 0 && (
+            <div className="mt-5">
+              <p className="text-xs font-medium text-gray-500 uppercase mb-2">Histórico</p>
+              <ul className="text-sm text-gray-700 space-y-1">
+                {[...(pagamento?.historico ?? [])].reverse().map((h, i) => (
+                  <li key={i}>
+                    {new Date(h.data).toLocaleDateString('pt-BR')} — {[h.setor, h.etapa].filter(Boolean).join(' - ')}
+                    {h.porNome ? <span className="text-gray-400"> ({h.porNome})</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+
+        <section className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="anexoLink" className="block text-sm font-medium text-gray-700">Comprovante (link)</label>
+              <input type="text" id="anexoLink" value={anexoLink} onChange={(e) => setAnexoLink(e.target.value)} className={CLASSE_INPUT} placeholder="https://..." />
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="observacao" className="block text-sm font-medium text-gray-700">Observações</label>
+              <textarea id="observacao" rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} className={CLASSE_INPUT} />
+            </div>
+          </div>
+        </section>
+
+        <div className="flex justify-end space-x-3">
+          <button type="button" onClick={() => navigate(-1)} className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button type="submit" disabled={salvando} className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed">
+            <Save className="-ml-1 mr-2 h-5 w-5" />
+            {salvando ? 'Salvando...' : emEdicao ? 'Salvar Alterações' : 'Salvar Pagamento'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
