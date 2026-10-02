@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw } from 'lucide-react';
+import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import IntegracaoPCA from './IntegracaoPCA';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS, type StatusProcesso } from '../types';
@@ -47,6 +47,10 @@ export default function Aquisicoes() {
   const setFiltroFonte = (v: string) => definirParam('fonte', v, '');
   const filtroPrevisaoPca = (searchParams.get('pca') as FiltroPrevisaoPca) || 'todos';
   const setFiltroPrevisaoPca = (v: FiltroPrevisaoPca) => definirParam('pca', v, 'todos');
+  // Ordenação por status: 'asc' (A→Z), 'desc' (Z→A) ou vazio (ordem original da lista).
+  const ordemStatus = (searchParams.get('ordem') as 'asc' | 'desc' | null) ?? '';
+  const alternarOrdemStatus = () =>
+    definirParam('ordem', ordemStatus === '' ? 'asc' : ordemStatus === 'asc' ? 'desc' : '', '');
   const filtroStatus = (searchParams.get('status') ?? '') as StatusProcesso | '';
   const setFiltroStatus = (v: StatusProcesso | '') => definirParam('status', v, '');
   const filtroDemandante = searchParams.get('demandante') ?? '';
@@ -73,7 +77,7 @@ export default function Aquisicoes() {
     filtroRito, filtroNatureza, filtroSetorAtual, filtroFonte, filtroDemandante, filtroStatus,
   ].filter(Boolean).length + (filtroPrevisaoPca !== 'todos' ? 1 : 0);
 
-  const filtrados = processos.filter(p => {
+  const filtradosSemOrdem = processos.filter(p => {
     const setorAtualEfetivo = p.localizacao_atual || setores.find(s => s.id === p.fase_atual_id)?.sigla || '';
     const buscaNormalizada = busca.toLowerCase();
     const matchBusca =
@@ -105,6 +109,15 @@ export default function Aquisicoes() {
     return false;
   });
   
+  // Pelo rótulo exibido (A→Z), não pelo código interno; a ordenação do JS é
+  // estável, então processos do mesmo status mantêm a ordem original entre si.
+  const filtrados = ordemStatus
+    ? [...filtradosSemOrdem].sort((a, b) => {
+        const comparacao = STATUS_LABELS[a.status].localeCompare(STATUS_LABELS[b.status], 'pt-BR');
+        return ordemStatus === 'asc' ? comparacao : -comparacao;
+      })
+    : filtradosSemOrdem;
+
   const contagemTempo = processos.reduce(
     (acc, proc) => {
       const dias = proc.ultima_tramitacao ? Math.max(0, differenceInDays(hoje, new Date(proc.ultima_tramitacao))) : 0;
@@ -384,8 +397,32 @@ export default function Aquisicoes() {
                     <th scope="col" className="w-[8%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Dias no Setor
                     </th>
-                    <th scope="col" className="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                    <th
+                      scope="col"
+                      aria-sort={ordemStatus === 'asc' ? 'ascending' : ordemStatus === 'desc' ? 'descending' : 'none'}
+                      className="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      <button
+                        type="button"
+                        onClick={alternarOrdemStatus}
+                        title={
+                          ordemStatus === ''
+                            ? 'Ordenar por status (A→Z)'
+                            : ordemStatus === 'asc'
+                              ? 'Ordenado A→Z — clique para Z→A'
+                              : 'Ordenado Z→A — clique para remover a ordenação'
+                        }
+                        className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-gray-900 ${ordemStatus ? 'text-red-700' : ''}`}
+                      >
+                        Status
+                        {ordemStatus === 'asc' ? (
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        ) : ordemStatus === 'desc' ? (
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
+                        )}
+                      </button>
                     </th>
                   </tr>
                 </thead>
