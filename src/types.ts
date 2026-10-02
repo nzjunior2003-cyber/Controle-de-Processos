@@ -329,7 +329,7 @@ export interface Contrato {
   valorGlobal: number;
   /** Saldo financeiro de referência no cadastro (preenchido pelo Gestor). */
   saldoInicialFinanceiro: number;
-  /** Saldo financeiro corrente, decrementado a cada execução (NF) lançada. */
+  /** Saldo financeiro corrente, decrementado quando o Financeiro registra o pagamento da fatura/NF (contratos antigos: a cada NF lançada). */
   saldoAtualFinanceiro: number;
   /** Saldo em quantidade de referência, para contratos com controle por quantitativo. */
   saldoInicialQuantitativo?: number;
@@ -729,6 +729,12 @@ export interface PagamentoContrato {
   historico?: AndamentoPagamento[];
   observacao?: string;
   anexoLink?: string;
+  /**
+   * Quanto este pagamento já abateu do saldo financeiro do contrato — o saldo
+   * só cai quando o Financeiro marca a fatura como paga. Guardado pra poder
+   * reverter/ajustar sem recalcular tudo.
+   */
+  valorAbatidoSaldo?: number;
   /** Legado (modelo anterior). */
   execucaoId?: string;
   numeroEmpenho?: string;

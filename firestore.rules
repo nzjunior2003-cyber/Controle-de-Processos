@@ -120,6 +120,12 @@ service cloud.firestore {
           || resource.data.fiscalSuplenteEmail == request.auth.token.email)
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['saldoAtualFinanceiro', 'saldoAtualQuantitativo', 'atualizado_em']);
+      // O Financeiro abate (ou devolve) o saldo financeiro do contrato ao
+      // registrar o pagamento da fatura — só esse campo, nunca os demais.
+      allow update: if ativo()
+        && perfilDoc().perfil == 'financeiro'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['saldoAtualFinanceiro', 'atualizado_em']);
     }
     match /execucoes/{documento} {
       allow read: if ativo();

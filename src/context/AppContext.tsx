@@ -103,6 +103,7 @@ import {
   PushSubscriptionRegistro,
   TipoEventoNotificacao,
 } from '../types';
+import { valorASerAbatido, valorJaAbatido } from '../lib/financeiro';
 
 const URL_PLANILHA_PCA =
   'https://docs.google.com/spreadsheets/d/1-XrRG5oLqrcMPLNHePm3KS4671vCp1r0/gviz/tq?tqx=out:csv&sheet=GERAL%20PCA';
@@ -1402,7 +1403,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Contrato não encontrado.');
       }
       const contrato = contratoSnap.data() as Contrato;
-      const saldo = abaterSaldo(contrato, dados);
+      // O valor só sai do saldo quando o Financeiro registra o pagamento;
+      // aqui abate apenas a quantidade (a NF fica "a pagar").
+      const saldo = abaterSaldo(contrato, dados, { financeiro: false });
       const itensAtualizados = abaterItens(contrato.itens, dados.itensConsumidos);
 
       if (saldo.saldoAtualFinanceiro < 0) {
@@ -1416,7 +1419,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         );
       }
 
-      transacao.set(execucaoRef, { ...dados, criado_em: agora });
+      transacao.set(execucaoRef, { ...dados, saldoFinanceiroAbatido: false, criado_em: agora });
       transacao.update(contratoRef, {
         ...saldo,
         ...(itensAtualizados ? { itens: itensAtualizados } : {}),
@@ -1431,6 +1434,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   /** Remove uma execução e devolve valor/quantidade ao saldo atual do contrato. */
   const deleteExecucao = useCallback(async (id: string, contratoId: string) => {
+    if (pagamentos.some((p) => (p.documentos ?? []).some((d) => d.execucaoId === id))) {
+      throw new Error('Esta NF está ligada a um pagamento do Financeiro. Remova-a do pagamento antes de excluí-la.');
+    }
     const db = requireDb();
     const contratoRef = doc(db, 'contratos', contratoId);
     const execucaoRef = doc(db, 'execucoes', id);
@@ -1445,7 +1451,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
       const contrato = contratoSnap.data() as Contrato;
       const execucao = execucaoSnap.data() as ExecucaoContrato;
-      const novoSaldo = devolverSaldo(contrato, execucao);
+      const novoSaldo = devolverSaldo(contrato, execucao, {
+        financeiro: execucao.saldoFinanceiroAbatido !== false,
+      });
       const itensRevertidos = devolverItens(contrato.itens, execucao.itensConsumidos);
 
       transacao.delete(execucaoRef);
@@ -1458,7 +1466,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
 
     await registrarAuditoria('execucoes', id, 'DELETE', {}, execucaoRemovida);
-  }, [registrarAuditoria]);
+  }, [registrarAuditoria, pagamentos]);
 
   /**
    * Registra uma ocorrência sobre um contrato: um apontamento (atraso na
@@ -1659,30 +1667,97 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [pcas, registrarAuditoria],
   );
 
+  /**
+   * Grava o pagamento e ajusta o saldo financeiro do contrato numa única
+   * transação: o saldo só cai quando a fatura está **paga**, e volta se ela
+   * for revertida, arquivada ou excluída. `valorAbatidoSaldo` guarda quanto
+   * já foi abatido, então reeditar nunca abate duas vezes.
+   */
+  const gravarPagamentoComSaldo = useCallback(
+    async (id: string | null, dados: Partial<PagamentoContrato>, anterior?: PagamentoContrato) => {
+      const db = requireDb();
+      const agora = new Date().toISOString();
+      const pagamentoRef = id ? doc(db, 'pagamentos', id) : doc(collection(db, 'pagamentos'));
+      const resultado: PagamentoContrato = {
+        ...(anterior ?? ({} as PagamentoContrato)),
+        ...dados,
+      };
+      const contratoNovo = resultado.contratoId;
+      const contratoAnterior = anterior?.contratoId;
+      const desejado = valorASerAbatido(resultado, execucoes);
+      const jaAbatido = anterior ? valorJaAbatido(anterior, execucoes) : 0;
+
+      await runTransaction(db, async (transacao) => {
+        const idsContratos = Array.from(new Set([contratoNovo, contratoAnterior].filter(Boolean))) as string[];
+        const snaps = new Map(
+          await Promise.all(
+            idsContratos.map(async (cid) => [cid, await transacao.get(doc(db, 'contratos', cid))] as const),
+          ),
+        );
+        const ajustes = new Map<string, number>();
+        if (contratoAnterior && contratoAnterior !== contratoNovo) {
+          ajustes.set(contratoAnterior, jaAbatido); // devolve ao contrato antigo
+          ajustes.set(contratoNovo, -desejado);
+        } else {
+          ajustes.set(contratoNovo, jaAbatido - desejado);
+        }
+        for (const [cid, delta] of ajustes) {
+          const snap = snaps.get(cid);
+          if (!delta || !snap?.exists()) continue;
+          const saldoAtual = (snap.data() as Contrato).saldoAtualFinanceiro ?? 0;
+          transacao.update(doc(db, 'contratos', cid), {
+            saldoAtualFinanceiro: saldoAtual + delta,
+            atualizado_em: agora,
+          });
+        }
+        const campos = Object.fromEntries(
+          Object.entries({ ...dados, valorAbatidoSaldo: desejado, atualizado_em: agora }).filter(
+            ([, valor]) => valor !== undefined,
+          ),
+        );
+        if (id) transacao.update(pagamentoRef, campos);
+        else transacao.set(pagamentoRef, { ...campos, criado_em: agora });
+      });
+      return pagamentoRef.id;
+    },
+    [execucoes],
+  );
+
   const addPagamento = useCallback(
     async (dados: Omit<PagamentoContrato, 'id' | 'criado_em' | 'atualizado_em'>) => {
-      const id = await criarEm('pagamentos', dados);
+      const id = await gravarPagamentoComSaldo(null, dados);
       await registrarAuditoria('pagamentos', id, 'CREATE', dados);
       return id;
     },
-    [criarEm, registrarAuditoria],
+    [gravarPagamentoComSaldo, registrarAuditoria],
   );
   const updatePagamento = useCallback(
     async (id: string, dados: Partial<PagamentoContrato>) => {
       const anterior = pagamentos.find((p) => p.id === id);
-      await atualizarEm('pagamentos', id, dados);
+      await gravarPagamentoComSaldo(id, dados, anterior);
       await registrarAuditoria('pagamentos', id, 'UPDATE', dados, anterior);
     },
-    [atualizarEm, registrarAuditoria, pagamentos],
+    [gravarPagamentoComSaldo, registrarAuditoria, pagamentos],
   );
   const deletePagamento = useCallback(
     async (id: string) => {
       const db = requireDb();
       const anterior = pagamentos.find((p) => p.id === id);
-      await deleteDoc(doc(db, 'pagamentos', id));
+      const devolver = anterior ? valorJaAbatido(anterior, execucoes) : 0;
+      await runTransaction(db, async (transacao) => {
+        const contratoRef = anterior ? doc(db, 'contratos', anterior.contratoId) : null;
+        const contratoSnap = contratoRef ? await transacao.get(contratoRef) : null;
+        if (contratoRef && contratoSnap?.exists() && devolver) {
+          transacao.update(contratoRef, {
+            saldoAtualFinanceiro: ((contratoSnap.data() as Contrato).saldoAtualFinanceiro ?? 0) + devolver,
+            atualizado_em: new Date().toISOString(),
+          });
+        }
+        transacao.delete(doc(db, 'pagamentos', id));
+      });
       await registrarAuditoria('pagamentos', id, 'DELETE', {}, anterior);
     },
-    [pagamentos, registrarAuditoria],
+    [pagamentos, execucoes, registrarAuditoria],
   );
 
   const addDotacao = useCallback(

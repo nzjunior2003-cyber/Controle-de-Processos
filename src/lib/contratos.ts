@@ -235,6 +235,12 @@ export interface ExecucaoContrato {
   observacao?: string;
   arquivoLink?: string | null;
   criado_em?: string;
+  /**
+   * `false` nas NFs lançadas depois que o saldo financeiro passou a cair só
+   * com o pagamento (a NF fica "a pagar"). Ausente/`true` = NF antiga, que já
+   * abateu o saldo ao ser lançada.
+   */
+  saldoFinanceiroAbatido?: boolean;
 }
 
 export interface SaldoContrato {
@@ -242,14 +248,20 @@ export interface SaldoContrato {
   saldoAtualQuantitativo?: number;
 }
 
-/** Abate valor (e quantidade, quando controlada) de uma execução (NF) lançada do saldo atual do contrato. */
+/**
+ * Abate valor (e quantidade, quando controlada) de uma execução (NF) lançada
+ * do saldo atual do contrato. Com `financeiro: false` só a quantidade é
+ * abatida — o valor cai depois, quando o Financeiro registra o pagamento.
+ */
 export function abaterSaldo(
   saldo: SaldoContrato,
   execucao: Pick<ExecucaoContrato, 'valor' | 'quantidade'>,
+  opcoes: { financeiro?: boolean } = {},
 ): SaldoContrato {
   const controlaQuantidade = typeof saldo.saldoAtualQuantitativo === 'number';
+  const abaterValor = opcoes.financeiro ?? true;
   return {
-    saldoAtualFinanceiro: (saldo.saldoAtualFinanceiro ?? 0) - (execucao.valor || 0),
+    saldoAtualFinanceiro: (saldo.saldoAtualFinanceiro ?? 0) - (abaterValor ? execucao.valor || 0 : 0),
     ...(controlaQuantidade
       ? {
           saldoAtualQuantitativo:
@@ -263,10 +275,12 @@ export function abaterSaldo(
 export function devolverSaldo(
   saldo: SaldoContrato,
   execucao: Pick<ExecucaoContrato, 'valor' | 'quantidade'>,
+  opcoes: { financeiro?: boolean } = {},
 ): SaldoContrato {
   const controlaQuantidade = typeof saldo.saldoAtualQuantitativo === 'number';
+  const devolverValor = opcoes.financeiro ?? true;
   return {
-    saldoAtualFinanceiro: (saldo.saldoAtualFinanceiro ?? 0) + (execucao.valor || 0),
+    saldoAtualFinanceiro: (saldo.saldoAtualFinanceiro ?? 0) + (devolverValor ? execucao.valor || 0 : 0),
     ...(controlaQuantidade
       ? {
           saldoAtualQuantitativo:

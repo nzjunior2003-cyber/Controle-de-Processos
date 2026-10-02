@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ArrowLeft, FileText, PlusCircle, Trash2, Upload, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { useApp } from '../../context/AppContext';
+import { valorAPagarDoContrato } from '../../lib/financeiro';
 import { uploadArquivoContrato } from '../../lib/driveUploadService';
 import {
   formatarMoeda,
@@ -160,7 +162,9 @@ export default function ExecucaoModal({
     setLinhasItensAditivo((anterior) => anterior.filter((_, i) => i !== indice));
   };
 
+  const { pagamentos } = useApp();
   const execucoesDoContrato = execucoes.filter((e) => e.contratoId === contrato.id);
+  const aPagar = valorAPagarDoContrato(contrato.id, execucoes, pagamentos);
   const valorExecutado = execucoesDoContrato.reduce((acc, atual) => acc + atual.valor, 0);
   const saldo = contrato.saldoAtualFinanceiro ?? (contrato.valorGlobal || 0) - valorExecutado;
   const percExec = contrato.valorGlobal
@@ -401,6 +405,11 @@ export default function ExecucaoModal({
               <div>
                 <p className="text-xs text-gray-500 uppercase font-medium">Saldo Restante</p>
                 <p className="text-xl font-bold text-emerald-600">{formatarMoeda(saldo)}</p>
+                {aPagar > 0 && (
+                  <p className="text-xs text-amber-700 mt-1" title="NFs lançadas que o Financeiro ainda não registrou como pagas — só saem do saldo depois do pagamento.">
+                    {formatarMoeda(aPagar)} a pagar (já lançado) · disponível {formatarMoeda(saldo - aPagar)}
+                  </p>
+                )}
               </div>
             </div>
 

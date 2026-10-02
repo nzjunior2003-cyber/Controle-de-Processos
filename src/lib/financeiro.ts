@@ -4,6 +4,7 @@
  * partir dos registros lançados (nunca persistido), pra planilha-controle
  * não divergir de si mesma (ex.: total do mês que não bate com as NFs).
  */
+import type { ExecucaoContrato } from './contratos';
 import type {
   DotacaoOrcamentaria,
   Empenho,
@@ -177,4 +178,53 @@ export function descreverAndamento(p: Pick<PagamentoContrato, 'setorAtual' | 'et
   if (partes) return partes;
   const status = statusDoPagamento(p);
   return status === 'pago' ? 'Pago' : status === 'arquivado' ? 'Arquivado' : '-';
+}
+
+/**
+ * Quanto uma fatura deve tirar do saldo financeiro do contrato: o valor total
+ * quando está **paga**, menos o que veio de NFs antigas (já abatidas ao serem
+ * lançadas — ver `ExecucaoContrato.saldoFinanceiroAbatido`). Em tramitação ou
+ * arquivada, não abate nada.
+ */
+export function valorASerAbatido(
+  p: Pick<PagamentoContrato, 'status' | 'valorTotal' | 'valorPago' | 'documentos'>,
+  execucoes: Pick<ExecucaoContrato, 'id' | 'valor' | 'saldoFinanceiroAbatido'>[],
+): number {
+  if (statusDoPagamento(p) !== 'pago') return 0;
+  const jaAbatido = (p.documentos ?? []).reduce((acc, d) => {
+    const execucao = d.execucaoId ? execucoes.find((e) => e.id === d.execucaoId) : undefined;
+    return execucao && execucao.saldoFinanceiroAbatido !== false ? acc + (execucao.valor || 0) : acc;
+  }, 0);
+  return Math.max(0, valorDoPagamento(p) - jaAbatido);
+}
+
+/**
+ * Quanto o pagamento já tirou do saldo. Registros do modelo anterior (sem
+ * `status`) nunca abateram nada além das NFs, então contam como "já em dia".
+ */
+export function valorJaAbatido(
+  p: Pick<PagamentoContrato, 'status' | 'valorTotal' | 'valorPago' | 'documentos' | 'valorAbatidoSaldo'>,
+  execucoes: Pick<ExecucaoContrato, 'id' | 'valor' | 'saldoFinanceiroAbatido'>[],
+): number {
+  if (p.valorAbatidoSaldo !== undefined) return p.valorAbatidoSaldo;
+  return p.status === undefined ? valorASerAbatido(p, execucoes) : 0;
+}
+
+/**
+ * NFs lançadas pelo fiscal (modelo novo) cujo pagamento ainda não foi
+ * registrado como pago — o valor "comprometido" que ainda não saiu do saldo.
+ */
+export function valorAPagarDoContrato(
+  contratoId: string,
+  execucoes: Pick<ExecucaoContrato, 'id' | 'contratoId' | 'valor' | 'saldoFinanceiroAbatido'>[],
+  pagamentos: Pick<PagamentoContrato, 'status' | 'documentos'>[],
+): number {
+  const pagas = new Set(
+    pagamentos
+      .filter((p) => statusDoPagamento(p) === 'pago')
+      .flatMap((p) => (p.documentos ?? []).map((d) => d.execucaoId)),
+  );
+  return execucoes
+    .filter((e) => e.contratoId === contratoId && e.saldoFinanceiroAbatido === false && !pagas.has(e.id))
+    .reduce((acc, e) => acc + (e.valor || 0), 0);
 }

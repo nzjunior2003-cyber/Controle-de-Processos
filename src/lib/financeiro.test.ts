@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  valorASerAbatido,
+  valorAPagarDoContrato,
+  valorJaAbatido,
   competenciaDoPagamento,
   descreverAndamento,
   diferencaDocumentos,
@@ -251,5 +254,42 @@ describe('totalPagoPorFonte — só o que foi pago', () => {
       fatura({ id: '3', valorTotal: 400, status: 'arquivado' }),
     ];
     expect(totalPagoPorFonte(pagamentos)).toEqual({ TESOURO: 100 });
+  });
+});
+
+describe('saldo do contrato só cai com o pagamento', () => {
+  const novaNf = { id: 'e1', contratoId: 'c1', valor: 700, saldoFinanceiroAbatido: false };
+  const nfAntiga = { id: 'e2', contratoId: 'c1', valor: 300 };
+
+  it('em tramitação ou arquivado não abate nada', () => {
+    const base = { valorTotal: 700, documentos: [{ tipo: 'NF' as const, numero: '1', execucaoId: 'e1' }] };
+    expect(valorASerAbatido({ ...base, status: 'em_tramitacao' }, [novaNf])).toBe(0);
+    expect(valorASerAbatido({ ...base, status: 'arquivado' }, [novaNf])).toBe(0);
+  });
+
+  it('pago abate o valor da fatura', () => {
+    const p = { status: 'pago' as const, valorTotal: 700, documentos: [{ tipo: 'NF' as const, numero: '1', execucaoId: 'e1' }] };
+    expect(valorASerAbatido(p, [novaNf])).toBe(700);
+  });
+
+  it('NF antiga (já abatida ao lançar) não é abatida de novo', () => {
+    const p = { status: 'pago' as const, valorTotal: 1000, documentos: [
+      { tipo: 'NF' as const, numero: '1', execucaoId: 'e1' },
+      { tipo: 'NF' as const, numero: '2', execucaoId: 'e2' },
+    ] };
+    expect(valorASerAbatido(p, [novaNf, nfAntiga])).toBe(700);
+  });
+
+  it('valorJaAbatido: usa o gravado; legado sem status não gera ajuste', () => {
+    expect(valorJaAbatido({ valorAbatidoSaldo: 500 }, [])).toBe(500);
+    expect(valorJaAbatido({ valorPago: 1000 }, [])).toBe(1000);
+    expect(valorJaAbatido({ status: 'em_tramitacao', valorTotal: 9 }, [])).toBe(0);
+  });
+
+  it('a pagar: NFs novas sem pagamento pago', () => {
+    const execs = [novaNf, nfAntiga, { id: 'e3', contratoId: 'c1', valor: 50, saldoFinanceiroAbatido: false }];
+    const pagos = [{ status: 'pago' as const, documentos: [{ tipo: 'NF' as const, numero: '1', execucaoId: 'e1' }] }];
+    expect(valorAPagarDoContrato('c1', execs, pagos)).toBe(50);
+    expect(valorAPagarDoContrato('c1', execs, [])).toBe(750);
   });
 });

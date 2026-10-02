@@ -452,7 +452,7 @@ export default function PagamentoForm() {
                   <option key={s} value={s}>{STATUS_PAGAMENTO_LABELS[s]}</option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-gray-500">Arquivado não entra em nenhuma soma.</p>
+              <p className="mt-1 text-xs text-gray-500">Só <strong>Pago</strong> desconta do saldo financeiro do contrato (volta se mudar a situação). Arquivado não entra em nenhuma soma.</p>
             </div>
             <div className="flex items-center md:pt-6">
               <input id="autenticado" type="checkbox" checked={autenticado} onChange={(e) => setAutenticado(e.target.checked)} className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded cursor-pointer" />
