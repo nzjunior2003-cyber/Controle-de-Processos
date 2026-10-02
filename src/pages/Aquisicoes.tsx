@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import IntegracaoPCA from './IntegracaoPCA';
-import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS } from '../types';
+import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS, type StatusProcesso } from '../types';
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
 import { calcularProgressoChecklist } from '../lib/fluxoProcesso';
 import { useEtapasPorRito } from '../hooks/useEtapasPorRito';
@@ -47,6 +47,8 @@ export default function Aquisicoes() {
   const setFiltroFonte = (v: string) => definirParam('fonte', v, '');
   const filtroPrevisaoPca = (searchParams.get('pca') as FiltroPrevisaoPca) || 'todos';
   const setFiltroPrevisaoPca = (v: FiltroPrevisaoPca) => definirParam('pca', v, 'todos');
+  const filtroStatus = (searchParams.get('status') ?? '') as StatusProcesso | '';
+  const setFiltroStatus = (v: StatusProcesso | '') => definirParam('status', v, '');
   const filtroDemandante = searchParams.get('demandante') ?? '';
   const setFiltroDemandante = (v: string) => definirParam('demandante', v, '');
 
@@ -62,9 +64,13 @@ export default function Aquisicoes() {
   );
   const opcoesFonte = opcoesUnicas(processos.map((p) => p.fonte));
   const opcoesDemandante = opcoesUnicas(processos.map((p) => p.unidade_demandante));
+  const contagemPorStatus = processos.reduce<Partial<Record<StatusProcesso, number>>>((acc, p) => {
+    acc[p.status] = (acc[p.status] ?? 0) + 1;
+    return acc;
+  }, {});
 
   const filtrosAtivos = [
-    filtroRito, filtroNatureza, filtroSetorAtual, filtroFonte, filtroDemandante,
+    filtroRito, filtroNatureza, filtroSetorAtual, filtroFonte, filtroDemandante, filtroStatus,
   ].filter(Boolean).length + (filtroPrevisaoPca !== 'todos' ? 1 : 0);
 
   const filtrados = processos.filter(p => {
@@ -79,6 +85,7 @@ export default function Aquisicoes() {
 
     if (!matchBusca) return false;
 
+    if (filtroStatus && p.status !== filtroStatus) return false;
     if (filtroRito && p.rito_processual !== filtroRito) return false;
     if (filtroNatureza && p.natureza_despesa !== filtroNatureza) return false;
     if (filtroSetorAtual && setorAtualEfetivo !== filtroSetorAtual) return false;
@@ -283,6 +290,17 @@ export default function Aquisicoes() {
             {mostrarFiltros && (
               <div className="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+                  <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value as StatusProcesso | '')} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
+                    <option value="">Todos</option>
+                    {(Object.keys(STATUS_LABELS) as StatusProcesso[]).map((status) => (
+                      <option key={status} value={status}>
+                        {STATUS_LABELS[status]} ({contagemPorStatus[status] ?? 0})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Rito</label>
                   <select value={filtroRito} onChange={(e) => setFiltroRito(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
                     <option value="">Todos</option>
@@ -336,6 +354,7 @@ export default function Aquisicoes() {
                         setFiltroFonte('');
                         setFiltroPrevisaoPca('todos');
                         setFiltroDemandante('');
+                        setFiltroStatus('');
                       }}
                       className="text-sm text-red-600 hover:text-red-800 font-medium"
                     >

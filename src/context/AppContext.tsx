@@ -203,7 +203,8 @@ interface AppContextData {
   deleteDotacao: (id: string) => Promise<void>;
   marcarNotificacaoLida: (id: string) => Promise<void>;
   excluirNotificacao: (id: string) => Promise<void>;
-  limparNotificacoesLidas: () => Promise<void>;
+  marcarTodasNotificacoesLidas: () => Promise<void>;
+  limparNotificacoes: () => Promise<void>;
   registrarPushSubscription: (dados: Omit<PushSubscriptionRegistro, 'id' | 'criado_em'>) => Promise<void>;
   removerPushSubscription: (endpoint: string) => Promise<void>;
 }
@@ -1695,22 +1696,40 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await updateDoc(doc(db, 'notificacoes', id), { lida: true });
   }, []);
 
-  // Só notificações já lidas podem ser apagadas (as regras do Firestore
-  // também exigem isso) — uma não lida nunca some sem o usuário ter visto.
   const excluirNotificacao = useCallback(async (id: string) => {
     const db = requireDb();
     await deleteDoc(doc(db, 'notificacoes', id));
   }, []);
 
-  const limparNotificacoesLidas = useCallback(async () => {
+  // As duas ações abaixo consultam o Firestore em vez de usar a lista da
+  // tela, que mostra só as 50 mais recentes — senão "limpar todas" deixaria
+  // pra trás as mais antigas, que reapareceriam logo em seguida.
+  const marcarTodasNotificacoesLidas = useCallback(async () => {
     const db = requireDb();
-    const lidas = notificacoes.filter((n) => n.lida);
-    for (let inicio = 0; inicio < lidas.length; inicio += 400) {
+    if (!usuarioAtual) return;
+    const snapshot = await getDocs(
+      query(collection(db, 'notificacoes'), where('destinatarioId', '==', usuarioAtual.id)),
+    );
+    const naoLidas = snapshot.docs.filter((d) => d.data().lida !== true);
+    for (let inicio = 0; inicio < naoLidas.length; inicio += 400) {
       const lote = writeBatch(db);
-      lidas.slice(inicio, inicio + 400).forEach((n) => lote.delete(doc(db, 'notificacoes', n.id)));
+      naoLidas.slice(inicio, inicio + 400).forEach((d) => lote.update(d.ref, { lida: true }));
       await lote.commit();
     }
-  }, [notificacoes]);
+  }, [usuarioAtual]);
+
+  const limparNotificacoes = useCallback(async () => {
+    const db = requireDb();
+    if (!usuarioAtual) return;
+    const snapshot = await getDocs(
+      query(collection(db, 'notificacoes'), where('destinatarioId', '==', usuarioAtual.id)),
+    );
+    for (let inicio = 0; inicio < snapshot.docs.length; inicio += 400) {
+      const lote = writeBatch(db);
+      snapshot.docs.slice(inicio, inicio + 400).forEach((d) => lote.delete(d.ref));
+      await lote.commit();
+    }
+  }, [usuarioAtual]);
 
   const registrarPushSubscription = useCallback(
     async (dados: Omit<PushSubscriptionRegistro, 'id' | 'criado_em'>) => {
@@ -1808,7 +1827,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       deleteDotacao,
       marcarNotificacaoLida,
       excluirNotificacao,
-      limparNotificacoesLidas,
+      marcarTodasNotificacoesLidas,
+      limparNotificacoes,
       registrarPushSubscription,
       removerPushSubscription,
     }),
@@ -1879,7 +1899,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       deleteDotacao,
       marcarNotificacaoLida,
       excluirNotificacao,
-      limparNotificacoesLidas,
+      marcarTodasNotificacoesLidas,
+      limparNotificacoes,
       registrarPushSubscription,
       removerPushSubscription,
     ],

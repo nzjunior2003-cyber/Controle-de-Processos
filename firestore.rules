@@ -194,10 +194,8 @@ service cloud.firestore {
       allow update: if ativo()
         && resource.data.destinatarioId == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lida']);
-      // O dono só apaga notificação que já leu.
-      allow delete: if ativo()
-        && resource.data.destinatarioId == request.auth.uid
-        && resource.data.lida == true;
+      // O dono apaga as próprias notificações (lidas ou não).
+      allow delete: if ativo() && resource.data.destinatarioId == request.auth.uid;
     }
     match /push_subscriptions/{documento} {
       // Leitura liberada a qualquer usuário ativo: quem dispara um evento

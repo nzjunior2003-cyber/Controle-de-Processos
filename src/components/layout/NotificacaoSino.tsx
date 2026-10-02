@@ -17,14 +17,13 @@ const formatarQuando = (iso: string) => {
  * lidas. Clicar marca como lida e navega pra `url`, quando houver.
  */
 export default function NotificacaoSino() {
-  const { notificacoes, marcarNotificacaoLida, excluirNotificacao, limparNotificacoesLidas } = useApp();
+  const { notificacoes, marcarNotificacaoLida, excluirNotificacao, marcarTodasNotificacoesLidas, limparNotificacoes } = useApp();
   const navigate = useNavigate();
   const [aberto, setAberto] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { suportado, ativando, erro, ativar } = usePushNotifications();
 
   const naoLidas = notificacoes.filter((n) => !n.lida).length;
-  const lidas = notificacoes.length - naoLidas;
   const podeAtivarPush =
     suportado && typeof Notification !== 'undefined' && Notification.permission === 'default';
 
@@ -60,12 +59,22 @@ export default function NotificacaoSino() {
     }
   };
 
-  const handleLimparLidas = async () => {
+  const handleMarcarTodasLidas = async () => {
     try {
-      await limparNotificacoesLidas();
+      await marcarTodasNotificacoesLidas();
     } catch (erro) {
-      console.error('Erro ao limpar notificações lidas:', erro);
-      alert('Não foi possível limpar as notificações lidas.');
+      console.error('Erro ao marcar notificações como lidas:', erro);
+      alert('Não foi possível marcar as notificações como lidas.');
+    }
+  };
+
+  const handleLimparTodas = async () => {
+    if (!window.confirm('Apagar todas as suas notificações? Esta ação não pode ser desfeita.')) return;
+    try {
+      await limparNotificacoes();
+    } catch (erro) {
+      console.error('Erro ao limpar notificações:', erro);
+      alert('Não foi possível limpar as notificações.');
     }
   };
 
@@ -88,19 +97,21 @@ export default function NotificacaoSino() {
         <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-md shadow-lg border border-gray-200 z-50 text-gray-900">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <span className="text-sm font-semibold">Notificações</span>
-            <div className="flex items-center gap-3">
-              {naoLidas > 0 && <span className="text-xs text-gray-500">{naoLidas} não lida(s)</span>}
-              {lidas > 0 && (
-                <button
-                  onClick={handleLimparLidas}
-                  className="text-xs font-medium text-red-700 hover:underline"
-                  title="Apaga todas as notificações já lidas"
-                >
-                  Limpar lidas ({lidas})
-                </button>
-              )}
-            </div>
           </div>
+          {notificacoes.length > 0 && (
+            <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between text-xs">
+              {naoLidas > 0 ? (
+                <button onClick={handleMarcarTodasLidas} className="font-medium text-gray-600 hover:underline">
+                  Marcar todas como lidas ({naoLidas})
+                </button>
+              ) : (
+                <span className="text-gray-400">Tudo lido</span>
+              )}
+              <button onClick={handleLimparTodas} className="font-medium text-red-700 hover:underline">
+                Limpar todas
+              </button>
+            </div>
+          )}
           {podeAtivarPush && (
             <div className="px-4 py-3 border-b border-gray-100 bg-amber-50">
               <button
@@ -128,15 +139,13 @@ export default function NotificacaoSino() {
                     <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.corpo}</p>
                     <p className="text-[11px] text-gray-400 mt-1">{formatarQuando(n.criado_em)}</p>
                   </button>
-                  {n.lida && (
-                    <button
-                      onClick={() => handleExcluir(n.id)}
-                      className="p-3 text-gray-400 hover:text-red-600"
-                      title="Excluir notificação"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleExcluir(n.id)}
+                    className="p-3 text-gray-400 hover:text-red-600"
+                    title="Excluir notificação"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </li>
               ))}
             </ul>
