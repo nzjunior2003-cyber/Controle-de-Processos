@@ -107,8 +107,10 @@ service cloud.firestore {
     }
     match /contratos/{documento} {
       allow read: if ativo();
-      allow write: if ativo()
+      allow create, update: if ativo()
         && perfilDoc().perfil in ['master', 'contratos', 'gestao'];
+      // Só o master exclui contrato (ex.: cadastro em duplicidade).
+      allow delete: if master();
       // O Fiscal titular/suplente pode ter o saldo do próprio contrato
       // atualizado automaticamente ao lançar uma execução (NF) — só os
       // campos de saldo, nunca os demais dados do contrato.

@@ -12,6 +12,8 @@ import {
   calcularEconomicidade,
   contratoComNumeroDuplicado,
   criarProcedimentoDeIrp,
+  descreverVinculos,
+  vinculosDoContrato,
   execucaoDuplicada,
   encontrarVinculosPorPae,
   extrairAnoNumeroContrato,
@@ -695,6 +697,30 @@ describe('execucaoDuplicada', () => {
 
   it('nunca acusa duplicidade sem nº de documento', () => {
     expect(execucaoDuplicada(execucoes, { contratoId: 'c1', tipo: 'NF/Fatura', nf: '' })).toBe(false);
+  });
+});
+
+describe('vinculosDoContrato / descreverVinculos', () => {
+  const dados = {
+    execucoes: [{ contratoId: 'c1' }, { contratoId: 'c1' }, { contratoId: 'c2' }],
+    aditivos: [{ contratoId: 'c1' }],
+    ocorrencias: [{ contratoId: 'c2' }],
+    pagamentos: [{ contratoId: 'c1' }, { contratoId: 'c3' }],
+  };
+
+  it('conta só os registros do contrato informado', () => {
+    expect(vinculosDoContrato('c1', dados)).toEqual({ execucoes: 2, aditivos: 1, ocorrencias: 0, pagamentos: 1, total: 4 });
+  });
+
+  it('contrato sem nada lançado tem total zero (pode ser excluído)', () => {
+    expect(vinculosDoContrato('novo', dados).total).toBe(0);
+  });
+
+  it('descreve só o que existe, em português corrido', () => {
+    expect(descreverVinculos(vinculosDoContrato('c1', dados))).toBe('2 execução(ões), 1 aditivo(s) e 1 pagamento(s)');
+    expect(descreverVinculos(vinculosDoContrato('c2', dados))).toBe('1 execução(ões) e 1 ocorrência(s)');
+    expect(descreverVinculos(vinculosDoContrato('c3', dados))).toBe('1 pagamento(s)');
+    expect(descreverVinculos(vinculosDoContrato('novo', dados))).toBe('');
   });
 });
 

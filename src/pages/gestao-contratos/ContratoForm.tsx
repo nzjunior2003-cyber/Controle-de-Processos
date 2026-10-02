@@ -183,7 +183,7 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
 export default function ContratoForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { contratos, addContrato, updateContrato, usuarioAtual, pagamentos } = useApp();
+  const { contratos, addContrato, updateContrato, deleteContrato, usuarioAtual, pagamentos } = useApp();
 
   const contrato = id ? contratos.find((c) => c.id === id) ?? null : null;
   const emEdicao = !!id;
@@ -520,6 +520,32 @@ export default function ContratoForm() {
     }
   };
 
+  const [excluindo, setExcluindo] = useState(false);
+
+  const handleExcluir = async () => {
+    if (!contrato) return;
+    const confirmado = window.confirm(
+      [
+        `Excluir o contrato nº ${contrato.numero} (${contrato.empresa}, ${formatarMoeda(contrato.valorGlobal)})?`,
+        '',
+        'Use isso só para cadastro em duplicidade. A exclusão fica registrada na auditoria.',
+        'Se o número ainda estiver na planilha "Gestão de Contratos", a sincronização pode recriá-lo — ' +
+          'nesse caso, exclua o outro cadastro ou remova a linha da planilha.',
+      ].join('\n'),
+    );
+    if (!confirmado) return;
+    setExcluindo(true);
+    setErro(null);
+    try {
+      await deleteContrato(contrato.id);
+      navigate(usuarioAtual?.perfil === 'contratos' ? '/sistema/contratos-arps' : '/sistema/gestao-contratos');
+    } catch (erroCapturado) {
+      setErro(erroCapturado instanceof Error ? erroCapturado.message : 'Não foi possível excluir o contrato.');
+    } finally {
+      setExcluindo(false);
+    }
+  };
+
   const podeEditarContrato =
     usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'gestao' || usuarioAtual?.perfil === 'contratos';
   if (!podeEditarContrato) {
@@ -549,6 +575,18 @@ export default function ContratoForm() {
               : 'Cadastre um novo contrato, informando o saldo inicial que servirá de base para as execuções (NFs).'}
           </p>
         </div>
+        {emEdicao && usuarioAtual?.perfil === 'master' && (
+          <button
+            type="button"
+            onClick={handleExcluir}
+            disabled={excluindo}
+            title="Exclui o contrato (use para cadastro em duplicidade). Só é possível se não houver lançamentos nele."
+            className="ml-auto inline-flex items-center px-3 py-1.5 border border-red-200 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 disabled:opacity-50"
+          >
+            <Trash2 className="-ml-1 mr-1.5 h-4 w-4" />
+            {excluindo ? 'Excluindo...' : 'Excluir contrato'}
+          </button>
+        )}
       </div>
 
       <div className="bg-white shadow-sm rounded-lg border border-gray-200">

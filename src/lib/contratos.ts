@@ -555,6 +555,48 @@ export function calcularEconomicidade(
   return { valor, percentual: (valor / valorEstimado) * 100 };
 }
 
+export interface VinculosDoContrato {
+  execucoes: number;
+  aditivos: number;
+  ocorrencias: number;
+  pagamentos: number;
+  total: number;
+}
+
+/**
+ * Conta os registros lançados contra um contrato (execuções/NFs, aditivos,
+ * ocorrências e pagamentos). Usado pra só permitir excluir um contrato
+ * (ex.: cadastro duplicado) que não tenha nada lançado — excluir um
+ * contrato com lançamentos deixaria esses registros órfãos, sem dono.
+ */
+export function vinculosDoContrato(
+  contratoId: string,
+  dados: {
+    execucoes: Pick<ExecucaoContrato, 'contratoId'>[];
+    aditivos: Pick<Aditivo, 'contratoId'>[];
+    ocorrencias: Pick<Ocorrencia, 'contratoId'>[];
+    pagamentos: { contratoId: string }[];
+  },
+): VinculosDoContrato {
+  const contar = (lista: { contratoId: string }[]) => lista.filter((item) => item.contratoId === contratoId).length;
+  const execucoes = contar(dados.execucoes);
+  const aditivos = contar(dados.aditivos);
+  const ocorrencias = contar(dados.ocorrencias);
+  const pagamentos = contar(dados.pagamentos);
+  return { execucoes, aditivos, ocorrencias, pagamentos, total: execucoes + aditivos + ocorrencias + pagamentos };
+}
+
+/** Texto pro aviso de "não dá pra excluir", listando só o que existe (ex.: "2 execução(ões) e 1 pagamento(s)"). */
+export function descreverVinculos(v: VinculosDoContrato): string {
+  const partes = [
+    v.execucoes ? `${v.execucoes} execução(ões)` : '',
+    v.aditivos ? `${v.aditivos} aditivo(s)` : '',
+    v.ocorrencias ? `${v.ocorrencias} ocorrência(s)` : '',
+    v.pagamentos ? `${v.pagamentos} pagamento(s)` : '',
+  ].filter(Boolean);
+  return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} e ${partes[partes.length - 1]}` : (partes[0] ?? '');
+}
+
 /** Normaliza um identificador (nº de contrato, aditivo, NF) pra comparar ignorando caixa e espaços extras. */
 const normalizarIdentificador = (texto: string | undefined): string =>
   (texto ?? '').trim().replace(/\s+/g, ' ').toLowerCase();

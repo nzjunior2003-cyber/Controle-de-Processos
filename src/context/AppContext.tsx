@@ -63,11 +63,13 @@ import {
   aplicarAditivoQuantidade,
   contratoComNumeroDuplicado,
   criarProcedimentoDeIrp,
+  descreverVinculos,
   execucaoDuplicada,
   devolverItens,
   devolverSaldo,
   registrarTrocaFiscal,
   validarLimiteFiscal,
+  vinculosDoContrato,
   type Aditivo,
   type ExecucaoContrato,
   type Ocorrencia,
@@ -1349,14 +1351,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     },
     [atualizarEm, contratos, registrarAuditoria],
   );
+  // Só o master exclui contrato (ex.: cadastro em duplicidade), e só se não
+  // houver nada lançado contra ele — senão as execuções/aditivos/etc. ficariam
+  // órfãos. O DELETE fica no log de auditoria com o contrato como estava.
   const deleteContrato = useCallback(
     async (id: string) => {
-      const db = requireDb();
+      if (usuarioAtual?.perfil !== 'master') {
+        throw new Error('Só o perfil Master pode excluir contratos.');
+      }
       const anterior = contratos.find((c) => c.id === id);
+      const vinculos = vinculosDoContrato(id, { execucoes, aditivos, ocorrencias, pagamentos });
+      if (vinculos.total > 0) {
+        throw new Error(
+          `Este contrato tem ${descreverVinculos(vinculos)} lançado(s) e não pode ser excluído. ` +
+            'Se for um cadastro duplicado, exclua o outro (o que não tem lançamentos).',
+        );
+      }
+      const db = requireDb();
       await deleteDoc(doc(db, 'contratos', id));
       await registrarAuditoria('contratos', id, 'DELETE', {}, anterior);
     },
-    [contratos, registrarAuditoria],
+    [contratos, execucoes, aditivos, ocorrencias, pagamentos, usuarioAtual, registrarAuditoria],
   );
 
   /**
