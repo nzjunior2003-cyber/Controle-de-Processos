@@ -6,7 +6,7 @@ import { differenceInDays } from 'date-fns';
 import IntegracaoPCA from './IntegracaoPCA';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS, type StatusProcesso } from '../types';
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
-import { calcularProgressoChecklist } from '../lib/fluxoProcesso';
+import { calcularProgressoChecklist, ordenarPorProgresso } from '../lib/fluxoProcesso';
 import { useEtapasPorRito } from '../hooks/useEtapasPorRito';
 
 type FiltroTempo = 'todos' | 'verde' | 'amarelo' | 'vermelho' | 'contratado';
@@ -47,7 +47,8 @@ export default function Aquisicoes() {
   const setFiltroFonte = (v: string) => definirParam('fonte', v, '');
   const filtroPrevisaoPca = (searchParams.get('pca') as FiltroPrevisaoPca) || 'todos';
   const setFiltroPrevisaoPca = (v: FiltroPrevisaoPca) => definirParam('pca', v, 'todos');
-  // Ordenação por status: 'asc' (A→Z), 'desc' (Z→A) ou vazio (ordem original da lista).
+  // Ordenação pelo percentual de andamento (o mesmo exibido sob o status):
+  // 'asc' (menor→maior), 'desc' (maior→menor) ou vazio (ordem original da lista).
   const ordemStatus = (searchParams.get('ordem') as 'asc' | 'desc' | null) ?? '';
   const alternarOrdemStatus = () =>
     definirParam('ordem', ordemStatus === '' ? 'asc' : ordemStatus === 'asc' ? 'desc' : '', '');
@@ -109,13 +110,8 @@ export default function Aquisicoes() {
     return false;
   });
   
-  // Pelo rótulo exibido (A→Z), não pelo código interno; a ordenação do JS é
-  // estável, então processos do mesmo status mantêm a ordem original entre si.
   const filtrados = ordemStatus
-    ? [...filtradosSemOrdem].sort((a, b) => {
-        const comparacao = STATUS_LABELS[a.status].localeCompare(STATUS_LABELS[b.status], 'pt-BR');
-        return ordemStatus === 'asc' ? comparacao : -comparacao;
-      })
+    ? ordenarPorProgresso(filtradosSemOrdem, ordemStatus, etapasPorRito)
     : filtradosSemOrdem;
 
   const contagemTempo = processos.reduce(
@@ -407,10 +403,10 @@ export default function Aquisicoes() {
                         onClick={alternarOrdemStatus}
                         title={
                           ordemStatus === ''
-                            ? 'Ordenar por status (A→Z)'
+                            ? 'Ordenar pelo andamento (menor → maior %)'
                             : ordemStatus === 'asc'
-                              ? 'Ordenado A→Z — clique para Z→A'
-                              : 'Ordenado Z→A — clique para remover a ordenação'
+                              ? 'Menor → maior % — clique para inverter'
+                              : 'Maior → menor % — clique para remover a ordenação'
                         }
                         className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-gray-900 ${ordemStatus ? 'text-red-700' : ''}`}
                       >

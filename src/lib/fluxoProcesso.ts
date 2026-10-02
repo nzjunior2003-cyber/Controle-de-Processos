@@ -155,6 +155,32 @@ export function calcularProgressoChecklist(
   return Math.round((concluidas / checklistDoRito.length) * 100);
 }
 
+/**
+ * Ordena processos pelo percentual de andamento do checklist
+ * (`calcularProgressoChecklist`): 'asc' do menor pro maior, 'desc' do maior
+ * pro menor. Processos sem percentual calculável (sem rito ou rito sem
+ * checklist) vão sempre pro fim, nas duas direções — não têm posição na
+ * escala. Empates mantêm a ordem original (a ordenação é estável).
+ */
+export function ordenarPorProgresso<T extends Pick<Processo, 'rito_processual' | 'checklist_rito'>>(
+  processos: T[],
+  direcao: 'asc' | 'desc',
+  checklistsPorRito: Record<string, string[]> = ETAPAS_PADRAO,
+): T[] {
+  const comProgresso = processos.map((processo) => ({
+    processo,
+    progresso: calcularProgressoChecklist(processo, checklistsPorRito),
+  }));
+  return comProgresso
+    .sort((a, b) => {
+      if (a.progresso === null && b.progresso === null) return 0;
+      if (a.progresso === null) return 1;
+      if (b.progresso === null) return -1;
+      return direcao === 'asc' ? a.progresso - b.progresso : b.progresso - a.progresso;
+    })
+    .map((item) => item.processo);
+}
+
 /** Agrupa uma lista de estadias por processo, num Map por processo_id. */
 export function agruparEstadasPorProcesso(
   estadas: EstadaProcesso[],

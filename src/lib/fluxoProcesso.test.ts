@@ -9,6 +9,7 @@ import {
   calcularTempoTotal,
   localizacaoEfetiva,
   montarLinhaDoTempo,
+  ordenarPorProgresso,
   type EstadaProcesso,
 } from './fluxoProcesso';
 import type { Processo } from '../types';
@@ -199,5 +200,45 @@ describe('calcularProgressoChecklist', () => {
 
   it('devolve 0% quando nada foi marcado ainda', () => {
     expect(calcularProgressoChecklist({ rito_processual: 'Pregão Eletrônico', checklist_rito: [] })).toBe(0);
+  });
+});
+
+describe('ordenarPorProgresso', () => {
+  const etapas = { 'Pregão Eletrônico': ['a', 'b', 'c', 'd'] };
+  const proc = (id: string, concluidas: number) => ({
+    id,
+    rito_processual: 'Pregão Eletrônico' as string | undefined,
+    checklist_rito: ['a', 'b', 'c', 'd'].slice(0, concluidas),
+  });
+  // Sem rito de verdade (não dá pra usar undefined como argumento: ativaria o valor padrão).
+  const semRito = { ...proc('sem-rito', 3), rito_processual: undefined };
+
+  const processos = [proc('p50', 2), proc('p100', 4), proc('p0', 0), semRito, proc('p25', 1)];
+
+  it('crescente: do menor pro maior percentual', () => {
+    const ids = ordenarPorProgresso(processos, 'asc', etapas).map((p) => p.id);
+    expect(ids).toEqual(['p0', 'p25', 'p50', 'p100', 'sem-rito']);
+  });
+
+  it('decrescente: do maior pro menor percentual', () => {
+    const ids = ordenarPorProgresso(processos, 'desc', etapas).map((p) => p.id);
+    expect(ids).toEqual(['p100', 'p50', 'p25', 'p0', 'sem-rito']);
+  });
+
+  it('processos sem percentual vão sempre pro fim, nas duas direções', () => {
+    expect(ordenarPorProgresso(processos, 'asc', etapas).at(-1)?.id).toBe('sem-rito');
+    expect(ordenarPorProgresso(processos, 'desc', etapas).at(-1)?.id).toBe('sem-rito');
+  });
+
+  it('empates mantêm a ordem original', () => {
+    const iguais = [proc('x', 2), proc('y', 2), proc('z', 2)];
+    expect(ordenarPorProgresso(iguais, 'asc', etapas).map((p) => p.id)).toEqual(['x', 'y', 'z']);
+    expect(ordenarPorProgresso(iguais, 'desc', etapas).map((p) => p.id)).toEqual(['x', 'y', 'z']);
+  });
+
+  it('não altera a lista original', () => {
+    const copia = processos.map((p) => p.id);
+    ordenarPorProgresso(processos, 'desc', etapas);
+    expect(processos.map((p) => p.id)).toEqual(copia);
   });
 });
