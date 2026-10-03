@@ -13,8 +13,9 @@ import {
 } from '../../lib/financeiro';
 import { STATUS_PAGAMENTO_LABELS, type StatusPagamento } from '../../types';
 import FichaContrato from './FichaContrato';
+import ControleOrcamentario from './ControleOrcamentario';
 
-type Aba = 'pagamentos' | 'empenhos' | 'dotacoes' | 'ficha';
+type Aba = 'pagamentos' | 'empenhos' | 'dotacoes' | 'ficha' | 'orcamento';
 
 const CORES_STATUS: Record<StatusPagamento, string> = {
   em_tramitacao: 'bg-amber-50 text-amber-700',
@@ -121,6 +122,7 @@ export default function Financeiro() {
     { id: 'empenhos', nome: 'Empenhos (NE)' },
     { id: 'dotacoes', nome: 'Dotações' },
     { id: 'ficha', nome: 'Ficha por contrato' },
+    { id: 'orcamento', nome: 'Controle orçamentário' },
   ];
 
   const CABECALHO = 'px-4 py-3 text-xs font-medium text-gray-500 uppercase';
@@ -137,7 +139,7 @@ export default function Financeiro() {
             Controle de pagamentos da Diretoria de Finanças: faturas (PAE), notas de empenho, ordens bancárias e dotações.
           </p>
         </div>
-        {isMasterOuFinanceiro && aba !== 'ficha' && (
+        {isMasterOuFinanceiro && aba !== 'ficha' && aba !== 'orcamento' && (
           <button
             onClick={() => navigate(rotaNovo)}
             className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800"
@@ -162,6 +164,8 @@ export default function Financeiro() {
 
       {aba === 'ficha' ? (
         <FichaContrato />
+      ) : aba === 'orcamento' ? (
+        <ControleOrcamentario />
       ) : (
         <>
           <div className="bg-white p-4 shadow-sm rounded-lg border border-gray-200 flex flex-col sm:flex-row gap-3">

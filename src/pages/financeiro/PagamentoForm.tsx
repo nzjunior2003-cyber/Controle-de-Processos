@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext';
 import { OPCOES_FONTE_PROCESSO } from '../../lib/planilhaProcessos';
 import { formatarMoeda, type ExecucaoContrato } from '../../lib/contratos';
 import BuscaContrato from './BuscaContrato';
+import { limparClassificacoes } from '../../lib/orcamento';
 import {
   ETAPAS_PAGAMENTO,
   SETORES_PAGAMENTO,
@@ -21,9 +22,11 @@ import {
 } from '../../lib/financeiro';
 import {
   STATUS_PAGAMENTO_LABELS,
+  type ClassificacaoOrcamentaria,
   type DocumentoPagamento,
   type OrdemBancaria,
   type StatusPagamento,
+  CAMPOS_ORCAMENTARIOS,
 } from '../../types';
 
 const CLASSE_INPUT =
@@ -58,7 +61,7 @@ export default function PagamentoForm() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const {
-    pagamentos, contratos, dotacoes, empenhos, execucoes,
+    pagamentos, contratos, dotacoes, empenhos, execucoes, processos,
     addPagamento, updatePagamento, deletePagamento, usuarioAtual,
   } = useApp();
   const navigate = useNavigate();
@@ -72,6 +75,7 @@ export default function PagamentoForm() {
   );
   const [fonteRecurso, setFonteRecurso] = useState(pagamento?.fonteRecurso ?? '');
   const [dotacaoId, setDotacaoId] = useState(pagamento?.dotacaoId ?? '');
+  const [classificacao, setClassificacao] = useState<ClassificacaoOrcamentaria>(pagamento?.classificacao ?? {});
   const [paeFatura, setPaeFatura] = useState(pagamento?.paeFatura ?? '');
   const [documentos, setDocumentos] = useState<LinhaDocumento[]>(
     (pagamento?.documentos ?? []).map((d) => ({
@@ -101,9 +105,20 @@ export default function PagamentoForm() {
   const contrato = contratos.find((c) => c.id === contratoId);
   const exercicio = Number(competencia.slice(0, 4)) || new Date().getFullYear();
 
-  const escolherContrato = (c: { id: string; fonteRecurso?: string }) => {
+  // Dotações lançadas no checklist do processo deste contrato (o PAE do contrato = nº do processo).
+  const linhasDoProcesso = useMemo(() => {
+    const processo = contrato ? processos.find((p) => p.numero_processo === contrato.pae) : undefined;
+    return limparClassificacoes(processo?.dotacoes_orcamentarias ?? []);
+  }, [contrato, processos]);
+  const rotuloClassificacao = (c: ClassificacaoOrcamentaria) =>
+    CAMPOS_ORCAMENTARIOS.map(({ chave }) => c[chave]).filter(Boolean).join(' · ') || '(vazia)';
+
+  const escolherContrato = (c: { id: string; pae?: string; fonteRecurso?: string }) => {
     setContratoId(c.id);
     if (c.fonteRecurso) setFonteRecurso(c.fonteRecurso);
+    // Processo com uma única dotação: já usa ela como classificação do pagamento.
+    const linhas = limparClassificacoes(processos.find((p) => p.numero_processo === c.pae)?.dotacoes_orcamentarias ?? []);
+    setClassificacao(linhas.length === 1 ? linhas[0] : {});
   };
 
   // NEs do contrato no exercício da fatura.
@@ -207,6 +222,7 @@ export default function PagamentoForm() {
         empenhoIds,
         ordensBancarias: ordensLimpas,
         dotacaoId,
+        classificacao: limparClassificacoes([classificacao])[0] ?? {},
         fonteRecurso,
         competencia,
         setorAtual,
@@ -360,6 +376,35 @@ export default function PagamentoForm() {
                   <option key={opcao} value={opcao}>{opcao}</option>
                 ))}
               </select>
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="classificacao" className="block text-sm font-medium text-gray-700">Classificação orçamentária (do processo)</label>
+              <select
+                id="classificacao"
+                value={(() => {
+                  const atual = JSON.stringify(limparClassificacoes([classificacao])[0] ?? {});
+                  const indice = linhasDoProcesso.findIndex((l) => JSON.stringify(l) === atual);
+                  return indice >= 0 ? String(indice) : atual === '{}' ? '' : 'gravada';
+                })()}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === 'gravada') return;
+                  setClassificacao(v === '' ? {} : linhasDoProcesso[Number(v)]);
+                }}
+                className={`${CLASSE_INPUT} bg-white`}
+              >
+                <option value="">Nenhuma</option>
+                {!linhasDoProcesso.some((l) => JSON.stringify(l) === JSON.stringify(limparClassificacoes([classificacao])[0] ?? {})) &&
+                  Object.keys(classificacao).length > 0 && <option value="gravada">{rotuloClassificacao(classificacao)} (gravada)</option>}
+                {linhasDoProcesso.map((l, i) => (
+                  <option key={i} value={String(i)}>{rotuloClassificacao(l)}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                {linhasDoProcesso.length === 0
+                  ? 'O processo deste contrato ainda não tem dotação lançada no checklist (item "Dotação Orçamentária").'
+                  : 'Alimenta o controle de pagamentos por fonte, programa de trabalho, natureza, plano interno e UG.'}
+              </p>
             </div>
             <div>
               <label htmlFor="dotacaoId" className="block text-sm font-medium text-gray-700">Dotação (ficha orçamentária)</label>

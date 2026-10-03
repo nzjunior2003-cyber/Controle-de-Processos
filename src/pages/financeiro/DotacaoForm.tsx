@@ -23,6 +23,7 @@ export default function DotacaoForm() {
   const [projetoAtividade, setProjetoAtividade] = useState(dotacao?.projetoAtividade ?? '');
   const [naturezaDespesa, setNaturezaDespesa] = useState(dotacao?.naturezaDespesa ?? '');
   const [fonteCodigo, setFonteCodigo] = useState(dotacao?.fonteCodigo ?? '');
+  const [unidadeGestora, setUnidadeGestora] = useState(dotacao?.unidadeGestora ?? '');
   const [detalhamento, setDetalhamento] = useState(dotacao?.detalhamento ?? '');
   const [planoInterno, setPlanoInterno] = useState(dotacao?.planoInterno ?? '');
 
@@ -47,6 +48,7 @@ export default function DotacaoForm() {
         projetoAtividade,
         naturezaDespesa,
         fonteCodigo,
+        unidadeGestora,
         detalhamento,
         planoInterno,
       };
@@ -204,6 +206,7 @@ export default function DotacaoForm() {
               ['projetoAtividade', 'Projeto-Atividade ou Operações Especiais', projetoAtividade, setProjetoAtividade, 'Ex.: Operacionalização das Ações Administrativas'],
               ['naturezaDespesa', 'Natureza da Despesa', naturezaDespesa, setNaturezaDespesa, 'Ex.: 339033'],
               ['fonteCodigo', 'Fonte (código)', fonteCodigo, setFonteCodigo, 'Ex.: 01500.000001'],
+              ['unidadeGestora', 'Unidade Gestora', unidadeGestora, setUnidadeGestora, 'Ex.: 180101'],
               ['detalhamento', 'Detalhamento', detalhamento, setDetalhamento, 'Ex.: 006359'],
               ['planoInterno', 'Plano Interno', planoInterno, setPlanoInterno, 'Ex.: 4110008338C'],
             ] as const).map(([chave, rotulo, valor, definir, exemplo]) => (

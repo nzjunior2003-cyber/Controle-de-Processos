@@ -218,6 +218,8 @@ export interface Processo {
   valor_estimado?: number;
   rito_processual?: string;
   checklist_rito?: string[];
+  /** Dotações orçamentárias do processo (item "Dotação Orçamentária" do checklist) — uma ou mais linhas com os campos da ficha da Finanças. */
+  dotacoes_orcamentarias?: ClassificacaoOrcamentaria[];
   /** Só usados quando o rito é a Adesão à ata de registro de preços (RITO_ADESAO_ARP). */
   orgaoGerenciadorArp?: string;
   fornecedorArp?: string;
@@ -599,6 +601,32 @@ export interface IRP {
   atualizado_em: string;
 }
 
+/** Campos da classificação orçamentária (os mesmos do cabeçalho da ficha da Diretoria de Finanças). */
+export const CAMPOS_ORCAMENTARIOS = [
+  { chave: 'unidadeGestora', rotulo: 'Unidade Gestora', exemplo: 'Ex.: 180101' },
+  { chave: 'programaTrabalho', rotulo: 'Funcional / Programa de Trabalho', exemplo: 'Ex.: 06.122.1297-8338' },
+  { chave: 'projetoAtividade', rotulo: 'Projeto-Atividade', exemplo: 'Ex.: 8338' },
+  { chave: 'naturezaDespesa', rotulo: 'Natureza da Despesa', exemplo: 'Ex.: 339033' },
+  { chave: 'fonte', rotulo: 'Fonte', exemplo: 'Ex.: 01500.000001' },
+  { chave: 'detalhamento', rotulo: 'Detalhamento', exemplo: 'Ex.: 006359' },
+  { chave: 'planoInterno', rotulo: 'Plano Interno', exemplo: 'Ex.: 4110008338C' },
+] as const;
+
+export type CampoOrcamentario = (typeof CAMPOS_ORCAMENTARIOS)[number]['chave'];
+
+/** Uma linha de classificação orçamentária: código de cada campo (todos opcionais). */
+export type ClassificacaoOrcamentaria = Partial<Record<CampoOrcamentario, string>>;
+
+/** Catálogo código→descrição de cada campo orçamentário (preenche a descrição sozinha ao digitar o código). */
+export interface ItemCatalogoOrcamentario {
+  id: string;
+  campo: CampoOrcamentario;
+  codigo: string;
+  descricao: string;
+  criado_em: string;
+  atualizado_em: string;
+}
+
 /**
  * Registro de dotação orçamentária (módulo Financeiro) — o saldo
  * disponível é sempre calculado (nunca persistido) somando os
@@ -615,6 +643,8 @@ export interface DotacaoOrcamentaria {
   valorDotado: number;
   /** Funcional programática (ex.: 06.122.1297-8338) — cabeçalho da ficha de controle da Diretoria de Finanças. */
   funcionalProgramatica?: string;
+  /** Unidade gestora (UG). */
+  unidadeGestora?: string;
   /** Projeto-Atividade ou Operações Especiais (ex.: Operacionalização das Ações Administrativas). */
   projetoAtividade?: string;
   /** Natureza da despesa (ex.: 339033). */
@@ -719,6 +749,8 @@ export interface PagamentoContrato {
   empenhoIds?: string[];
   ordensBancarias?: OrdemBancaria[];
   dotacaoId?: string;
+  /** Classificação orçamentária da despesa (cópia dos códigos da dotação do processo ou da ficha) — base do controle por fonte/programa/natureza/plano/UG. */
+  classificacao?: ClassificacaoOrcamentaria;
   fonteRecurso: string;
   /** Mês de competência, 'AAAA-MM' (a coluna MÊS da planilha de controle). */
   competencia?: string;

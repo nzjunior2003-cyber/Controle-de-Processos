@@ -222,6 +222,15 @@ service cloud.firestore {
       allow read: if ativo();
       allow write: if ativo() && perfilDoc().perfil in ['master', 'financeiro'];
     }
+    // Catálogo código→descrição da classificação orçamentária (fonte, programa
+    // de trabalho, natureza, plano interno, UG...). Quem preenche a dotação do
+    // processo cadastra o código novo na hora; só master/financeiro apagam.
+    match /catalogo_orcamentario/{documento} {
+      allow read: if ativo();
+      allow create, update: if ativo()
+        && perfilDoc().perfil in ['master', 'financeiro', 'apoio', 'contratos', 'gestao'];
+      allow delete: if ativo() && perfilDoc().perfil in ['master', 'financeiro'];
+    }
     match /dotacoes/{documento} {
       allow read: if ativo();
       allow write: if ativo() && perfilDoc().perfil in ['master', 'financeiro'];

@@ -17,6 +17,9 @@ import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
 import { processoParaDadosPlanilha, SUBFASE_CONTRATADO } from '../lib/planilhaProcessos';
 import { calcularEconomicidade, encontrarVinculosPorPae, formatarMoeda } from '../lib/contratos';
 import { calcularDataPrevista, prazoAlvoDoRito } from '../lib/prazosProcesso';
+import { ehItemDotacaoOrcamentaria, limparClassificacoes } from '../lib/orcamento';
+import DotacaoOrcamentariaEditor from '../components/processo/DotacaoOrcamentariaEditor';
+import type { ClassificacaoOrcamentaria } from '../types';
 
 const CORES_GANTT = [
   'bg-blue-400', 'bg-indigo-400', 'bg-purple-400', 'bg-emerald-400',
@@ -32,6 +35,9 @@ export default function DetalheProcesso() {
   const [excluindo, setExcluindo] = useState(false);
   const [marcandoContratado, setMarcandoContratado] = useState(false);
   const [modoGantt, setModoGantt] = useState<'real' | 'planejado' | 'sobreposto'>('sobreposto');
+  // Rascunho das linhas de dotação (null = sem alteração pendente) — grava só ao clicar em "Salvar dotação".
+  const [dotacoesDraft, setDotacoesDraft] = useState<ClassificacaoOrcamentaria[] | null>(null);
+  const [salvandoDotacoes, setSalvandoDotacoes] = useState(false);
 
   const processo = processos.find(p => p.id === id);
   if (!processo) {
@@ -172,6 +178,19 @@ export default function DetalheProcesso() {
       : calcularDataPrevista(processo.data_entrada, processo.rito_processual);
 
   const isMasterOrApoio = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'apoio';
+
+  const handleSalvarDotacoes = async () => {
+    if (!dotacoesDraft) return;
+    setSalvandoDotacoes(true);
+    try {
+      await updateProcesso(processo.id, { dotacoes_orcamentarias: limparClassificacoes(dotacoesDraft) });
+      setDotacoesDraft(null);
+    } catch (erro) {
+      alert('Não foi possível salvar a dotação: ' + (erro instanceof Error ? erro.message : String(erro)));
+    } finally {
+      setSalvandoDotacoes(false);
+    }
+  };
 
   const handleToggleChecklistItem = (item: string) => {
     const atual = processo.checklist_rito || [];
@@ -445,10 +464,29 @@ export default function DetalheProcesso() {
                             className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded cursor-pointer"
                           />
                         </div>
-                        <div className="ml-3 text-sm">
+                        <div className="ml-3 text-sm flex-1">
                           <label htmlFor={`check-${idx}`} className={`font-medium cursor-pointer ${isChecked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                             {item}
                           </label>
+                          {ehItemDotacaoOrcamentaria(item) && isChecked && (
+                            <div>
+                              <DotacaoOrcamentariaEditor
+                                linhas={dotacoesDraft ?? (processo.dotacoes_orcamentarias?.length ? processo.dotacoes_orcamentarias : [{}])}
+                                onChange={setDotacoesDraft}
+                                somenteLeitura={!isMasterOrApoio}
+                              />
+                              {isMasterOrApoio && dotacoesDraft && (
+                                <button
+                                  type="button"
+                                  disabled={salvandoDotacoes}
+                                  onClick={handleSalvarDotacoes}
+                                  className="mt-3 inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400"
+                                >
+                                  {salvandoDotacoes ? 'Salvando...' : 'Salvar dotação'}
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

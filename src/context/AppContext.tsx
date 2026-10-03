@@ -98,11 +98,14 @@ import {
   IRP,
   DotacaoOrcamentaria,
   Empenho,
+  CampoOrcamentario,
+  ItemCatalogoOrcamentario,
   PagamentoContrato,
   Notificacao,
   PushSubscriptionRegistro,
   TipoEventoNotificacao,
 } from '../types';
+import { idItemCatalogo, normalizarCodigoOrcamentario } from '../lib/orcamento';
 import { execucoesArquivadas, valorASerAbatido, valorJaAbatido } from '../lib/financeiro';
 
 const URL_PLANILHA_PCA =
@@ -128,6 +131,7 @@ interface AppContextData {
   pagamentos: PagamentoContrato[];
   dotacoes: DotacaoOrcamentaria[];
   empenhos: Empenho[];
+  catalogoOrcamentario: ItemCatalogoOrcamentario[];
   /** Só as últimas 50 do usuário logado (ver `useNotificacoesDoUsuario`). */
   notificacoes: Notificacao[];
   pushSubscriptions: PushSubscriptionRegistro[];
@@ -206,6 +210,8 @@ interface AppContextData {
   addDotacao: (dados: Omit<DotacaoOrcamentaria, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
   updateDotacao: (id: string, dados: Partial<DotacaoOrcamentaria>) => Promise<void>;
   deleteDotacao: (id: string) => Promise<void>;
+  /** Cadastra (ou atualiza) a descrição de um código orçamentário no catálogo. */
+  salvarItemCatalogo: (campo: CampoOrcamentario, codigo: string, descricao: string) => Promise<void>;
   addEmpenho: (dados: Omit<Empenho, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
   updateEmpenho: (id: string, dados: Partial<Empenho>) => Promise<void>;
   deleteEmpenho: (id: string) => Promise<void>;
@@ -412,6 +418,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const pagamentos = useColecao<PagamentoContrato>('pagamentos', isAuthenticated);
   const dotacoes = useColecao<DotacaoOrcamentaria>('dotacoes', isAuthenticated);
   const empenhos = useColecao<Empenho>('empenhos', isAuthenticated);
+  const catalogoOrcamentario = useColecao<ItemCatalogoOrcamentario>('catalogo_orcamentario', isAuthenticated);
   const notificacoes = useNotificacoesDoUsuario(usuarioAtual?.id, isAuthenticated);
   const pushSubscriptions = useColecao<PushSubscriptionRegistro>('push_subscriptions', isAuthenticated);
   // Leitura restrita a 'master' nas firestore.rules — só assina quando fizer
@@ -1786,6 +1793,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [dotacoes, registrarAuditoria],
   );
 
+  const salvarItemCatalogo = useCallback(
+    async (campo: CampoOrcamentario, codigo: string, descricao: string) => {
+      const codigoLimpo = normalizarCodigoOrcamentario(codigo);
+      const descricaoLimpa = descricao.trim();
+      if (!codigoLimpo || !descricaoLimpa) return;
+      const db = requireDb();
+      const id = idItemCatalogo(campo, codigoLimpo);
+      const agora = new Date().toISOString();
+      const existente = catalogoOrcamentario.find((i) => i.id === id);
+      await setDoc(
+        doc(db, 'catalogo_orcamentario', id),
+        { campo, codigo: codigoLimpo, descricao: descricaoLimpa, criado_em: existente?.criado_em ?? agora, atualizado_em: agora },
+      );
+      await registrarAuditoria('catalogo_orcamentario', id, existente ? 'UPDATE' : 'CREATE', { campo, codigo: codigoLimpo, descricao: descricaoLimpa }, existente);
+    },
+    [catalogoOrcamentario, registrarAuditoria],
+  );
+
   const addEmpenho = useCallback(
     async (dados: Omit<Empenho, 'id' | 'criado_em' | 'atualizado_em'>) => {
       const id = await criarEm('empenhos', dados);
@@ -1909,6 +1934,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       pagamentos,
       dotacoes,
       empenhos,
+      catalogoOrcamentario,
+      salvarItemCatalogo,
       notificacoes,
       pushSubscriptions,
       logsAcesso,
@@ -1986,6 +2013,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       pagamentos,
       dotacoes,
       empenhos,
+      catalogoOrcamentario,
+      salvarItemCatalogo,
       notificacoes,
       pushSubscriptions,
       logsAcesso,

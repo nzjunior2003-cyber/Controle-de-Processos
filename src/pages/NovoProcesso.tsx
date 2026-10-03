@@ -10,6 +10,9 @@ import { normalizarRito, RITO_ADESAO_ARP } from '../lib/ritosProcessuais';
 import { encontrarObjetosSemelhantes, type CandidatoObjeto } from '../lib/correspondenciaTexto';
 import { getAccessToken, googleSignIn, initAuth } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
+import { ehItemDotacaoOrcamentaria, limparClassificacoes } from '../lib/orcamento';
+import DotacaoOrcamentariaEditor from '../components/processo/DotacaoOrcamentariaEditor';
+import type { ClassificacaoOrcamentaria } from '../types';
 import {
   OPCOES_FONTE_PROCESSO,
   OPCOES_NATUREZA_DESPESA,
@@ -58,6 +61,9 @@ export default function NovoProcesso() {
 
   const [ritoProcessual, setRitoProcessual] = useState(normalizarRito(processo?.rito_processual) ?? '');
   const [checklistLocal, setChecklistLocal] = useState<string[]>(processo?.checklist_rito ?? []);
+  const [dotacoesLocal, setDotacoesLocal] = useState<ClassificacaoOrcamentaria[]>(
+    processo?.dotacoes_orcamentarias?.length ? processo.dotacoes_orcamentarias : [{}],
+  );
   const [orgaoGerenciadorArp, setOrgaoGerenciadorArp] = useState(processo?.orgaoGerenciadorArp ?? '');
   const [fornecedorArp, setFornecedorArp] = useState(processo?.fornecedorArp ?? '');
   const [naturezaDespesa, setNaturezaDespesa] = useState(processo?.natureza_despesa ?? '');
@@ -206,6 +212,7 @@ export default function NovoProcesso() {
         pca_id: pcaId || '',
         rito_processual: ritoProcessual,
         checklist_rito: checklistLocal,
+        dotacoes_orcamentarias: limparClassificacoes(dotacoesLocal),
         andamento,
         data_entrada: new Date(dataEntrada).toISOString(),
         natureza_despesa: naturezaDespesa,
@@ -437,10 +444,13 @@ export default function NovoProcesso() {
                             className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded cursor-pointer"
                           />
                         </div>
-                        <div className="ml-3 text-sm">
+                        <div className="ml-3 text-sm flex-1">
                           <label htmlFor={`check-novo-${idx}`} className={`font-medium cursor-pointer ${checklistLocal.includes(item) ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                             {item}
                           </label>
+                          {ehItemDotacaoOrcamentaria(item) && checklistLocal.includes(item) && (
+                            <DotacaoOrcamentariaEditor linhas={dotacoesLocal} onChange={setDotacoesLocal} />
+                          )}
                         </div>
                       </div>
                     ))}
