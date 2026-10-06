@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { ArrowLeft, FileText, PlusCircle, Trash2, Upload, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
-import { valorAPagarDoContrato } from '../../lib/financeiro';
+import { situacaoDaNf, valorAPagarDoContrato } from '../../lib/financeiro';
+import { execucaoEhCobranca as execucaoEhCobrancaPaga } from '../../lib/notificacoesPagamento';
 import { uploadArquivoContrato } from '../../lib/driveUploadService';
 import {
   formatarMoeda,
@@ -663,6 +664,20 @@ export default function ExecucaoModal({
                               <p className="text-xs text-gray-500 mt-1">
                                 {format(new Date(exec.data), 'dd/MM/yyyy')} - Ref: {exec.observacao}
                               </p>
+                              {exec.saldoFinanceiroAbatido === false && execucaoEhCobrancaPaga(exec) && (() => {
+                                const situacao = situacaoDaNf(exec.id, pagamentos);
+                                const cor =
+                                  situacao.situacao === 'pago'
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : situacao.situacao === 'em_tramitacao'
+                                      ? 'bg-amber-50 text-amber-700'
+                                      : 'bg-gray-100 text-gray-600';
+                                return (
+                                  <span className={`mt-1 inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${cor}`} title="Situação do pagamento no Financeiro">
+                                    Pagamento: {situacao.descricao}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <div className="text-right">
                               <p className="text-lg font-bold text-red-600">- {formatarMoeda(exec.valor)}</p>

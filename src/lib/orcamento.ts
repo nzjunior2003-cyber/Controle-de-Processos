@@ -2,7 +2,8 @@
  * Classificação orçamentária (os campos da ficha da Diretoria de Finanças) —
  * catálogo código→descrição e o controle de quanto já foi pago em cada um.
  */
-import { statusDoPagamento, valorDoPagamento } from './financeiro';
+import { competenciaDoPagamento, statusDoPagamento, valorDoPagamento } from './financeiro';
+import { competenciaNoPeriodo, type FiltroPeriodo } from './periodo';
 import {
   CAMPOS_ORCAMENTARIOS,
   type CampoOrcamentario,
@@ -88,19 +89,21 @@ export const SEM_CLASSIFICACAO = 'Sem classificação';
 /**
  * Quanto já foi pago (OB feita) e quanto está em tramitação em cada código de
  * um campo (fonte, programa de trabalho, natureza, plano interno, unidade
- * gestora...). Arquivados ficam de fora; `exercicio` filtra pela competência.
+ * gestora...). Arquivados ficam de fora; `periodo` (um ano, ou vários anos/meses) filtra pela competência.
  */
 export function totaisPorCampoOrcamentario(
   pagamentos: PagamentoContrato[],
   dotacoes: DotacaoOrcamentaria[],
   campo: CampoOrcamentario,
-  exercicio?: number,
+  periodo?: number | FiltroPeriodo,
 ): TotalOrcamentario[] {
+  const filtro: FiltroPeriodo | undefined =
+    typeof periodo === 'number' ? { anos: [periodo], meses: [] } : periodo;
   const porCodigo = new Map<string, TotalOrcamentario>();
   pagamentos.forEach((p) => {
     const status = statusDoPagamento(p);
     if (status === 'arquivado') return;
-    if (exercicio !== undefined && !(p.competencia ?? p.dataPagamento ?? p.criado_em ?? '').startsWith(String(exercicio))) return;
+    if (filtro && !competenciaNoPeriodo(competenciaDoPagamento(p), filtro)) return;
     const codigo = classificacaoDoPagamento(p, dotacoes)[campo] || SEM_CLASSIFICACAO;
     const chave = chaveCodigo(codigo);
     const atual = porCodigo.get(chave) ?? { codigo, pago: 0, emTramitacao: 0, quantidade: 0 };

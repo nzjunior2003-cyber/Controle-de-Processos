@@ -105,11 +105,19 @@ import {
   PagamentoContrato,
   Notificacao,
   PushSubscriptionRegistro,
-  TipoEventoNotificacao,
+  TipoEventoProcesso,
 } from '../types';
 import { idItemCatalogo, normalizarCodigoOrcamentario } from '../lib/orcamento';
 import { resolverAndamento } from '../lib/andamentoProcesso';
 import { idAjusteRito, type AjusteRito } from '../lib/ajustesRito';
+import {
+  destinatariosFinanceiro,
+  destinatariosFiscais,
+  execucaoEhCobranca,
+  montarNotificacaoAndamentoPagamento,
+  montarNotificacaoNfAguardando,
+  mudouAndamentoPagamento,
+} from '../lib/notificacoesPagamento';
 import { getAccessToken } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
@@ -740,7 +748,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
    */
   const dispararNotificacoesProcesso = useCallback(
     async (
-      tipo: TipoEventoNotificacao,
+      tipo: TipoEventoProcesso,
       processo: Pick<Processo, 'id' | 'numero_processo' | 'objeto' | 'localizacao_atual' | 'unidade_demandante'>,
     ) => {
       try {
@@ -777,6 +785,41 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     },
     [usuarios, pushSubscriptions],
+  );
+
+  /**
+   * Grava (uma por destinatário) e envia por push as notificações já montadas
+   * — usado pelo fluxo NF/fatura → pagamento. Nunca lança: erro só é logado,
+   * pra não quebrar a ação que originou o aviso.
+   */
+  const enviarNotificacoes = useCallback(
+    async (notificacoes: Omit<Notificacao, 'id'>[]) => {
+      if (notificacoes.length === 0) return;
+      try {
+        const db = requireDb();
+        const lote = writeBatch(db);
+        notificacoes.forEach((notificacao) => lote.set(doc(collection(db, 'notificacoes')), notificacao));
+        await lote.commit();
+
+        const idToken = await getFirebaseAuth()?.currentUser?.getIdToken();
+        if (!idToken) return;
+        notificacoes.forEach((notificacao) => {
+          const inscricoes = pushSubscriptions.filter((sub) => sub.usuarioId === notificacao.destinatarioId);
+          if (inscricoes.length === 0) return;
+          fetch('/api/send-push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+            body: JSON.stringify({
+              subscriptions: inscricoes.map((sub) => ({ endpoint: sub.endpoint, keys: sub.keys })),
+              payload: { title: notificacao.titulo, body: notificacao.corpo, url: notificacao.url },
+            }),
+          }).catch((erro) => console.error('Erro ao enviar push:', erro));
+        });
+      } catch (erro) {
+        console.error('Erro ao enviar notificações:', erro);
+      }
+    },
+    [pushSubscriptions],
   );
 
   /**
@@ -1495,8 +1538,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
 
     await registrarAuditoria('execucoes', execucaoRef.id, 'CREATE', dados);
+
+    // NF/fatura nova: avisa o Financeiro que há uma cobrança aguardando pagamento.
+    if (execucaoEhCobranca(dados)) {
+      const contratoDaNf = contratos.find((c) => c.id === dados.contratoId);
+      if (contratoDaNf) {
+        void enviarNotificacoes(
+          destinatariosFinanceiro(usuarios).map((u) => montarNotificacaoNfAguardando(dados, contratoDaNf, u.id)),
+        );
+      }
+    }
     return novoSaldo;
-  }, [execucoes, pagamentos, registrarAuditoria]);
+  }, [execucoes, pagamentos, contratos, usuarios, enviarNotificacoes, registrarAuditoria]);
 
   /** Remove uma execução e devolve valor/quantidade ao saldo atual do contrato. */
   const deleteExecucao = useCallback(async (id: string, contratoId: string) => {
@@ -1856,21 +1909,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [execucoes],
   );
 
+  /** Avisa o fiscal (titular e suplente) do contrato sobre o andamento do pagamento da NF/fatura. */
+  const avisarFiscaisDoPagamento = useCallback(
+    (pagamento: Parameters<typeof montarNotificacaoAndamentoPagamento>[0] & { contratoId: string }) => {
+      const contrato = contratos.find((c) => c.id === pagamento.contratoId);
+      if (!contrato) return;
+      void enviarNotificacoes(
+        destinatariosFiscais(contrato, usuarios).map((u) => montarNotificacaoAndamentoPagamento(pagamento, contrato, u.id)),
+      );
+    },
+    [contratos, usuarios, enviarNotificacoes],
+  );
+
   const addPagamento = useCallback(
     async (dados: Omit<PagamentoContrato, 'id' | 'criado_em' | 'atualizado_em'>) => {
       const id = await gravarPagamentoComSaldo(null, dados);
       await registrarAuditoria('pagamentos', id, 'CREATE', dados);
+      avisarFiscaisDoPagamento(dados);
       return id;
     },
-    [gravarPagamentoComSaldo, registrarAuditoria],
+    [gravarPagamentoComSaldo, registrarAuditoria, avisarFiscaisDoPagamento],
   );
   const updatePagamento = useCallback(
     async (id: string, dados: Partial<PagamentoContrato>) => {
       const anterior = pagamentos.find((p) => p.id === id);
       await gravarPagamentoComSaldo(id, dados, anterior);
       await registrarAuditoria('pagamentos', id, 'UPDATE', dados, anterior);
+      if (anterior) {
+        const resultado = { ...anterior, ...dados };
+        if (mudouAndamentoPagamento(anterior, resultado)) avisarFiscaisDoPagamento(resultado);
+      }
     },
-    [gravarPagamentoComSaldo, registrarAuditoria, pagamentos],
+    [gravarPagamentoComSaldo, registrarAuditoria, pagamentos, avisarFiscaisDoPagamento],
   );
   const deletePagamento = useCallback(
     async (id: string) => {

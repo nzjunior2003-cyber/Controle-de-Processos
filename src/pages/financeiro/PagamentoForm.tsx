@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, PlusCircle, Save, Trash2, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -6,6 +6,13 @@ import { OPCOES_FONTE_PROCESSO } from '../../lib/planilhaProcessos';
 import { formatarMoeda, type ExecucaoContrato } from '../../lib/contratos';
 import BuscaContrato from './BuscaContrato';
 import { limparClassificacoes } from '../../lib/orcamento';
+import {
+  IMPOSTOS_SUGERIDOS,
+  calcularImposto,
+  totalImpostos,
+  ultimasAliquotas,
+  valorLiquido,
+} from '../../lib/impostos';
 import {
   ETAPAS_PAGAMENTO,
   SETORES_PAGAMENTO,
@@ -24,6 +31,7 @@ import {
   STATUS_PAGAMENTO_LABELS,
   type ClassificacaoOrcamentaria,
   type DocumentoPagamento,
+  type ImpostoPagamento,
   type OrdemBancaria,
   type StatusPagamento,
   CAMPOS_ORCAMENTARIOS,
@@ -44,6 +52,15 @@ interface LinhaDocumento {
   numero: string;
   valor: string;
   execucaoId: string;
+}
+interface LinhaImposto {
+  nome: string;
+  base: string;
+  aliquota: string;
+  valor: string;
+  /** true quando o valor foi digitado à mão — para de recalcular com base × alíquota. */
+  valorManual: boolean;
+  contaContabil: string;
 }
 interface LinhaOb {
   numero: string;
@@ -90,6 +107,17 @@ export default function PagamentoForm() {
   const [ordens, setOrdens] = useState<LinhaOb[]>(
     pagamento?.ordensBancarias?.map((o) => ({ numero: o.numero, documento: o.documento ?? '', valor: numeroOuVazio(o.valor), data: paraDataInput(o.data) })) ??
       (pagamento?.numeroOrdemPagamento ? [{ numero: pagamento.numeroOrdemPagamento, documento: '', valor: '', data: paraDataInput(pagamento.dataPagamento) }] : []),
+  );
+  const [temImposto, setTemImposto] = useState((pagamento?.impostos?.length ?? 0) > 0);
+  const [impostos, setImpostos] = useState<LinhaImposto[]>(
+    (pagamento?.impostos ?? []).map((i) => ({
+      nome: i.nome,
+      base: String(i.base),
+      aliquota: i.aliquota !== undefined ? String(i.aliquota) : '',
+      valor: String(i.valor),
+      valorManual: true,
+      contaContabil: i.contaContabil ?? '',
+    })),
   );
   const [setorAtual, setSetorAtual] = useState(pagamento?.setorAtual ?? '');
   const [etapa, setEtapa] = useState(pagamento?.etapa ?? '');
@@ -138,7 +166,64 @@ export default function PagamentoForm() {
     return execucoes.filter((e) => e.contratoId === contratoId && !jaVinculadas.has(e.id) && !canceladas.has(e.id));
   }, [execucoes, pagamentos, contratoId, id]);
 
+  // Vindo da fila "A pagar" (?execucaoId=): já inclui a NF, com valor e mês.
+  const execucaoDaUrl = searchParams.get('execucaoId');
+  const urlAplicada = useRef(false);
+  useEffect(() => {
+    if (emEdicao || !execucaoDaUrl || urlAplicada.current) return;
+    const execucao = execucoes.find((e) => e.id === execucaoDaUrl);
+    if (!execucao) return;
+    urlAplicada.current = true;
+    setDocumentos([{ tipo: 'NF', numero: execucao.nf, valor: String(execucao.valor), execucaoId: execucao.id }]);
+    setValorTotal(String(execucao.valor));
+    if (execucao.data) setCompetencia(execucao.data.slice(0, 7));
+  }, [emEdicao, execucaoDaUrl, execucoes]);
+
   const valorTotalNumero = paraNumero(valorTotal) ?? 0;
+
+  // Impostos: sugestões de nome/conta (as já usadas) e a última alíquota de cada imposto.
+  const historicoImpostos = useMemo(() => ultimasAliquotas(pagamentos), [pagamentos]);
+  const nomesImposto = useMemo(() => {
+    const usados = pagamentos.flatMap((p) => (p.impostos ?? []).map((i) => i.nome.trim())).filter(Boolean);
+    return Array.from(new Set([...IMPOSTOS_SUGERIDOS, ...usados]));
+  }, [pagamentos]);
+  const contasContabeis = useMemo(
+    () => Array.from(new Set(pagamentos.flatMap((p) => (p.impostos ?? []).map((i) => (i.contaContabil ?? '').trim())).filter(Boolean))),
+    [pagamentos],
+  );
+  const recalcular = (linha: LinhaImposto): LinhaImposto => {
+    if (linha.valorManual) return linha;
+    const base = paraNumero(linha.base);
+    const aliquota = paraNumero(linha.aliquota);
+    return { ...linha, valor: base !== undefined && aliquota !== undefined ? String(calcularImposto(base, aliquota)) : '' };
+  };
+  const atualizarImposto = (indice: number, mudanca: Partial<LinhaImposto>) =>
+    setImpostos((anterior) => anterior.map((l, i) => (i === indice ? recalcular({ ...l, ...mudanca }) : l)));
+  const escolherImposto = (indice: number, nome: string) => {
+    const lembrado = historicoImpostos[nome.trim().toLowerCase()];
+    setImpostos((anterior) =>
+      anterior.map((l, i) =>
+        i !== indice
+          ? l
+          : recalcular({
+              ...l,
+              nome,
+              // Pré-preenche com o que foi usado da última vez nesse imposto (só se o campo ainda está vazio).
+              aliquota: l.aliquota === '' && lembrado?.aliquota !== undefined ? String(lembrado.aliquota) : l.aliquota,
+              contaContabil: l.contaContabil === '' && lembrado?.contaContabil ? lembrado.contaContabil : l.contaContabil,
+            }),
+      ),
+    );
+  };
+  const impostosNumericos: ImpostoPagamento[] = impostos
+    .filter((l) => l.nome.trim() !== '' && paraNumero(l.valor) !== undefined)
+    .map((l) => ({
+      nome: l.nome.trim(),
+      base: paraNumero(l.base) ?? 0,
+      ...(paraNumero(l.aliquota) !== undefined ? { aliquota: paraNumero(l.aliquota) as number } : {}),
+      valor: paraNumero(l.valor) as number,
+      ...(l.contaContabil.trim() ? { contaContabil: l.contaContabil.trim() } : {}),
+    }));
   const documentosParaValidar = documentos.map((d) => ({ tipo: d.tipo, numero: d.numero, valor: paraNumero(d.valor) }));
   const diferenca = diferencaDocumentos({ valorTotal: paraNumero(valorTotal), documentos: documentosParaValidar });
   const somaNfs = somaDocumentos({ documentos: documentosParaValidar });
@@ -223,6 +308,7 @@ export default function PagamentoForm() {
         valorTotal: valorTotalNumero,
         empenhoIds,
         ordensBancarias: ordensLimpas,
+        impostos: temImposto ? impostosNumericos : [],
         dotacaoId,
         classificacao: limparClassificacoes([classificacao])[0] ?? {},
         fonteRecurso,
@@ -539,6 +625,87 @@ export default function PagamentoForm() {
                     <p className="text-emerald-700">O saldo de NE cobre esta fatura.</p>
                   )
                 )}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-gray-900">Impostos</h2>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={temImposto}
+                onChange={(e) => {
+                  setTemImposto(e.target.checked);
+                  if (e.target.checked && impostos.length === 0) {
+                    setImpostos([{ nome: '', base: valorTotal, aliquota: '', valor: '', valorManual: false, contaContabil: '' }]);
+                  }
+                }}
+                className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded cursor-pointer"
+              />
+              Há pagamento de imposto neste pagamento
+            </label>
+          </div>
+          {!temImposto ? (
+            <p className="text-sm text-gray-500">Marque se houver imposto retido/pago junto com esta NF/fatura.</p>
+          ) : (
+            <div className="space-y-3">
+              <datalist id="lista-impostos">{nomesImposto.map((n) => <option key={n} value={n} />)}</datalist>
+              <datalist id="lista-contas">{contasContabeis.map((c) => <option key={c} value={c} />)}</datalist>
+              {impostos.map((l, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-12 md:col-span-3">
+                    {i === 0 && <label className="block text-[11px] font-medium text-gray-500 uppercase">Imposto</label>}
+                    <input type="text" list="lista-impostos" value={l.nome} onChange={(e) => escolherImposto(i, e.target.value)} className={CLASSE_INPUT_LINHA} placeholder="Selecione ou digite" aria-label="Imposto" />
+                  </div>
+                  <div className="col-span-4 md:col-span-2">
+                    {i === 0 && <label className="block text-[11px] font-medium text-gray-500 uppercase">Base (R$)</label>}
+                    <input type="number" step="0.01" min="0" value={l.base} onChange={(e) => atualizarImposto(i, { base: e.target.value })} className={CLASSE_INPUT_LINHA} aria-label="Base de cálculo" />
+                  </div>
+                  <div className="col-span-3 md:col-span-1">
+                    {i === 0 && <label className="block text-[11px] font-medium text-gray-500 uppercase">Alíq. %</label>}
+                    <input type="number" step="0.0001" min="0" value={l.aliquota} onChange={(e) => atualizarImposto(i, { aliquota: e.target.value })} className={CLASSE_INPUT_LINHA} aria-label="Alíquota" />
+                  </div>
+                  <div className="col-span-5 md:col-span-2">
+                    {i === 0 && <label className="block text-[11px] font-medium text-gray-500 uppercase">Valor (R$)</label>}
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={l.valor}
+                      onChange={(e) => atualizarImposto(i, { valor: e.target.value, valorManual: true })}
+                      className={CLASSE_INPUT_LINHA}
+                      aria-label="Valor do imposto"
+                      title={l.valorManual ? 'Valor digitado à mão' : 'Calculado: base × alíquota'}
+                    />
+                  </div>
+                  <div className="col-span-10 md:col-span-3">
+                    {i === 0 && <label className="block text-[11px] font-medium text-gray-500 uppercase">Conta contábil</label>}
+                    <input type="text" list="lista-contas" value={l.contaContabil} onChange={(e) => atualizarImposto(i, { contaContabil: e.target.value })} className={CLASSE_INPUT_LINHA} aria-label="Conta contábil" />
+                  </div>
+                  <div className="col-span-2 md:col-span-1 flex items-center justify-end gap-1">
+                    {l.valorManual && (
+                      <button type="button" onClick={() => atualizarImposto(i, { valorManual: false })} className="text-[11px] text-red-700 hover:underline" title="Voltar ao cálculo automático">auto</button>
+                    )}
+                    <button type="button" onClick={() => setImpostos((anterior) => anterior.filter((_, idx) => idx !== i))} className="p-1.5 text-gray-400 hover:text-red-600" title="Remover">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setImpostos((anterior) => [...anterior, { nome: '', base: valorTotal, aliquota: '', valor: '', valorManual: false, contaContabil: '' }])}
+                className="inline-flex items-center text-sm font-medium text-red-700 hover:underline"
+              >
+                <PlusCircle className="h-4 w-4 mr-1" /> Adicionar imposto
+              </button>
+              <div className="rounded-md bg-gray-50 border border-gray-200 p-3 text-sm text-gray-700 space-y-1">
+                <p>Total de impostos: <strong>{formatarMoeda(totalImpostos(impostosNumericos))}</strong></p>
+                <p>Valor líquido ao fornecedor: <strong>{formatarMoeda(valorLiquido(valorTotalNumero, impostosNumericos))}</strong></p>
+                <p className="text-xs text-gray-500">O valor é calculado (base × alíquota); digite no campo Valor para ajustar. Cada imposto pode ir para uma conta contábil diferente.</p>
               </div>
             </div>
           )}

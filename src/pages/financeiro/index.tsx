@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DollarSign, PlusCircle, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { formatarMoeda } from '../../lib/contratos';
 import {
   competenciaDoPagamento,
   descreverAndamento,
+  filaAPagar,
   pagamentosAtivos,
   saldoDaDotacao,
   statusDoPagamento,
@@ -15,8 +16,13 @@ import { STATUS_PAGAMENTO_LABELS, type StatusPagamento } from '../../types';
 import FichaContrato from './FichaContrato';
 import { casaBusca, criarBuscaVinculada } from '../../lib/buscaVinculada';
 import ControleOrcamentario from './ControleOrcamentario';
+import FilaAPagar from './FilaAPagar';
+import AndamentoRapidoModal from './AndamentoRapidoModal';
+import FiltroPeriodo from '../../components/financeiro/FiltroPeriodo';
+import { FILTRO_PERIODO_VAZIO, competenciaNoPeriodo, type FiltroPeriodo as TipoFiltroPeriodo } from '../../lib/periodo';
 
-type Aba = 'pagamentos' | 'empenhos' | 'dotacoes' | 'ficha' | 'orcamento';
+type Aba = 'a-pagar' | 'pagamentos' | 'empenhos' | 'dotacoes' | 'ficha' | 'orcamento';
+const ABAS_VALIDAS: Aba[] = ['a-pagar', 'pagamentos', 'empenhos', 'dotacoes', 'ficha', 'orcamento'];
 
 const CORES_STATUS: Record<StatusPagamento, string> = {
   em_tramitacao: 'bg-amber-50 text-amber-700',
@@ -33,7 +39,7 @@ const formatarMes = (competencia: string) => (competencia ? `${competencia.slice
  * por contrato. Saldos e totais são sempre calculados (src/lib/financeiro.ts).
  */
 export default function Financeiro() {
-  const { pagamentos, dotacoes, empenhos, contratos, usuarioAtual, processos, procedimentos } = useApp();
+  const { pagamentos, dotacoes, empenhos, contratos, usuarioAtual, processos, procedimentos, execucoes } = useApp();
   const buscaVinculada = useMemo(
     () => criarBuscaVinculada({ processos, contratos, procedimentos }),
     [processos, contratos, procedimentos],
@@ -41,7 +47,20 @@ export default function Financeiro() {
   const navigate = useNavigate();
   const isMasterOuFinanceiro = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'financeiro';
 
-  const [aba, setAba] = useState<Aba>('pagamentos');
+  const [searchParams] = useSearchParams();
+  const abaDaUrl = searchParams.get('aba') as Aba | null;
+  const [aba, setAba] = useState<Aba>(abaDaUrl && ABAS_VALIDAS.includes(abaDaUrl) ? abaDaUrl : 'pagamentos');
+  const [periodo, setPeriodo] = useState<TipoFiltroPeriodo>(FILTRO_PERIODO_VAZIO);
+  const [pagamentoAndamento, setPagamentoAndamento] = useState<(typeof pagamentos)[number] | null>(null);
+  const qtdAPagar = useMemo(() => filaAPagar(execucoes, pagamentos).length, [execucoes, pagamentos]);
+  // Anos que existem nos dados (e o atual) — opções do filtro de período.
+  const anosDisponiveis = useMemo(() => {
+    const anos = new Set<number>([new Date().getFullYear()]);
+    pagamentos.forEach((p) => { const a = Number(competenciaDoPagamento(p).slice(0, 4)); if (a) anos.add(a); });
+    empenhos.forEach((e) => anos.add(e.exercicio));
+    dotacoes.forEach((d) => anos.add(d.exercicio));
+    return Array.from(anos).sort((a, b) => b - a);
+  }, [pagamentos, empenhos, dotacoes]);
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<StatusPagamento | ''>('');
 
@@ -65,6 +84,7 @@ export default function Financeiro() {
     const buscaNormalizada = busca.toLowerCase();
     return pagamentos
       .filter((p) => !filtroStatus || statusDoPagamento(p) === filtroStatus)
+      .filter((p) => competenciaNoPeriodo(competenciaDoPagamento(p), periodo))
       .filter((p) => {
         if (!buscaNormalizada) return true;
         const contrato = contratoPorId.get(p.contratoId);
@@ -81,11 +101,12 @@ export default function Financeiro() {
       .sort((a, b) => competenciaDoPagamento(b).localeCompare(competenciaDoPagamento(a)));
     // numerosNe/numerosOb dependem só de empenhoPorId, já listado.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagamentos, busca, filtroStatus, contratoPorId, empenhoPorId, buscaVinculada]);
+  }, [pagamentos, busca, filtroStatus, periodo, contratoPorId, empenhoPorId, buscaVinculada]);
 
   const empenhosFiltrados = useMemo(() => {
     const buscaNormalizada = busca.toLowerCase();
     return empenhos
+      .filter((e) => periodo.anos.length === 0 || periodo.anos.includes(e.exercicio))
       .filter((e) => {
         if (!buscaNormalizada) return true;
         const contrato = contratoPorId.get(e.contratoId);
@@ -93,18 +114,19 @@ export default function Financeiro() {
           .some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
       })
       .sort((a, b) => b.exercicio - a.exercicio || a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true }));
-  }, [empenhos, busca, contratoPorId]);
+  }, [empenhos, busca, contratoPorId, periodo.anos]);
 
   const dotacoesFiltradas = useMemo(() => {
     const buscaNormalizada = busca.toLowerCase();
     return dotacoes
+      .filter((d) => periodo.anos.length === 0 || periodo.anos.includes(d.exercicio))
       .filter((d) => {
         if (!buscaNormalizada) return true;
         return [d.codigo, d.descricao, d.fonteRecurso, d.fonteCodigo, d.funcionalProgramatica, d.planoInterno]
           .some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
       })
       .sort((a, b) => b.exercicio - a.exercicio || a.codigo.localeCompare(b.codigo));
-  }, [dotacoes, busca]);
+  }, [dotacoes, busca, periodo.anos]);
 
   const totalFiltrado = pagamentosAtivos(pagamentosFiltrados).reduce((acc, p) => acc + valorDoPagamento(p), 0);
 
@@ -126,6 +148,7 @@ export default function Financeiro() {
         : '/sistema/financeiro/dotacoes/novo';
 
   const abas: { id: Aba; nome: string }[] = [
+    { id: 'a-pagar', nome: qtdAPagar > 0 ? `A pagar (${qtdAPagar})` : 'A pagar' },
     { id: 'pagamentos', nome: 'Pagamentos' },
     { id: 'empenhos', nome: 'Empenhos (NE)' },
     { id: 'dotacoes', nome: 'Dotações' },
@@ -147,7 +170,7 @@ export default function Financeiro() {
             Controle de pagamentos da Diretoria de Finanças: faturas (PAE), notas de empenho, ordens bancárias e dotações.
           </p>
         </div>
-        {isMasterOuFinanceiro && aba !== 'ficha' && aba !== 'orcamento' && (
+        {isMasterOuFinanceiro && aba !== 'ficha' && aba !== 'orcamento' && aba !== 'a-pagar' && (
           <button
             onClick={() => navigate(rotaNovo)}
             className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800"
@@ -170,10 +193,16 @@ export default function Financeiro() {
         ))}
       </div>
 
-      {aba === 'ficha' ? (
+      {(aba === 'pagamentos' || aba === 'empenhos' || aba === 'dotacoes' || aba === 'orcamento') && (
+        <FiltroPeriodo valor={periodo} onChange={setPeriodo} anosDisponiveis={anosDisponiveis} />
+      )}
+
+      {aba === 'a-pagar' ? (
+        <FilaAPagar />
+      ) : aba === 'ficha' ? (
         <FichaContrato />
       ) : aba === 'orcamento' ? (
-        <ControleOrcamentario />
+        <ControleOrcamentario periodo={periodo} />
       ) : (
         <>
           <div className="bg-white p-4 shadow-sm rounded-lg border border-gray-200 flex flex-col sm:flex-row gap-3">
@@ -226,6 +255,7 @@ export default function Financeiro() {
                       <th className={`${CABECALHO} text-right`}>Valor</th>
                       <th className={`${CABECALHO} text-center`}>Mês</th>
                       <th className={`${CABECALHO} text-center`}>Situação</th>
+                      {isMasterOuFinanceiro && <th className={`${CABECALHO} text-center`}>Andamento</th>}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -255,12 +285,26 @@ export default function Financeiro() {
                               {STATUS_PAGAMENTO_LABELS[status]}
                             </span>
                           </td>
+                          {isMasterOuFinanceiro && (
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPagamentoAndamento(p);
+                                }}
+                                className="text-xs font-medium text-red-700 hover:underline whitespace-nowrap"
+                              >
+                                Alterar
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
                     {pagamentosFiltrados.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500">Nenhum pagamento encontrado.</td>
+                        <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-500">Nenhum pagamento encontrado.</td>
                       </tr>
                     )}
                   </tbody>
@@ -357,6 +401,14 @@ export default function Financeiro() {
             </div>
           )}
         </>
+      )}
+
+      {pagamentoAndamento && (
+        <AndamentoRapidoModal
+          key={pagamentoAndamento.id}
+          pagamento={pagamentoAndamento}
+          onFechar={() => setPagamentoAndamento(null)}
+        />
       )}
     </div>
   );

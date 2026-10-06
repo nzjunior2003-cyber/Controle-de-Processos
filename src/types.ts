@@ -776,6 +776,19 @@ export interface DocumentoPagamento {
   execucaoId?: string;
 }
 
+/** Imposto pago/retido junto com o pagamento de uma NF/fatura. */
+export interface ImpostoPagamento {
+  nome: string;
+  /** Base de cálculo (em geral o valor da fatura). */
+  base: number;
+  /** Alíquota em % (ex.: 5 = 5%). */
+  aliquota?: number;
+  /** Valor do imposto — calculado (base × alíquota) ou digitado. */
+  valor: number;
+  /** Conta contábil de destino; impostos diferentes podem ter contas diferentes. */
+  contaContabil?: string;
+}
+
 /** Ordem Bancária (OB) de um pagamento — pode haver mais de uma (ex.: pagamento + retenção). */
 export interface OrdemBancaria {
   numero: string;
@@ -809,6 +822,8 @@ export interface PagamentoContrato {
   valorTotal?: number;
   empenhoIds?: string[];
   ordensBancarias?: OrdemBancaria[];
+  /** Impostos retidos/pagos neste pagamento (vazio/ausente = sem imposto). */
+  impostos?: ImpostoPagamento[];
   dotacaoId?: string;
   /** Classificação orçamentária da despesa (cópia dos códigos da dotação do processo ou da ficha) — base do controle por fonte/programa/natureza/plano/UG. */
   classificacao?: ClassificacaoOrcamentaria;
@@ -841,7 +856,14 @@ export interface PagamentoContrato {
 }
 
 /** Eventos de um processo que disparam notificação (push + central interna). */
-export type TipoEventoNotificacao = 'mudanca_setor' | 'mudanca_fase' | 'conclusao';
+export type TipoEventoProcesso = 'mudanca_setor' | 'mudanca_fase' | 'conclusao';
+
+export type TipoEventoNotificacao =
+  | TipoEventoProcesso
+  /** O fiscal lançou uma NF/fatura — aguarda pagamento do Financeiro. */
+  | 'nf_aguardando_pagamento'
+  /** O pagamento da NF/fatura mudou de etapa ou foi concluído. */
+  | 'pagamento_andamento';
 
 /**
  * Notificação dirigida a um único usuário (destinatarioId), gravada pelo

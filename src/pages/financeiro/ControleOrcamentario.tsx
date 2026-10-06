@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { formatarMoeda } from '../../lib/contratos';
 import { SEM_CLASSIFICACAO, descricaoDoCodigo, totaisPorCampoOrcamentario } from '../../lib/orcamento';
 import { CAMPOS_ORCAMENTARIOS, type CampoOrcamentario } from '../../types';
+import { filtroPeriodoAtivo, type FiltroPeriodo } from '../../lib/periodo';
 
 /**
  * Visão ampla do Financeiro/DF: quanto já foi pago (OB feita) e quanto está em
@@ -10,19 +11,13 @@ import { CAMPOS_ORCAMENTARIOS, type CampoOrcamentario } from '../../types';
  * interno, unidade gestora etc. — a partir da classificação de cada pagamento
  * (vinda da dotação lançada no checklist do processo). Arquivados ficam fora.
  */
-export default function ControleOrcamentario() {
+export default function ControleOrcamentario({ periodo }: { periodo: FiltroPeriodo }) {
   const { pagamentos, dotacoes, catalogoOrcamentario } = useApp();
   const [campo, setCampo] = useState<CampoOrcamentario>('fonte');
-  const [exercicio, setExercicio] = useState(new Date().getFullYear());
-
-  const anos = useMemo(() => {
-    const doPagamento = pagamentos.map((p) => Number((p.competencia ?? p.dataPagamento ?? p.criado_em ?? '').slice(0, 4))).filter(Boolean);
-    return Array.from(new Set([new Date().getFullYear(), ...doPagamento])).sort((a, b) => b - a);
-  }, [pagamentos]);
 
   const linhas = useMemo(
-    () => totaisPorCampoOrcamentario(pagamentos, dotacoes, campo, exercicio),
-    [pagamentos, dotacoes, campo, exercicio],
+    () => totaisPorCampoOrcamentario(pagamentos, dotacoes, campo, periodo),
+    [pagamentos, dotacoes, campo, periodo],
   );
   const totalPago = linhas.reduce((acc, l) => acc + l.pago, 0);
   const totalTramitacao = linhas.reduce((acc, l) => acc + l.emTramitacao, 0);
@@ -40,19 +35,11 @@ export default function ControleOrcamentario() {
         >
           {CAMPOS_ORCAMENTARIOS.map((c) => <option key={c.chave} value={c.chave}>Por {c.rotulo}</option>)}
         </select>
-        <select
-          value={exercicio}
-          onChange={(e) => setExercicio(Number(e.target.value))}
-          className="block w-full sm:w-32 rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white"
-          aria-label="Exercício"
-        >
-          {anos.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-xs text-gray-500 uppercase">Pago em {exercicio}</p>
+          <p className="text-xs text-gray-500 uppercase">Pago {filtroPeriodoAtivo(periodo) ? 'no período' : 'no total'}</p>
           <p className="text-xl font-bold text-emerald-700">{formatarMoeda(totalPago)}</p>
         </div>
         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -85,7 +72,7 @@ export default function ControleOrcamentario() {
               </tr>
             ))}
             {linhas.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">Nenhum pagamento em {exercicio}.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">Nenhum pagamento no período.</td></tr>
             )}
           </tbody>
         </table>

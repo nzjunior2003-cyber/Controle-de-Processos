@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   execucoesArquivadas,
+  filaAPagar,
+  situacaoDaNf,
   valorASerAbatido,
   valorAPagarDoContrato,
   valorJaAbatido,
@@ -300,5 +302,34 @@ describe('saldo do contrato só cai com o pagamento', () => {
     const pagos = [{ status: 'pago' as const, documentos: [{ tipo: 'NF' as const, numero: '1', execucaoId: 'e1' }] }];
     expect(valorAPagarDoContrato('c1', execs, pagos)).toBe(50);
     expect(valorAPagarDoContrato('c1', execs, [])).toBe(750);
+  });
+});
+
+describe('fila A pagar e situação da NF', () => {
+  const nova = (id: string, extra = {}) => ({ id, contratoId: 'c1', valor: 100, saldoFinanceiroAbatido: false, ...extra });
+  const doc = (execucaoId: string) => ({ tipo: 'NF' as const, numero: execucaoId, execucaoId });
+
+  it('só NFs novas, com valor, fora de recibo e sem pagamento ativo', () => {
+    const execs = [
+      nova('a'),
+      nova('b'),
+      nova('c', { tipo: 'Recibo de Pagamento' }),
+      nova('d', { valor: 0 }),
+      { id: 'e', contratoId: 'c1', valor: 5 },
+      nova('f'),
+    ];
+    const pagamentos = [
+      { status: 'em_tramitacao' as const, documentos: [doc('b')] },
+      { status: 'arquivado' as const, documentos: [doc('f')] },
+    ];
+    expect(filaAPagar(execs, pagamentos).map((e) => e.id)).toEqual(['a']);
+  });
+
+  it('situação: aguardando, em tramitação (com etapa) ou pago', () => {
+    expect(situacaoDaNf('x', []).situacao).toBe('aguardando');
+    const tram = [{ status: 'em_tramitacao' as const, setorAtual: 'GAB', etapa: 'P/ ASS', documentos: [doc('x')] }];
+    expect(situacaoDaNf('x', tram)).toEqual({ situacao: 'em_tramitacao', descricao: 'GAB - P/ ASS' });
+    expect(situacaoDaNf('x', [{ status: 'pago' as const, documentos: [doc('x')] }]).situacao).toBe('pago');
+    expect(situacaoDaNf('x', [{ status: 'arquivado' as const, documentos: [doc('x')] }]).situacao).toBe('aguardando');
   });
 });

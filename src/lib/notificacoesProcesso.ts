@@ -5,7 +5,7 @@
  * dispara é sempre o cliente que fez a escrita (ver
  * `dispararNotificacoesProcesso`, AppContext.tsx).
  */
-import type { Notificacao, Processo, TipoEventoNotificacao, Usuario } from '../types';
+import type { Notificacao, Processo, TipoEventoProcesso, Usuario } from '../types';
 
 /**
  * Quem recebe a notificação de cada tipo de evento:
@@ -16,7 +16,7 @@ import type { Notificacao, Processo, TipoEventoNotificacao, Usuario } from '../t
  *   mudança (Apoio) já sabe.
  */
 export function destinatariosEventoProcesso(
-  tipo: TipoEventoNotificacao,
+  tipo: TipoEventoProcesso,
   processo: Pick<Processo, 'unidade_demandante'>,
   usuarios: Usuario[],
 ): Usuario[] {
@@ -31,13 +31,13 @@ export function destinatariosEventoProcesso(
   return [...demandantesDoSetor, ...equipeApoio.filter((u) => !idsJaIncluidos.has(u.id))];
 }
 
-const TITULOS: Record<TipoEventoNotificacao, (numero: string) => string> = {
+const TITULOS: Record<TipoEventoProcesso, (numero: string) => string> = {
   mudanca_setor: (numero) => `Processo ${numero} mudou de setor`,
   mudanca_fase: (numero) => `Processo ${numero} mudou de fase`,
   conclusao: (numero) => `Processo ${numero} foi concluído`,
 };
 
-const CORPOS: Record<TipoEventoNotificacao, (processo: Pick<Processo, 'objeto' | 'localizacao_atual'>) => string> = {
+const CORPOS: Record<TipoEventoProcesso, (processo: Pick<Processo, 'objeto' | 'localizacao_atual'>) => string> = {
   mudanca_setor: (p) => `Agora está em: ${p.localizacao_atual || 'setor não informado'}. Objeto: ${p.objeto}`,
   mudanca_fase: (p) => `Objeto: ${p.objeto}`,
   conclusao: (p) => `Processo concluído. Objeto: ${p.objeto}`,
@@ -45,7 +45,7 @@ const CORPOS: Record<TipoEventoNotificacao, (processo: Pick<Processo, 'objeto' |
 
 /** Monta a notificação (sem id) pra um destinatário específico. */
 export function montarNotificacao(
-  tipo: TipoEventoNotificacao,
+  tipo: TipoEventoProcesso,
   processo: Pick<Processo, 'id' | 'numero_processo' | 'objeto' | 'localizacao_atual'>,
   destinatarioId: string,
 ): Omit<Notificacao, 'id'> {

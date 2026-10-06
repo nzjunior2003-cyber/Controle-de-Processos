@@ -228,6 +228,47 @@ export function execucoesArquivadas(
 }
 
 /**
+ * Fila "A pagar" do Financeiro: NFs/faturas lançadas pelo fiscal (modelo novo)
+ * que ainda não estão em nenhum pagamento — nem em tramitação, nem pago.
+ * As que só estão em fatura arquivada (NF cancelada) ficam de fora.
+ */
+export function filaAPagar<
+  E extends Pick<ExecucaoContrato, 'id' | 'tipo' | 'valor' | 'saldoFinanceiroAbatido'>,
+>(execucoes: E[], pagamentos: Pick<PagamentoContrato, 'status' | 'documentos'>[]): E[] {
+  const emUso = new Set(
+    pagamentos
+      .filter((p) => statusDoPagamento(p) !== 'arquivado')
+      .flatMap((p) => (p.documentos ?? []).map((d) => d.execucaoId))
+      .filter(Boolean),
+  );
+  const canceladas = execucoesArquivadas(pagamentos);
+  const sem = ['Recebimento da NE pelo Fornecedor', 'Recibo de Pagamento'];
+  return execucoes.filter(
+    (e) =>
+      e.saldoFinanceiroAbatido === false &&
+      (e.valor ?? 0) > 0 &&
+      !sem.includes(e.tipo ?? '') &&
+      !emUso.has(e.id) &&
+      !canceladas.has(e.id),
+  );
+}
+
+/** Situação de uma NF do ponto de vista do pagamento — o que o fiscal acompanha. */
+export function situacaoDaNf(
+  execucaoId: string,
+  pagamentos: Pick<PagamentoContrato, 'status' | 'documentos' | 'setorAtual' | 'etapa'>[],
+): { situacao: 'aguardando' | 'em_tramitacao' | 'pago'; descricao: string } {
+  const doPagamento = pagamentos
+    .filter((p) => (p.documentos ?? []).some((d) => d.execucaoId === execucaoId))
+    .filter((p) => statusDoPagamento(p) !== 'arquivado');
+  const pago = doPagamento.find((p) => statusDoPagamento(p) === 'pago');
+  if (pago) return { situacao: 'pago', descricao: 'Pago' };
+  const emTramitacao = doPagamento[0];
+  if (emTramitacao) return { situacao: 'em_tramitacao', descricao: descreverAndamento(emTramitacao) };
+  return { situacao: 'aguardando', descricao: 'Aguardando pagamento' };
+}
+
+/**
  * NFs lançadas pelo fiscal (modelo novo) cujo pagamento ainda não foi
  * registrado como pago — o valor "comprometido" que ainda não saiu do saldo.
  */
