@@ -108,6 +108,8 @@ export default function PagamentoForm() {
   // Dotações lançadas no checklist do processo deste contrato (o PAE do contrato = nº do processo).
   const linhasDoProcesso = useMemo(() => {
     const processo = contrato ? processos.find((p) => p.numero_processo === contrato.pae) : undefined;
+    // Dotação do contrato (se um apostilamento a trocou) tem prioridade sobre a do processo de origem.
+    if (contrato?.dotacoes_orcamentarias?.length) return limparClassificacoes(contrato.dotacoes_orcamentarias);
     return limparClassificacoes(processo?.dotacoes_orcamentarias ?? []);
   }, [contrato, processos]);
   const rotuloClassificacao = (c: ClassificacaoOrcamentaria) =>

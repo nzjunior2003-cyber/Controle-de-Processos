@@ -99,6 +99,8 @@ import {
   DotacaoOrcamentaria,
   Empenho,
   CampoOrcamentario,
+  AditivoArp,
+  Apostilamento,
   ItemCatalogoOrcamentario,
   PagamentoContrato,
   Notificacao,
@@ -139,6 +141,12 @@ interface AppContextData {
   empenhos: Empenho[];
   catalogoOrcamentario: ItemCatalogoOrcamentario[];
   ajustesRito: AjusteRito[];
+  aditivosArp: AditivoArp[];
+  /** Prorroga a vigência de uma ata (ARP/adesão/partícipe) e registra o aditivo. */
+  addAditivoArp: (dados: Omit<AditivoArp, 'id' | 'criado_em' | 'vigenciaAnterior'>) => Promise<void>;
+  apostilamentos: Apostilamento[];
+  /** Registra um apostilamento e aplica ao contrato a fonte/dotação novas (quando for o caso). */
+  addApostilamento: (dados: Omit<Apostilamento, 'id' | 'criado_em' | 'fonteAnterior' | 'dotacoesAnteriores'>) => Promise<void>;
   /** Master: grava os itens incluídos/excluídos de um rito (sobre a lista oficial da planilha). */
   salvarAjusteRito: (rito: string, adicionar: string[], remover: string[]) => Promise<void>;
   /** Só as últimas 50 do usuário logado (ver `useNotificacoesDoUsuario`). */
@@ -429,6 +437,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const empenhos = useColecao<Empenho>('empenhos', isAuthenticated);
   const catalogoOrcamentario = useColecao<ItemCatalogoOrcamentario>('catalogo_orcamentario', isAuthenticated);
   const ajustesRito = useColecao<AjusteRito>('ajustes_rito', isAuthenticated);
+  const aditivosArp = useColecao<AditivoArp>('aditivos_arp', isAuthenticated);
+  const apostilamentos = useColecao<Apostilamento>('apostilamentos', isAuthenticated);
   const notificacoes = useNotificacoesDoUsuario(usuarioAtual?.id, isAuthenticated);
   const pushSubscriptions = useColecao<PushSubscriptionRegistro>('push_subscriptions', isAuthenticated);
   // Leitura restrita a 'master' nas firestore.rules — só assina quando fizer
@@ -1612,6 +1622,73 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [usuarioAtual, aditivos, registrarAuditoria],
   );
 
+  const addAditivoArp = useCallback(
+    async (dados: Omit<AditivoArp, 'id' | 'criado_em' | 'vigenciaAnterior'>) => {
+      const perfil = usuarioAtual?.perfil;
+      if (perfil !== 'master' && perfil !== 'contratos') {
+        throw new Error('Você não tem permissão para registrar aditivos de ARP.');
+      }
+      const numero = dados.numero.trim().toLowerCase();
+      if (aditivosArp.some((a) => a.procedimentoId === dados.procedimentoId && a.numero.trim().toLowerCase() === numero)) {
+        throw new Error(`Já existe um aditivo nº ${dados.numero} registrado nesta ata.`);
+      }
+      const db = requireDb();
+      const procRef = doc(db, 'procedimentos', dados.procedimentoId);
+      const aditivoRef = doc(collection(db, 'aditivos_arp'));
+      const agora = new Date().toISOString();
+      const vigenciaAnterior = await runTransaction(db, async (transacao) => {
+        const snap = await transacao.get(procRef);
+        if (!snap.exists()) throw new Error('Ata não encontrada.');
+        const anterior = (snap.data() as ProcedimentoLicitatorio).vigenciaArp ?? '';
+        transacao.set(aditivoRef, { ...dados, vigenciaAnterior: anterior, criado_em: agora });
+        transacao.update(procRef, { vigenciaArp: dados.novaFimVigencia, atualizado_em: agora });
+        return anterior;
+      });
+      await registrarAuditoria('aditivos_arp', aditivoRef.id, 'CREATE', { ...dados, vigenciaAnterior });
+    },
+    [usuarioAtual, aditivosArp, registrarAuditoria],
+  );
+
+  const addApostilamento = useCallback(
+    async (dados: Omit<Apostilamento, 'id' | 'criado_em' | 'fonteAnterior' | 'dotacoesAnteriores'>) => {
+      const perfil = usuarioAtual?.perfil;
+      if (perfil !== 'master' && perfil !== 'contratos' && perfil !== 'gestao') {
+        throw new Error('Você não tem permissão para registrar apostilamentos.');
+      }
+      const numero = dados.numero.trim().toLowerCase();
+      if (apostilamentos.some((a) => a.contratoId === dados.contratoId && a.numero.trim().toLowerCase() === numero)) {
+        throw new Error(`Já existe um apostilamento nº ${dados.numero} registrado neste contrato.`);
+      }
+      const db = requireDb();
+      const contratoRef = doc(db, 'contratos', dados.contratoId);
+      const apostilaRef = doc(collection(db, 'apostilamentos'));
+      const agora = new Date().toISOString();
+      const registro = await runTransaction(db, async (transacao) => {
+        const snap = await transacao.get(contratoRef);
+        if (!snap.exists()) throw new Error('Contrato não encontrado.');
+        const contrato = snap.data() as Contrato;
+        const atualizacao: Record<string, unknown> = {};
+        const extra: Record<string, unknown> = {};
+        if (dados.tipo === 'FONTE_PAGAMENTO' && dados.fonteNova) {
+          extra.fonteAnterior = contrato.fonteRecurso ?? '';
+          atualizacao.fonteRecurso = dados.fonteNova;
+        }
+        if (dados.tipo === 'DOTACAO_ORCAMENTARIA' && dados.dotacoesNovas) {
+          extra.dotacoesAnteriores = contrato.dotacoes_orcamentarias ?? [];
+          atualizacao.dotacoes_orcamentarias = dados.dotacoesNovas;
+        }
+        const documento = { ...dados, ...extra, criado_em: agora };
+        transacao.set(apostilaRef, documento);
+        if (Object.keys(atualizacao).length > 0) {
+          transacao.update(contratoRef, { ...atualizacao, atualizado_em: agora });
+        }
+        return documento;
+      });
+      await registrarAuditoria('apostilamentos', apostilaRef.id, 'CREATE', registro);
+    },
+    [usuarioAtual, apostilamentos, registrarAuditoria],
+  );
+
   const addProcedimento = useCallback(
     async (dados: Omit<ProcedimentoLicitatorio, 'id'>) => {
       const id = await criarEm('procedimentos', dados);
@@ -2000,6 +2077,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       salvarItemCatalogo,
       ajustesRito,
       salvarAjusteRito,
+      aditivosArp,
+      addAditivoArp,
+      apostilamentos,
+      addApostilamento,
       notificacoes,
       pushSubscriptions,
       logsAcesso,
@@ -2081,6 +2162,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       salvarItemCatalogo,
       ajustesRito,
       salvarAjusteRito,
+      aditivosArp,
+      addAditivoArp,
+      apostilamentos,
+      addApostilamento,
       notificacoes,
       pushSubscriptions,
       logsAcesso,

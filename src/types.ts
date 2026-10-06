@@ -373,6 +373,10 @@ export interface Contrato {
   historicoFiscal?: HistoricoFiscalContrato[];
   portaria?: string;
   fonteRecurso?: string;
+  /** Dotação orçamentária do contrato (apostilamento de dotação pode trocá-la); sem ela vale a do processo de origem. */
+  dotacoes_orcamentarias?: ClassificacaoOrcamentaria[];
+  /** Ata (procedimento de ARP/adesão/partícipe) de onde o contrato se originou — o valor dele sai do saldo da ata. */
+  arpId?: string;
   /** Natureza de despesa do contrato (Consumo, Permanente ou Serviço). */
   naturezaDespesa?: string;
   /** Marcado manualmente pelo Gestor quando o contrato foi encerrado/totalmente executado antes do fim da vigência (ou mesmo depois, como registro). */
@@ -606,6 +610,52 @@ export interface IRP {
   procedimentoVinculadoId?: string;
   criado_em: string;
   atualizado_em: string;
+}
+
+/** Aditivo de uma ARP/ata (adesão, própria ou partícipe): prorrogação da vigência da ata. */
+export interface AditivoArp {
+  id: string;
+  procedimentoId: string;
+  numero: string;
+  data: string;
+  /** Novo fim de vigência da ata (AAAA-MM-DD). */
+  novaFimVigencia: string;
+  /** Fim de vigência que a ata tinha antes deste aditivo. */
+  vigenciaAnterior?: string;
+  observacao?: string;
+  registradoPorId: string;
+  registradoPorNome: string;
+  criado_em?: string;
+}
+
+export type TipoApostilamento = 'DADOS_CONTRATUAIS' | 'FONTE_PAGAMENTO' | 'DOTACAO_ORCAMENTARIA';
+
+export const TIPO_APOSTILAMENTO_LABELS: Record<TipoApostilamento, string> = {
+  DADOS_CONTRATUAIS: 'Alteração de dados contratuais',
+  FONTE_PAGAMENTO: 'Alteração da fonte de pagamento',
+  DOTACAO_ORCAMENTARIA: 'Alteração da dotação orçamentária',
+};
+
+/**
+ * Apostilamento a um contrato: registra a alteração (dados, fonte ou dotação)
+ * sem mudar o valor nem o prazo. Fonte e dotação são aplicadas ao contrato;
+ * o que havia antes fica guardado em `anterior*` para o histórico.
+ */
+export interface Apostilamento {
+  id: string;
+  contratoId: string;
+  tipo: TipoApostilamento;
+  numero: string;
+  data: string;
+  /** O que foi alterado, em texto (obrigatório em qualquer tipo). */
+  descricao: string;
+  fonteAnterior?: string;
+  fonteNova?: string;
+  dotacoesNovas?: ClassificacaoOrcamentaria[];
+  dotacoesAnteriores?: ClassificacaoOrcamentaria[];
+  registradoPorId: string;
+  registradoPorNome: string;
+  criado_em?: string;
 }
 
 /** Campos da classificação orçamentária (os mesmos do cabeçalho da ficha da Diretoria de Finanças). */

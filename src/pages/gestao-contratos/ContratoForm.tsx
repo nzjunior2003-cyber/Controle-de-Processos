@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, FileText, PlusCircle, Save, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Contrato, ItemContrato } from '../../types';
+import { ehProcedimentoArp, saldoDaArp } from '../../lib/arp';
 import { STATUS_PAGAMENTO_LABELS } from '../../types';
 import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
@@ -81,6 +82,8 @@ interface FormState {
   fiscalSuplenteUbm: string;
   portaria: string;
   fonteRecurso: string;
+  /** Id da ata (procedimento de ARP/adesão/partícipe) de onde o contrato se originou. */
+  arpId: string;
   naturezaDespesa: string;
   prd: string;
   valorPRD: string;
@@ -120,6 +123,7 @@ const estadoVazio: FormState = {
   fiscalSuplenteUbm: '',
   portaria: '',
   fonteRecurso: '',
+  arpId: '',
   naturezaDespesa: '',
   prd: '',
   valorPRD: '',
@@ -166,6 +170,7 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
     fiscalSuplenteUbm: contrato.fiscalSuplenteUbm ?? '',
     portaria: contrato.portaria ?? '',
     fonteRecurso: contrato.fonteRecurso ?? '',
+    arpId: contrato.arpId ?? '',
     naturezaDespesa: contrato.naturezaDespesa ?? '',
     prd: contrato.prd ?? '',
     valorPRD: contrato.valorPRD != null ? String(contrato.valorPRD) : '',
@@ -185,7 +190,7 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
 export default function ContratoForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { contratos, addContrato, updateContrato, deleteContrato, usuarioAtual, pagamentos } = useApp();
+  const { contratos, addContrato, updateContrato, deleteContrato, usuarioAtual, pagamentos, procedimentos } = useApp();
 
   const contrato = id ? contratos.find((c) => c.id === id) ?? null : null;
   const emEdicao = !!id;
@@ -388,6 +393,7 @@ export default function ContratoForm() {
         fiscalSuplenteUbm: form.fiscalSuplenteUbm || '',
         portaria: form.portaria || '',
         fonteRecurso: form.fonteRecurso || '',
+        arpId: form.arpId || '',
         naturezaDespesa: form.naturezaDespesa || '',
         prd: form.prd || '',
         ...(form.valorPRD ? { valorPRD: parseValorMonetario(form.valorPRD) } : {}),
@@ -1076,6 +1082,35 @@ export default function ContratoForm() {
                     <option key={opcao} value={opcao}>{opcao}</option>
                   ))}
                 </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className={CLASSE_LABEL}>Ata de origem (ARP / adesão / partícipe)</label>
+                <select
+                  value={form.arpId}
+                  onChange={(e) => handleChange('arpId', e.target.value)}
+                  className={`${CLASSE_INPUT} bg-white`}
+                >
+                  <option value="">Nenhuma — contrato não vem de ata</option>
+                  {procedimentos.filter(ehProcedimentoArp).map((proc) => (
+                    <option key={proc.id} value={proc.id}>
+                      {proc.modalidade} {proc.numero} — {proc.fornecedor || proc.objeto}
+                    </option>
+                  ))}
+                </select>
+                {(() => {
+                  const ata = procedimentos.find((proc) => proc.id === form.arpId);
+                  if (!ata) return <p className="mt-1 text-xs text-gray-500">Vincule o contrato à ata para controlar o saldo dela nas compras futuras.</p>;
+                  const saldo = saldoDaArp(ata, contratos.filter((c) => c.id !== contrato?.id));
+                  const valorDesteContrato = parseValorMonetario(form.valorGlobal) || 0;
+                  const restante = saldo.registrado - saldo.utilizado - valorDesteContrato;
+                  return (
+                    <p className={`mt-1 text-xs ${saldo.registrado > 0 && restante < 0 ? 'text-red-700' : 'text-gray-500'}`}>
+                      {saldo.registrado > 0
+                        ? `Registrado ${formatarMoeda(saldo.registrado)} · já contratado por outros ${formatarMoeda(saldo.utilizado)} · saldo após este contrato ${formatarMoeda(restante)}`
+                        : 'Informe o valor homologado no procedimento da ata para calcular o saldo.'}
+                    </p>
+                  );
+                })()}
               </div>
               <div>
                 <label className={CLASSE_LABEL}>Natureza de Despesa</label>

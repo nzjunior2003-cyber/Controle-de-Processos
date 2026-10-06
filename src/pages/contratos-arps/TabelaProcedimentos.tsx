@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
-import type { ProcedimentoLicitatorio } from '../../types';
+import type { Contrato, ProcedimentoLicitatorio } from '../../types';
+import { formatarMoeda } from '../../lib/contratos';
+import { ehProcedimentoArp, saldoDaArp } from '../../lib/arp';
 
 const formatarData = (valor?: string) => {
   if (!valor || valor === '-') return '-';
@@ -15,6 +17,10 @@ interface Props {
   getPcaTitleByProcesso: (numeroProcesso: string) => string | null;
   podeEditar: boolean;
   onEditar: (item: ProcedimentoLicitatorio) => void;
+  /** Contratos, pra calcular quanto da ata já foi usado pelos contratos vinculados a ela. */
+  contratos?: Contrato[];
+  /** Abre os aditivos (prorrogação) da ata — só para registros já gravados, não os automáticos. */
+  onAditivos?: (item: ProcedimentoLicitatorio) => void;
 }
 
 export default function TabelaProcedimentos({
@@ -22,6 +28,8 @@ export default function TabelaProcedimentos({
   getPcaTitleByProcesso,
   podeEditar,
   onEditar,
+  contratos = [],
+  onAditivos,
 }: Props) {
   const [expandido, setExpandido] = useState<string | null>(null);
 
@@ -110,15 +118,53 @@ export default function TabelaProcedimentos({
                             )}
                           </div>
                         </div>
-                        {podeEditar && (
-                          <button
-                            onClick={() => onEditar(item)}
-                            className="text-white bg-red-600 hover:bg-red-700 px-4 py-2 text-sm font-medium rounded-md shadow-sm transition-colors whitespace-nowrap"
-                          >
-                            Editar Procedimento
-                          </button>
-                        )}
+                        <div className="flex flex-col gap-2 items-stretch">
+                          {podeEditar && (
+                            <button
+                              onClick={() => onEditar(item)}
+                              className="text-white bg-red-600 hover:bg-red-700 px-4 py-2 text-sm font-medium rounded-md shadow-sm transition-colors whitespace-nowrap"
+                            >
+                              Editar Procedimento
+                            </button>
+                          )}
+                          {podeEditar && onAditivos && ehProcedimentoArp(item) && !item.isAuto && (
+                            <button
+                              onClick={() => onAditivos(item)}
+                              className="text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 text-sm font-medium rounded-md shadow-sm transition-colors whitespace-nowrap"
+                            >
+                              Aditivos
+                            </button>
+                          )}
+                        </div>
                       </div>
+                      {ehProcedimentoArp(item) && !item.isAuto && (() => {
+                        const saldo = saldoDaArp(item, contratos);
+                        return (
+                          <div className="mt-3 bg-white p-4 rounded-lg border border-red-100 shadow-sm text-sm">
+                            <span className="font-semibold text-gray-900 block mb-2">Saldo da ata para compras futuras</span>
+                            <div className="grid grid-cols-3 gap-4 mb-3">
+                              <div><span className="block text-xs text-gray-500 uppercase">Registrado</span>{saldo.registrado > 0 ? formatarMoeda(saldo.registrado) : 'não informado'}</div>
+                              <div><span className="block text-xs text-gray-500 uppercase">Já contratado</span>{formatarMoeda(saldo.utilizado)}</div>
+                              <div>
+                                <span className="block text-xs text-gray-500 uppercase">Saldo</span>
+                                <strong className={saldo.saldo < 0 ? 'text-red-700' : 'text-emerald-700'}>{saldo.registrado > 0 ? formatarMoeda(saldo.saldo) : '-'}</strong>
+                              </div>
+                            </div>
+                            {saldo.contratos.length > 0 ? (
+                              <ul className="text-xs text-gray-600 space-y-0.5">
+                                {saldo.contratos.map((c) => (
+                                  <li key={c.id}>Contrato {c.numero} — {c.empresa}: {formatarMoeda(c.valorGlobal || 0)}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-xs text-gray-500">Nenhum contrato vinculado a esta ata ainda (vincule no cadastro do contrato).</p>
+                            )}
+                            {saldo.registrado === 0 && (
+                              <p className="text-xs text-amber-700 mt-2">Informe o valor homologado no procedimento para calcular o saldo.</p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                   </tr>
                 )}

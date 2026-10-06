@@ -225,6 +225,15 @@ service cloud.firestore {
     // Catálogo código→descrição da classificação orçamentária (fonte, programa
     // de trabalho, natureza, plano interno, UG...). Quem preenche a dotação do
     // processo cadastra o código novo na hora; só master/financeiro apagam.
+    // Aditivos de ARP/ata (prorrogação de vigência) e apostilamentos de contrato.
+    match /aditivos_arp/{documento} {
+      allow read: if ativo();
+      allow write: if ativo() && perfilDoc().perfil in ['master', 'contratos'];
+    }
+    match /apostilamentos/{documento} {
+      allow read: if ativo();
+      allow write: if ativo() && perfilDoc().perfil in ['master', 'contratos', 'gestao'];
+    }
     // Itens incluídos/excluídos pelo master nos checklists dos ritos processuais.
     match /ajustes_rito/{documento} {
       allow read: if ativo();

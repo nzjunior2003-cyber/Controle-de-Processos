@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, FilePlus2, Pencil } from 'lucide-react';
+import { ChevronDown, ChevronUp, FilePlus2, FileSignature, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Contrato } from '../../types';
+import type { Contrato, ProcedimentoLicitatorio } from '../../types';
 import { formatarMoeda } from '../../lib/contratos';
 
 const formatarData = (valor?: string) => {
@@ -14,10 +14,15 @@ export default function TabelaContratos({
   dados,
   onEditar,
   onAditivos,
+  onApostilamento,
+  procedimentos = [],
 }: {
   dados: Contrato[];
   onEditar?: (contrato: Contrato) => void;
   onAditivos?: (contrato: Contrato) => void;
+  onApostilamento?: (contrato: Contrato) => void;
+  /** Pra mostrar a ata de origem (ARP/adesão/partícipe) de cada contrato. */
+  procedimentos?: ProcedimentoLicitatorio[];
 }) {
   const [expandido, setExpandido] = useState<string | null>(null);
 
@@ -95,6 +100,15 @@ export default function TabelaContratos({
                         Aditivos
                       </button>
                     )}
+                    {onApostilamento && (
+                      <button
+                        onClick={() => onApostilamento(item)}
+                        className="inline-flex items-center text-white bg-sky-600 hover:bg-sky-700 px-3 py-1.5 rounded-md shadow-sm text-xs font-medium transition-colors"
+                      >
+                        <FileSignature className="w-3.5 h-3.5 mr-1.5" />
+                        Apostilamento
+                      </button>
+                    )}
                     </div>
                   </td>
                 </tr>
@@ -118,6 +132,14 @@ export default function TabelaContratos({
                         <div>
                           <span className="font-semibold text-gray-900 block mb-1">Dados Orçamentários</span>
                           <div className="text-gray-700">Fonte: {item.fonteRecurso}</div>
+                          {(() => {
+                            const ata = item.arpId ? procedimentos.find((p) => p.id === item.arpId) : undefined;
+                            return ata ? (
+                              <div className="text-gray-700 mt-2">
+                                Originado da ata: <span className="font-medium">{ata.modalidade} {ata.numero}</span> (PAE {ata.pae})
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                     </td>

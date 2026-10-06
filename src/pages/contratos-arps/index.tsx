@@ -34,6 +34,9 @@ import TabelaProcedimentos from './TabelaProcedimentos';
 import TabelaSancionatorios from './TabelaSancionatorios';
 import TabelaPortarias from './TabelaPortarias';
 import RegistroModal from './RegistroModal';
+import AditivoArpModal from './AditivoArpModal';
+import ApostilamentoModal from './ApostilamentoModal';
+import { limparClassificacoes } from '../../lib/orcamento';
 
 export default function ContratosArps() {
   const {
@@ -55,6 +58,10 @@ export default function ContratosArps() {
     updateSancionatorio,
     addPortaria,
     updatePortaria,
+    aditivosArp,
+    addAditivoArp,
+    apostilamentos,
+    addApostilamento,
   } = useApp();
   const { militares } = useMilitares();
   const navigate = useNavigate();
@@ -66,6 +73,8 @@ export default function ContratosArps() {
   const [salvando, setSalvando] = useState(false);
   const [formData, setFormData] = useState<RegistroFormData>({});
   const [contratoAditivosId, setContratoAditivosId] = useState<string | null>(null);
+  const [procedimentoAditivosId, setProcedimentoAditivosId] = useState<string | null>(null);
+  const [contratoApostilaId, setContratoApostilaId] = useState<string | null>(null);
 
   const isMasterOrContratos =
     usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'contratos';
@@ -76,6 +85,15 @@ export default function ContratosArps() {
     const contrato = contratos.find((c) => c.id === contratoAditivosId);
     return contrato ? calcularStatusContrato(contrato) : null;
   }, [contratos, contratoAditivosId]);
+
+  // Sempre a versão mais atual da ata/contrato aberto no modal (reflete na hora o que acabou de ser registrado).
+  const procedimentoAditivos = procedimentos.find((p) => p.id === procedimentoAditivosId) ?? null;
+  const contratoApostila = contratos.find((c) => c.id === contratoApostilaId) ?? null;
+  // Dotação em vigor: a do contrato (se um apostilamento já a trocou) ou a lançada no processo de origem.
+  const dotacoesDoContrato = (contrato: (typeof contratos)[number]) =>
+    contrato.dotacoes_orcamentarias?.length
+      ? contrato.dotacoes_orcamentarias
+      : limparClassificacoes(processos.find((p) => p.numero_processo === contrato.pae)?.dotacoes_orcamentarias ?? []);
 
   const getPcaTitleByProcesso = (numeroProcesso: string) => {
     const processo = processos.find((p) => p.numero_processo === numeroProcesso);
@@ -375,6 +393,8 @@ export default function ContratosArps() {
                   : undefined
               }
               onAditivos={isMasterOrContratos ? (contrato) => setContratoAditivosId(contrato.id) : undefined}
+              onApostilamento={isMasterOrContratos ? (contrato) => setContratoApostilaId(contrato.id) : undefined}
+              procedimentos={procedimentos}
             />
           )}
 
@@ -384,6 +404,8 @@ export default function ContratosArps() {
               getPcaTitleByProcesso={getPcaTitleByProcesso}
               podeEditar={isMasterOrContratos}
               onEditar={abrirEdicao}
+              contratos={contratos}
+              onAditivos={(proc) => setProcedimentoAditivosId(proc.id)}
             />
           )}
 
@@ -417,6 +439,39 @@ export default function ContratosArps() {
           salvando={salvando}
           onFechar={() => setModalOpen(false)}
           onSalvar={handleSalvarRegistro}
+        />
+      )}
+
+      {procedimentoAditivos && (
+        <AditivoArpModal
+          procedimento={procedimentoAditivos}
+          aditivos={aditivosArp.filter((a) => a.procedimentoId === procedimentoAditivos.id)}
+          onAdicionar={(dados) =>
+            addAditivoArp({
+              ...dados,
+              procedimentoId: procedimentoAditivos.id,
+              registradoPorId: usuarioAtual?.id ?? '',
+              registradoPorNome: usuarioAtual?.nome ?? '',
+            })
+          }
+          onFechar={() => setProcedimentoAditivosId(null)}
+        />
+      )}
+
+      {contratoApostila && (
+        <ApostilamentoModal
+          contrato={contratoApostila}
+          apostilamentos={apostilamentos.filter((a) => a.contratoId === contratoApostila.id)}
+          dotacoesAtuais={dotacoesDoContrato(contratoApostila)}
+          onAdicionar={(dados) =>
+            addApostilamento({
+              ...dados,
+              contratoId: contratoApostila.id,
+              registradoPorId: usuarioAtual?.id ?? '',
+              registradoPorNome: usuarioAtual?.nome ?? '',
+            })
+          }
+          onFechar={() => setContratoApostilaId(null)}
         />
       )}
 
