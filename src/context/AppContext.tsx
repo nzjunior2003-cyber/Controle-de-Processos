@@ -107,6 +107,7 @@ import {
 } from '../types';
 import { idItemCatalogo, normalizarCodigoOrcamentario } from '../lib/orcamento';
 import { resolverAndamento } from '../lib/andamentoProcesso';
+import { idAjusteRito, type AjusteRito } from '../lib/ajustesRito';
 import { getAccessToken } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
@@ -137,6 +138,9 @@ interface AppContextData {
   dotacoes: DotacaoOrcamentaria[];
   empenhos: Empenho[];
   catalogoOrcamentario: ItemCatalogoOrcamentario[];
+  ajustesRito: AjusteRito[];
+  /** Master: grava os itens incluídos/excluídos de um rito (sobre a lista oficial da planilha). */
+  salvarAjusteRito: (rito: string, adicionar: string[], remover: string[]) => Promise<void>;
   /** Só as últimas 50 do usuário logado (ver `useNotificacoesDoUsuario`). */
   notificacoes: Notificacao[];
   pushSubscriptions: PushSubscriptionRegistro[];
@@ -424,6 +428,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const dotacoes = useColecao<DotacaoOrcamentaria>('dotacoes', isAuthenticated);
   const empenhos = useColecao<Empenho>('empenhos', isAuthenticated);
   const catalogoOrcamentario = useColecao<ItemCatalogoOrcamentario>('catalogo_orcamentario', isAuthenticated);
+  const ajustesRito = useColecao<AjusteRito>('ajustes_rito', isAuthenticated);
   const notificacoes = useNotificacoesDoUsuario(usuarioAtual?.id, isAuthenticated);
   const pushSubscriptions = useColecao<PushSubscriptionRegistro>('push_subscriptions', isAuthenticated);
   // Leitura restrita a 'master' nas firestore.rules — só assina quando fizer
@@ -1837,6 +1842,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [dotacoes, registrarAuditoria],
   );
 
+  const salvarAjusteRito = useCallback(
+    async (rito: string, adicionar: string[], remover: string[]) => {
+      if (usuarioAtual?.perfil !== 'master') throw new Error('Só o master pode alterar os checklists dos ritos.');
+      const db = requireDb();
+      const id = idAjusteRito(rito);
+      const anterior = ajustesRito.find((a) => a.id === id);
+      const dados = { rito: normalizarRito(rito) ?? rito, adicionar, remover, atualizado_em: new Date().toISOString() };
+      await setDoc(doc(db, 'ajustes_rito', id), dados);
+      await registrarAuditoria('ajustes_rito', id, anterior ? 'UPDATE' : 'CREATE', dados, anterior);
+    },
+    [ajustesRito, usuarioAtual, registrarAuditoria],
+  );
+
   const salvarItemCatalogo = useCallback(
     async (campo: CampoOrcamentario, codigo: string, descricao: string) => {
       const codigoLimpo = normalizarCodigoOrcamentario(codigo);
@@ -1980,6 +1998,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       empenhos,
       catalogoOrcamentario,
       salvarItemCatalogo,
+      ajustesRito,
+      salvarAjusteRito,
       notificacoes,
       pushSubscriptions,
       logsAcesso,
@@ -2059,6 +2079,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       empenhos,
       catalogoOrcamentario,
       salvarItemCatalogo,
+      ajustesRito,
+      salvarAjusteRito,
       notificacoes,
       pushSubscriptions,
       logsAcesso,

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, ListChecks } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import IntegracaoPCA from './IntegracaoPCA';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS, type StatusProcesso } from '../types';
@@ -174,6 +174,16 @@ export default function Aquisicoes() {
               <RefreshCw className={`-ml-1 mr-2 h-5 w-5 ${sincronizando ? 'animate-spin' : ''}`} />
               {sincronizando ? 'Sincronizando...' : 'Sincronizar Planilha'}
             </button>
+            {usuarioAtual?.perfil === 'master' && (
+              <Link
+                to="/sistema/ritos"
+                title="Incluir ou excluir etapas dos checklists dos ritos"
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                <ListChecks className="-ml-1 mr-2 h-5 w-5" />
+                Checklists dos ritos
+              </Link>
+            )}
             <Link
               to="/sistema/processos/novo"
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"

@@ -225,6 +225,11 @@ service cloud.firestore {
     // Catálogo código→descrição da classificação orçamentária (fonte, programa
     // de trabalho, natureza, plano interno, UG...). Quem preenche a dotação do
     // processo cadastra o código novo na hora; só master/financeiro apagam.
+    // Itens incluídos/excluídos pelo master nos checklists dos ritos processuais.
+    match /ajustes_rito/{documento} {
+      allow read: if ativo();
+      allow write: if master();
+    }
     match /catalogo_orcamentario/{documento} {
       allow read: if ativo();
       allow create, update: if ativo()

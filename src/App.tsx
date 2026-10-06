@@ -24,6 +24,7 @@ import PlanoContratacaoAnual from './pages/pca';
 import PcaForm from './pages/pca/PcaForm';
 import RelatorioPca from './pages/pca/RelatorioPca';
 import Financeiro from './pages/financeiro';
+import AjustarRitos from './pages/ritos';
 import PagamentoForm from './pages/financeiro/PagamentoForm';
 import DotacaoForm from './pages/financeiro/DotacaoForm';
 import EmpenhoForm from './pages/financeiro/EmpenhoForm';
@@ -71,6 +72,7 @@ export default function App() {
                 <Route path="financeiro/dotacoes/:id/editar" element={<DotacaoForm />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="usuarios" element={<Usuarios />} />
+                <Route path="ritos" element={<AjustarRitos />} />
                 <Route path="auditoria" element={<Auditoria />} />
               </Route>
             </Route>

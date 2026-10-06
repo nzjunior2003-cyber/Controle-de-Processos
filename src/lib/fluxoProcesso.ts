@@ -151,7 +151,8 @@ export function calcularProgressoChecklist(
   if (!processo.rito_processual) return null;
   const checklistDoRito = checklistsPorRito[normalizarRito(processo.rito_processual) as string];
   if (!checklistDoRito || checklistDoRito.length === 0) return null;
-  const concluidas = processo.checklist_rito?.length ?? 0;
+  // Só conta etapas que ainda estão no checklist (o master pode ter excluído alguma depois de marcada).
+  const concluidas = (processo.checklist_rito ?? []).filter((item) => checklistDoRito.includes(item)).length;
   return Math.round((concluidas / checklistDoRito.length) * 100);
 }
 

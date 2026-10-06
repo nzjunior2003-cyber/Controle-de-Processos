@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CHECKLISTS_RITOS } from '../types';
 import { unificarEtapasPorRito } from '../lib/ritosProcessuais';
+import { aplicarAjustesRito } from '../lib/ajustesRito';
+import { useApp } from '../context/AppContext';
 import { ABA_RITO_DE_PROCESSOS, ID_PLANILHA_PROCESSOS, mapAbaRitoDeProcessos } from '../lib/csv';
 
 /**
@@ -12,7 +14,7 @@ import { ABA_RITO_DE_PROCESSOS, ID_PLANILHA_PROCESSOS, mapAbaRitoDeProcessos } f
  * só existem no dicionário — usados por processos já cadastrados antes
  * desta mudança — continuam disponíveis).
  */
-export function useEtapasPorRito(): Record<string, string[]> {
+export function useEtapasOficiaisPorRito(): Record<string, string[]> {
   const [etapasDaPlanilha, setEtapasDaPlanilha] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
@@ -44,4 +46,11 @@ export function useEtapasPorRito(): Record<string, string[]> {
 
   // Ritos unificados por nome canônico; em cada um fica o checklist com mais itens (planilha ou código).
   return useMemo(() => unificarEtapasPorRito(CHECKLISTS_RITOS, etapasDaPlanilha), [etapasDaPlanilha]);
+}
+
+/** Etapas de cada rito já com os ajustes do master (itens incluídos/excluídos) — é o que o resto do sistema usa. */
+export function useEtapasPorRito(): Record<string, string[]> {
+  const oficiais = useEtapasOficiaisPorRito();
+  const { ajustesRito } = useApp();
+  return useMemo(() => aplicarAjustesRito(oficiais, ajustesRito), [oficiais, ajustesRito]);
 }
