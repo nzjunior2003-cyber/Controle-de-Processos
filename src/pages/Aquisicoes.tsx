@@ -2,8 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { criarBuscaVinculada } from '../lib/buscaVinculada';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, ListChecks } from 'lucide-react';
-import { differenceInDays } from 'date-fns';
+import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, ListChecks, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { differenceInDays, format } from 'date-fns';
+import { formatarMoeda } from '../lib/contratos';
 import IntegracaoPCA from './IntegracaoPCA';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS, type StatusProcesso } from '../types';
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
@@ -24,6 +25,8 @@ export default function Aquisicoes() {
   const etapasPorRito = useEtapasPorRito();
   const [sincronizando, setSincronizando] = useState(false);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  // Linha com os detalhes abertos (uma por vez, como na lista de Gestão de Contratos).
+  const [expandido, setExpandido] = useState<string | null>(null);
 
   // Filtros na URL (query params), não em useState local — assim, ao entrar
   // no detalhe de um processo e voltar, a lista mantém exatamente os
@@ -66,6 +69,7 @@ export default function Aquisicoes() {
   const setFiltroDemandante = (v: string) => definirParam('demandante', v, '');
 
   const hoje = new Date();
+  const podeEditarProcesso = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'apoio';
 
   const opcoesUnicas = (valores: (string | undefined)[]) =>
     Array.from(new Set(valores.filter((v): v is string => !!v))).sort((a, b) => a.localeCompare(b));
@@ -469,11 +473,24 @@ export default function Aquisicoes() {
                         ? Math.max(0, differenceInDays(hoje, new Date(proc.ultima_tramitacao)))
                         : null;
                       const progresso = calcularProgressoChecklist(proc, etapasPorRito);
+                      const aberto = expandido === proc.id;
+                      const contratoDoProcesso = contratos.find((c) => c.pae === proc.numero_processo);
+                      const procedimentoDoProcesso = procedimentos.find((p) => p.pae === proc.numero_processo);
+                      const formatarData = (iso?: string) => {
+                        const data = iso ? new Date(iso) : null;
+                        return data && !Number.isNaN(data.getTime()) ? format(data, 'dd/MM/yyyy') : '-';
+                      };
+                      const detalhe = (rotulo: string, valor?: React.ReactNode) => (
+                        <div>
+                          <span className="block text-[11px] font-medium text-gray-500 uppercase">{rotulo}</span>
+                          <span className="text-sm text-gray-900 break-words">{valor || '-'}</span>
+                        </div>
+                      );
                       return (
+                        <React.Fragment key={proc.id}>
                         <tr
-                          key={proc.id}
                           onClick={() => navigate(`/sistema/processos/${proc.id}`)}
-                          className="hover:bg-gray-50 cursor-pointer"
+                          className={`hover:bg-gray-50 cursor-pointer ${aberto ? 'bg-red-50/30' : ''}`}
                         >
                           <td className="px-4 py-4 text-sm text-gray-500">{proc.ordem ?? '-'}</td>
                           <td className="px-4 py-4">
@@ -484,6 +501,18 @@ export default function Aquisicoes() {
                               <span className="text-sm font-medium text-gray-900 truncate" title={proc.numero_processo}>
                                 {proc.numero_processo}
                               </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandido(aberto ? null : proc.id);
+                                }}
+                                aria-expanded={aberto}
+                                title={aberto ? 'Recolher detalhes' : 'Ver detalhes'}
+                                className="ml-1 p-0.5 text-gray-400 hover:text-gray-700 rounded flex-shrink-0"
+                              >
+                                {aberto ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              </button>
                             </div>
                           </td>
                           <td className="px-4 py-4">
@@ -515,16 +544,75 @@ export default function Aquisicoes() {
                             >
                               {STATUS_LABELS[proc.status]}
                             </span>
-                            {progresso !== null && (
-                              <div className="mt-1.5 flex items-center gap-1.5" title={`${progresso}% do checklist do rito concluído`}>
-                                <div className="w-16 bg-gray-200 rounded-full h-1.5">
-                                  <div className="bg-red-600 h-1.5 rounded-full" style={{ width: `${progresso}%` }}></div>
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              {progresso !== null && (
+                                <div className="flex items-center gap-1.5" title={`${progresso}% do checklist do rito concluído`}>
+                                  <div className="w-16 bg-gray-200 rounded-full h-1.5">
+                                    <div className="bg-red-600 h-1.5 rounded-full" style={{ width: `${progresso}%` }}></div>
+                                  </div>
+                                  <span className="text-xs text-gray-500">{progresso}%</span>
                                 </div>
-                                <span className="text-xs text-gray-500">{progresso}%</span>
-                              </div>
-                            )}
+                              )}
+                              {podeEditarProcesso && (
+                                <Link
+                                  to={`/sistema/processos/${proc.id}/editar`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  title="Editar processo"
+                                  className="p-1 text-gray-400 hover:text-red-700 rounded"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Link>
+                              )}
+                            </div>
                           </td>
                         </tr>
+                        {aberto && (
+                          <tr className="bg-red-50/10">
+                            <td colSpan={7} className="px-4 py-4 border-b border-red-100">
+                              <div className="bg-white p-4 rounded-lg border border-red-100 shadow-sm space-y-4">
+                                <div>
+                                  <span className="block text-[11px] font-medium text-gray-500 uppercase">Objeto</span>
+                                  <p className="text-sm text-gray-900">{proc.objeto}</p>
+                                  {proc.descricao && <p className="text-xs text-gray-500 mt-1">{proc.descricao}</p>}
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3">
+                                  {detalhe('Demandante', proc.unidade_demandante)}
+                                  {detalhe('Rito processual', proc.rito_processual)}
+                                  {detalhe('Natureza da despesa', proc.natureza_despesa)}
+                                  {detalhe('Fonte', proc.fonte)}
+                                  {detalhe('Valor estimado', proc.valor_estimado ? formatarMoeda(proc.valor_estimado) : undefined)}
+                                  {detalhe('PRD', proc.prd ? `${proc.prd}${proc.prd_validade ? ` (até ${formatarData(proc.prd_validade)})` : ''}${proc.valor_prd ? ` — ${formatarMoeda(proc.valor_prd)}` : ''}` : undefined)}
+                                  {detalhe('Previsão no PCA', proc.pca_id ? 'Sim' : 'Não')}
+                                  {detalhe('Data de entrada', formatarData(proc.data_entrada))}
+                                  {detalhe('Última tramitação', formatarData(proc.ultima_tramitacao))}
+                                  {detalhe('Andamento', proc.andamento)}
+                                  {detalhe('Contrato vinculado', contratoDoProcesso ? `${contratoDoProcesso.numero} — ${contratoDoProcesso.empresa}` : undefined)}
+                                  {detalhe(
+                                    'Ata / procedimento',
+                                    procedimentoDoProcesso ? `${procedimentoDoProcesso.modalidade} ${procedimentoDoProcesso.numero}` : undefined,
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-3">
+                                  <Link
+                                    to={`/sistema/processos/${proc.id}`}
+                                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800"
+                                  >
+                                    Abrir processo
+                                  </Link>
+                                  {podeEditarProcesso && (
+                                    <Link
+                                      to={`/sistema/processos/${proc.id}/editar`}
+                                      className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
+                                    </Link>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       );
                     })
                   )}
