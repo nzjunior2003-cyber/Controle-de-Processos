@@ -197,7 +197,6 @@ export default function TabelaContratosVigencia({
                             <span className="font-semibold text-gray-900 block mb-1">Dados Orçamentários</span>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               <div><span className="font-medium text-gray-500">Fonte:</span> {item.fonteRecurso}</div>
-                              <div><span className="font-medium text-gray-500">PRD:</span> {item.prd}</div>
                               <div><span className="font-medium text-gray-500">Empenho:</span> {item.empenho}</div>
                               <div><span className="font-medium text-gray-500">Dotação:</span> {item.dotacao}</div>
                             </div>

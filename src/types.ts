@@ -219,6 +219,10 @@ export interface Processo {
   rito_processual?: string;
   /** Nº de ordem do processo na planilha de processos (coluna A) — sequencial, o sistema continua a numeração ao criar. */
   ordem?: number;
+  /** PRD (Pedido de Reconhecimento de Despesa) do processo — só é digitado no módulo Apoio e Suprimento; os demais módulos apenas leem. */
+  prd?: string;
+  prd_validade?: string;
+  valor_prd?: number;
   checklist_rito?: string[];
   /** Dotações orçamentárias do processo (item "Dotação Orçamentária" do checklist) — uma ou mais linhas com os campos da ficha da Finanças. */
   dotacoes_orcamentarias?: ClassificacaoOrcamentaria[];

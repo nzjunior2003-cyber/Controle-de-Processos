@@ -69,6 +69,9 @@ export default function NovoProcesso() {
   const [fornecedorArp, setFornecedorArp] = useState(processo?.fornecedorArp ?? '');
   const [naturezaDespesa, setNaturezaDespesa] = useState(processo?.natureza_despesa ?? '');
   const [fonte, setFonte] = useState(processo?.fonte ?? '');
+  const [prd, setPrd] = useState(processo?.prd ?? '');
+  const [prdValidade, setPrdValidade] = useState(processo?.prd_validade ? processo.prd_validade.split('T')[0] : '');
+  const [valorPrd, setValorPrd] = useState(processo?.valor_prd != null ? String(processo.valor_prd) : '');
   const [valorEstimado, setValorEstimado] = useState(
     processo?.valor_estimado != null ? String(processo.valor_estimado) : '',
   );
@@ -223,6 +226,9 @@ export default function NovoProcesso() {
         natureza_despesa: naturezaDespesa,
         fonte,
         valor_estimado: valorEstimadoNumero ?? 0,
+        prd: prd.trim(),
+        prd_validade: prdValidade ? new Date(prdValidade).toISOString() : '',
+        valor_prd: valorPrd.trim() === '' ? 0 : Number(valorPrd.replace(',', '.')),
         ...(ritoProcessual === RITO_ADESAO_ARP
           ? { orgaoGerenciadorArp, fornecedorArp }
           : { orgaoGerenciadorArp: '', fornecedorArp: '' }),
@@ -528,6 +534,40 @@ export default function NovoProcesso() {
                   <option key={opcao} value={opcao}>{opcao}</option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label htmlFor="prd" className="block text-sm font-medium text-gray-700">PRD</label>
+              <input
+                id="prd"
+                type="text"
+                value={prd}
+                onChange={(e) => setPrd(e.target.value)}
+                placeholder="Ex.: 10/2026"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+              />
+            </div>
+            <div>
+              <label htmlFor="prdValidade" className="block text-sm font-medium text-gray-700">Validade do PRD</label>
+              <input
+                id="prdValidade"
+                type="date"
+                value={prdValidade}
+                onChange={(e) => setPrdValidade(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+              />
+            </div>
+            <div>
+              <label htmlFor="valorPrd" className="block text-sm font-medium text-gray-700">Valor do PRD (R$)</label>
+              <input
+                id="valorPrd"
+                type="number"
+                step="0.01"
+                min="0"
+                value={valorPrd}
+                onChange={(e) => setValorPrd(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border"
+              />
             </div>
 
             <div>

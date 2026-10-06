@@ -31,9 +31,6 @@ export default function EmpenhoForm() {
   const [valor, setValor] = useState(empenho?.valor != null ? String(empenho.valor) : '');
   const [dotacaoId, setDotacaoId] = useState(empenho?.dotacaoId ?? '');
   const [estimativo, setEstimativo] = useState(empenho?.estimativo ?? true);
-  const [prd, setPrd] = useState(empenho?.prd ?? '');
-  const [prdValidade, setPrdValidade] = useState(paraDataInput(empenho?.prdValidade));
-  const [prdValor, setPrdValor] = useState(empenho?.prdValor != null ? String(empenho.prdValor) : '');
   const [paeOrigem, setPaeOrigem] = useState(empenho?.paeOrigem ?? '');
   const [data, setData] = useState(paraDataInput(empenho?.data));
   const [observacao, setObservacao] = useState(empenho?.observacao ?? '');
@@ -68,13 +65,10 @@ export default function EmpenhoForm() {
         tipo === 'origem'
           ? {
               estimativo,
-              prd,
-              prdValidade: prdValidade ? new Date(prdValidade).toISOString() : '',
-              prdValor: prdValor ? Number(prdValor.replace(',', '.')) : undefined,
               paeOrigem,
               neOrigemId: '',
             }
-          : { neOrigemId, prd: '', prdValidade: '', paeOrigem: '' };
+          : { neOrigemId, paeOrigem: '' };
 
       if (emEdicao && id) {
         await updateEmpenho(id, { ...comum, ...especifico });
@@ -219,18 +213,6 @@ export default function EmpenhoForm() {
                   <label htmlFor="estimativo" className="ml-2 block text-sm text-gray-700 cursor-pointer">
                     Despesa estimativa (valor mensal não fixo — cada fatura exige um reforço)
                   </label>
-                </div>
-                <div>
-                  <label htmlFor="prd" className="block text-sm font-medium text-gray-700">PRD do exercício</label>
-                  <input type="text" id="prd" value={prd} onChange={(e) => setPrd(e.target.value)} className={CLASSE_INPUT} placeholder="Ex.: 10/2026" />
-                </div>
-                <div>
-                  <label htmlFor="prdValidade" className="block text-sm font-medium text-gray-700">Validade do PRD</label>
-                  <input type="date" id="prdValidade" value={prdValidade} onChange={(e) => setPrdValidade(e.target.value)} className={CLASSE_INPUT} />
-                </div>
-                <div>
-                  <label htmlFor="prdValor" className="block text-sm font-medium text-gray-700">Valor do PRD (R$)</label>
-                  <input type="number" id="prdValor" step="0.01" min="0" value={prdValor} onChange={(e) => setPrdValor(e.target.value)} className={CLASSE_INPUT} />
                 </div>
                 <div>
                   <label htmlFor="paeOrigem" className="block text-sm font-medium text-gray-700">PAE (protocolo) da origem</label>

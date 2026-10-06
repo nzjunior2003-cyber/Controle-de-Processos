@@ -23,7 +23,7 @@ const formatarData = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('
  * valor lançado fica sinalizada (em vez de passar batida).
  */
 export default function FichaContrato({ contratoIdInicial = '' }: { contratoIdInicial?: string }) {
-  const { contratos, pagamentos, empenhos, dotacoes, usuarioAtual } = useApp();
+  const { contratos, pagamentos, empenhos, dotacoes, usuarioAtual, processos } = useApp();
   const [contratoId, setContratoId] = useState(contratoIdInicial);
   const [exercicio, setExercicio] = useState(new Date().getFullYear());
   const podeEditar = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'financeiro';
@@ -33,6 +33,11 @@ export default function FichaContrato({ contratoIdInicial = '' }: { contratoIdIn
 
   const empenhosDoExercicio = empenhos.filter((e) => e.contratoId === contratoId && e.exercicio === exercicio);
   const origem = empenhosDoExercicio.find((e) => e.tipo === 'origem');
+  // O PRD é digitado só no Apoio e Suprimento (processo do contrato, pelo PAE); aqui é apenas leitura.
+  const processoDoContrato = contrato ? processos.find((p) => p.numero_processo === contrato.pae) : undefined;
+  const prd = processoDoContrato?.prd || origem?.prd;
+  const prdValidade = processoDoContrato?.prd ? processoDoContrato.prd_validade : origem?.prdValidade;
+  const prdValor = processoDoContrato?.prd ? processoDoContrato.valor_prd : origem?.prdValor;
   const empenhoPorId = new Map(empenhos.map((e) => [e.id, e]));
 
   const pagamentosDoExercicio = pagamentos
@@ -103,7 +108,7 @@ export default function FichaContrato({ contratoIdInicial = '' }: { contratoIdIn
             {origem ? (
               <>
                 <span><strong>NE de origem:</strong> {origem.numero} ({formatarMoeda(origem.valor)}{origem.estimativo ? ', estimativa' : ''})</span>
-                {origem.prd && <span><strong>PRD:</strong> {origem.prd}{origem.prdValidade ? ` (até ${formatarData(origem.prdValidade)})` : ''}{origem.prdValor ? ` — ${formatarMoeda(origem.prdValor)}` : ''}</span>}
+                {prd && <span><strong>PRD:</strong> {prd}{prdValidade ? ` (até ${formatarData(prdValidade)})` : ''}{prdValor ? ` — ${formatarMoeda(prdValor)}` : ''}</span>}
                 {origem.paeOrigem && <span><strong>PAE:</strong> {origem.paeOrigem}</span>}
               </>
             ) : (

@@ -85,8 +85,6 @@ interface FormState {
   /** Id da ata (procedimento de ARP/adesão/partícipe) de onde o contrato se originou. */
   arpId: string;
   naturezaDespesa: string;
-  prd: string;
-  valorPRD: string;
   empenho: string;
   dotacao: string;
   doe: string;
@@ -125,8 +123,6 @@ const estadoVazio: FormState = {
   fonteRecurso: '',
   arpId: '',
   naturezaDespesa: '',
-  prd: '',
-  valorPRD: '',
   empenho: '',
   dotacao: '',
   doe: '',
@@ -172,8 +168,6 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
     fonteRecurso: contrato.fonteRecurso ?? '',
     arpId: contrato.arpId ?? '',
     naturezaDespesa: contrato.naturezaDespesa ?? '',
-    prd: contrato.prd ?? '',
-    valorPRD: contrato.valorPRD != null ? String(contrato.valorPRD) : '',
     empenho: contrato.empenho ?? '',
     dotacao: contrato.dotacao ?? '',
     doe: contrato.doe ?? '',
@@ -395,8 +389,6 @@ export default function ContratoForm() {
         fonteRecurso: form.fonteRecurso || '',
         arpId: form.arpId || '',
         naturezaDespesa: form.naturezaDespesa || '',
-        prd: form.prd || '',
-        ...(form.valorPRD ? { valorPRD: parseValorMonetario(form.valorPRD) } : {}),
         empenho: form.empenho || '',
         dotacao: form.dotacao || '',
         doe: form.doe || '',
@@ -1124,25 +1116,6 @@ export default function ContratoForm() {
                     <option key={opcao} value={opcao}>{opcao}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className={CLASSE_LABEL}>PRD</label>
-                <input
-                  type="text"
-                  value={form.prd}
-                  onChange={(e) => handleChange('prd', e.target.value)}
-                  className={CLASSE_INPUT}
-                />
-              </div>
-              <div>
-                <label className={CLASSE_LABEL}>Valor do PRD (R$)</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={form.valorPRD}
-                  onChange={(e) => handleChange('valorPRD', e.target.value)}
-                  className={CLASSE_INPUT}
-                />
               </div>
               <div>
                 <label className={CLASSE_LABEL}>Empenho</label>

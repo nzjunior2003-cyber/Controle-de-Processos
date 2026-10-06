@@ -421,10 +421,6 @@ export default function FormProcedimento({
                       <input type="date" value={inst.vigenciaFim || ''} onChange={(e) => atualizarInstrumentos(idx, 'vigenciaFim', e.target.value)} className={CLASSE_INPUT_PEQUENO} />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700">Nº da PRD</label>
-                      <input type="text" value={inst.prd || ''} onChange={(e) => atualizarInstrumentos(idx, 'prd', e.target.value)} className={CLASSE_INPUT_PEQUENO} />
-                    </div>
-                    <div>
                       <label className="block text-xs font-medium text-gray-700">Nº do Empenho</label>
                       <input type="text" value={inst.empenho || ''} onChange={(e) => atualizarInstrumentos(idx, 'empenho', e.target.value)} className={CLASSE_INPUT_PEQUENO} />
                     </div>
@@ -484,10 +480,6 @@ export default function FormProcedimento({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Número da PRD</label>
-              <input type="text" name="prd" placeholder="Ex: PRD 123/2026" value={formData.prd || ''} onChange={onInputChange} className={CLASSE_INPUT} />
-            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Número do Empenho</label>
               <input type="text" name="empenho" placeholder="Ex: 2026NE0001" value={formData.empenho || ''} onChange={onInputChange} className={CLASSE_INPUT} />

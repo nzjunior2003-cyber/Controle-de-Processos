@@ -81,7 +81,7 @@ export default function Financeiro() {
       .filter((e) => {
         if (!buscaNormalizada) return true;
         const contrato = contratoPorId.get(e.contratoId);
-        return [e.numero, e.prd, e.paeOrigem, contrato?.numero, contrato?.empresa]
+        return [e.numero, e.paeOrigem, contrato?.numero, contrato?.empresa]
           .some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
       })
       .sort((a, b) => b.exercicio - a.exercicio || a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true }));
@@ -182,7 +182,7 @@ export default function Financeiro() {
                   aba === 'pagamentos'
                     ? 'Buscar por PAE, NF, NE, OB, setor ou contrato...'
                     : aba === 'empenhos'
-                      ? 'Buscar por NE, PRD, PAE ou contrato...'
+                      ? 'Buscar por NE, PAE ou contrato...'
                       : 'Buscar por código, descrição, fonte ou plano interno...'
                 }
               />
@@ -269,7 +269,6 @@ export default function Financeiro() {
                     <th className={`${CABECALHO} text-left`}>NE</th>
                     <th className={`${CABECALHO} text-left`}>Contrato</th>
                     <th className={`${CABECALHO} text-left`}>Tipo</th>
-                    <th className={`${CABECALHO} text-left`}>PRD</th>
                     <th className={`${CABECALHO} text-right`}>Valor</th>
                     <th className={`${CABECALHO} text-center`}>Exercício</th>
                   </tr>
@@ -287,7 +286,6 @@ export default function Financeiro() {
                         {e.tipo === 'origem' ? 'Origem' : 'Reforço'}
                         {e.tipo === 'origem' && e.estimativo ? <span className="text-xs text-gray-500"> (estimativa)</span> : null}
                       </td>
-                      <td className="px-4 py-3 text-sm">{e.prd || '-'}</td>
                       <td className="px-4 py-3 text-sm text-right whitespace-nowrap">{formatarMoeda(e.valor)}</td>
                       <td className="px-4 py-3 text-sm text-center">{e.exercicio}</td>
                     </tr>
