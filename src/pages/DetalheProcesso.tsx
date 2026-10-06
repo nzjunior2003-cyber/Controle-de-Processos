@@ -19,6 +19,7 @@ import { calcularEconomicidade, encontrarVinculosPorPae, formatarMoeda } from '.
 import { calcularDataPrevista, prazoAlvoDoRito } from '../lib/prazosProcesso';
 import { ehItemDotacaoOrcamentaria, limparClassificacoes } from '../lib/orcamento';
 import DotacaoOrcamentariaEditor from '../components/processo/DotacaoOrcamentariaEditor';
+import { AdicionarEtapa, BotaoExcluirEtapa } from '../components/processo/ControlesChecklistMaster';
 import type { ClassificacaoOrcamentaria } from '../types';
 
 const CORES_GANTT = [
@@ -488,10 +489,12 @@ export default function DetalheProcesso() {
                             </div>
                           )}
                         </div>
+                        <BotaoExcluirEtapa rito={processo.rito_processual ?? ''} item={item} />
                       </div>
                     );
                   })}
                 </div>
+                <AdicionarEtapa rito={processo.rito_processual ?? ''} />
               </div>
             </div>
           )}

@@ -12,6 +12,7 @@ import { getAccessToken, googleSignIn, initAuth } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
 import { ehItemDotacaoOrcamentaria, limparClassificacoes } from '../lib/orcamento';
 import DotacaoOrcamentariaEditor from '../components/processo/DotacaoOrcamentariaEditor';
+import { AdicionarEtapa, BotaoExcluirEtapa } from '../components/processo/ControlesChecklistMaster';
 import type { ClassificacaoOrcamentaria } from '../types';
 import {
   OPCOES_FONTE_PROCESSO,
@@ -461,9 +462,11 @@ export default function NovoProcesso() {
                             <DotacaoOrcamentariaEditor linhas={dotacoesLocal} onChange={setDotacoesLocal} />
                           )}
                         </div>
+                        <BotaoExcluirEtapa rito={ritoProcessual} item={item} />
                       </div>
                     ))}
                   </div>
+                  <AdicionarEtapa rito={ritoProcessual} />
                 </div>
               )}
 
