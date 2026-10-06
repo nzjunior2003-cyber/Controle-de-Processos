@@ -106,6 +106,11 @@ import {
   TipoEventoNotificacao,
 } from '../types';
 import { idItemCatalogo, normalizarCodigoOrcamentario } from '../lib/orcamento';
+import { resolverAndamento } from '../lib/andamentoProcesso';
+import { getAccessToken } from '../lib/googleAuth';
+import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
+import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
+import { processoParaDadosPlanilha } from '../lib/planilhaProcessos';
 import { execucoesArquivadas, valorASerAbatido, valorJaAbatido } from '../lib/financeiro';
 
 const URL_PLANILHA_PCA =
@@ -857,6 +862,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         localizacao: string;
         dataMudanca: string;
       }> = [];
+      // Processos em que o andamento do sistema venceu e ainda falta gravar na coluna S da planilha.
+      const andamentosPendentes: string[] = [];
       const mudancasDeFase: Array<{
         tipo: 'mudanca_fase' | 'conclusao';
         dados: { id: string; numero_processo: string; objeto: string; localizacao_atual?: string; unidade_demandante: string };
@@ -874,6 +881,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
           const processoExistente = processos.find((p) => p.numero_processo === numero_processo);
           const idExistente = processoExistente?.id ?? idsCriadosNestaSincronizacao.get(numero_processo);
+
+          // Andamento (coluna S): vale quem mudou por último (planilha ou sistema).
+          if (processoExistente) {
+            const resolucao = resolverAndamento(processoExistente, dados.andamento, agora);
+            if (resolucao.origem === 'sistema') delete campos.andamento;
+            else campos.andamento = resolucao.valor;
+            Object.assign(campos, resolucao.controle);
+            if (resolucao.pendenteNaPlanilha) andamentosPendentes.push(processoExistente.id);
+          } else {
+            campos.andamento_planilha = dados.andamento ?? '';
+            campos.andamento_planilha_em = agora;
+          }
 
           if (idExistente) {
             if (!processoExistente || algumCampoMudou(processoExistente, { ...campos, numero_processo })) {
@@ -948,6 +967,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       mudancasDeFase.forEach((mudanca) => {
         dispararNotificacoesProcesso(mudanca.tipo, mudanca.dados);
       });
+
+      // Grava na planilha os andamentos digitados no sistema que ainda não chegaram lá (só se já há login Google nesta sessão).
+      const tokenGoogle = andamentosPendentes.length > 0 ? await getAccessToken() : null;
+      if (tokenGoogle) {
+        for (const idPendente of andamentosPendentes) {
+          const alvo = processos.find((p) => p.id === idPendente);
+          if (!alvo) continue;
+          try {
+            const linha = await sincronizarProcessoNaPlanilha(
+              tokenGoogle,
+              ID_PLANILHA_PROCESSOS,
+              processoParaDadosPlanilha(alvo),
+              alvo.planilha_linha,
+            );
+            await updateDoc(doc(db, 'processos', idPendente), {
+              andamento_planilha: alvo.andamento ?? '',
+              andamento_planilha_em: new Date().toISOString(),
+              planilha_linha: linha,
+            });
+          } catch (erro) {
+            console.warn('Não foi possível gravar o andamento na planilha:', erro);
+            break;
+          }
+        }
+      }
 
       return { criados, atualizados, ignorados: linhas.length - validas.length };
     },

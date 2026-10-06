@@ -15,6 +15,18 @@ describe('normalizarRito', () => {
     expect(normalizarRito('Inexigibilidade (com as suas variantes)')).toBe('Inexigibilidade');
   });
 
+  it('leva as grafias antigas da coluna O da planilha de processos pro rito canônico', () => {
+    expect(normalizarRito('ADESÃO À ATA')).toBe(RITO_ADESAO_ARP);
+    expect(normalizarRito('PREGÃO ELETRÔNICO PARA REGISTRO DE PREÇOS')).toBe('Pregão Eletrônico p/ Registro de preços');
+    expect(normalizarRito('GERENCIADOR DA ATA')).toBe('Gerenciador da Ata de Registro de Preços');
+    expect(normalizarRito('PARTICIPAÇÃO EM ATA')).toBe('Partícipe de uma ata de registro de preços');
+    expect(normalizarRito('INEXIGIBILIDADE (P/ CURSO)')).toBe('Inexigibilidade p/ Cursos');
+    expect(normalizarRito('DISPENSA POR VALOR')).toBe('Dispensa por valor (Decreto 2.787, Art. 3º, II. Lei 14.133, Art. 75, II.)');
+    expect(normalizarRito('DISPENSA POR VALOR IRRISÓRIO')).toBe('Dispensa por valor irrisório (Dec. N°2.787/22, Art. 3º, §6º)');
+    expect(normalizarRito('PRORROGAÇÃO')).toBe('Prorrogação de contrato');
+    expect(normalizarRito('ACRÉSCIMO')).toBe('Acréscimo ou supressão');
+  });
+
   it('tira o valor em reais dos ritos de dispensa por valor, seja qual for o valor', () => {
     const esperado1 = 'Dispensa por valor (Decreto 2.787, Art. 3º, II. Lei 14.133, Art. 75, II.)';
     expect(normalizarRito('Dispensa por valor R$ 59,906,02\n(Decreto 2.787, Art. 3º, II. Lei 14.133, Art. 75, II.)')).toBe(esperado1);

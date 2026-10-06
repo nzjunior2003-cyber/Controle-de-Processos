@@ -217,6 +217,8 @@ export interface Processo {
   natureza_despesa?: string;
   valor_estimado?: number;
   rito_processual?: string;
+  /** Nº de ordem do processo na planilha de processos (coluna A) — sequencial, o sistema continua a numeração ao criar. */
+  ordem?: number;
   checklist_rito?: string[];
   /** Dotações orçamentárias do processo (item "Dotação Orçamentária" do checklist) — uma ou mais linhas com os campos da ficha da Finanças. */
   dotacoes_orcamentarias?: ClassificacaoOrcamentaria[];
@@ -233,6 +235,11 @@ export interface Processo {
    */
   localizacao_atual?: string;
   andamento?: string;
+  /** Último andamento sabidamente presente na coluna S da planilha (ver lib/andamentoProcesso.ts). */
+  andamento_planilha?: string;
+  andamento_planilha_em?: string;
+  /** Quando o andamento foi editado no sistema pela última vez. */
+  andamento_editado_em?: string;
   data_entrada?: string;
   ultima_tramitacao?: string;
   /** Linha (1-based) desse processo na planilha de controle, para atualizações futuras acharem a linha certa sem precisar buscar de novo. */

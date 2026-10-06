@@ -143,6 +143,12 @@ describe('mapSheetRowToProcesso', () => {
     'ÚLTIMA TRAMITAÇÃO': '27/08/2026',
   };
 
+  it('lê o nº de ordem da primeira coluna, seja qual for o cabeçalho dela', () => {
+    const comOrdem = { 'https://api.whatsapp.com/send/?phone=1': '42', ...linhaBase };
+    expect(mapSheetRowToProcesso(comOrdem)?.ordem).toBe(42);
+    expect(mapSheetRowToProcesso({ 'cabeçalho qualquer': 'x', ...linhaBase })?.ordem).toBeUndefined();
+  });
+
   it('mapeia as colunas e remove o prefixo "E-" do número do processo', () => {
     const processo = mapSheetRowToProcesso(linhaBase);
     expect(processo).toEqual({
@@ -151,7 +157,7 @@ describe('mapSheetRowToProcesso', () => {
       unidade_demandante: 'CSMV/MOP',
       status: 'contratado_aditivado',
       fonte: 'TESOURO',
-      rito_processual: 'PRORROGAÇÃO',
+      rito_processual: 'Prorrogação de contrato',
       fase_processo: 'INTERNA',
       subfase_processo: 'CONTRATADO',
       localizacao_atual: 'CBM > CSMV/SUBCHEFIA > Complexo do Entroncamento',

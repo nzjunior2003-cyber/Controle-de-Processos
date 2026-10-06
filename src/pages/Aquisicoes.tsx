@@ -54,6 +54,8 @@ export default function Aquisicoes() {
     definirParam('ordem', ordemStatus === '' ? 'asc' : ordemStatus === 'asc' ? 'desc' : '', '');
   const filtroStatus = (searchParams.get('status') ?? '') as StatusProcesso | '';
   const setFiltroStatus = (v: StatusProcesso | '') => definirParam('status', v, '');
+  const filtroAno = searchParams.get('ano') ?? '';
+  const setFiltroAno = (v: string) => definirParam('ano', v, '');
   const filtroDemandante = searchParams.get('demandante') ?? '';
   const setFiltroDemandante = (v: string) => definirParam('demandante', v, '');
 
@@ -62,6 +64,9 @@ export default function Aquisicoes() {
   const opcoesUnicas = (valores: (string | undefined)[]) =>
     Array.from(new Set(valores.filter((v): v is string => !!v))).sort((a, b) => a.localeCompare(b));
 
+  // Ano de entrada do processo (a coluna "Ano de entrada" da planilha) — da data de entrada; sem ela, da abertura/criação.
+  const anoDoProcesso = (p: (typeof processos)[number]) => (p.data_entrada ?? p.data_abertura ?? p.criado_em ?? '').slice(0, 4);
+  const opcoesAno = opcoesUnicas(processos.map(anoDoProcesso)).sort((a, b) => b.localeCompare(a));
   const opcoesRito = opcoesUnicas(processos.map((p) => p.rito_processual));
   const opcoesNatureza = opcoesUnicas(processos.map((p) => p.natureza_despesa));
   const opcoesSetorAtual = opcoesUnicas(
@@ -75,7 +80,7 @@ export default function Aquisicoes() {
   }, {});
 
   const filtrosAtivos = [
-    filtroRito, filtroNatureza, filtroSetorAtual, filtroFonte, filtroDemandante, filtroStatus,
+    filtroRito, filtroNatureza, filtroSetorAtual, filtroFonte, filtroDemandante, filtroStatus, filtroAno,
   ].filter(Boolean).length + (filtroPrevisaoPca !== 'todos' ? 1 : 0);
 
   const filtradosSemOrdem = processos.filter(p => {
@@ -91,6 +96,7 @@ export default function Aquisicoes() {
     if (!matchBusca) return false;
 
     if (filtroStatus && p.status !== filtroStatus) return false;
+    if (filtroAno && anoDoProcesso(p) !== filtroAno) return false;
     if (filtroRito && p.rito_processual !== filtroRito) return false;
     if (filtroNatureza && p.natureza_despesa !== filtroNatureza) return false;
     if (filtroSetorAtual && setorAtualEfetivo !== filtroSetorAtual) return false;
@@ -110,9 +116,10 @@ export default function Aquisicoes() {
     return false;
   });
   
+  // Sem ordenação escolhida, segue a ordem da planilha (coluna A); processos sem nº de ordem vão pro fim.
   const filtrados = ordemStatus
     ? ordenarPorProgresso(filtradosSemOrdem, ordemStatus, etapasPorRito)
-    : filtradosSemOrdem;
+    : [...filtradosSemOrdem].sort((a, b) => (a.ordem ?? Number.MAX_SAFE_INTEGER) - (b.ordem ?? Number.MAX_SAFE_INTEGER));
 
   const contagemTempo = processos.reduce(
     (acc, proc) => {
@@ -346,6 +353,13 @@ export default function Aquisicoes() {
                   </select>
                 </div>
                 <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Ano</label>
+                  <select value={filtroAno} onChange={(e) => setFiltroAno(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
+                    <option value="">Todos</option>
+                    {opcoesAno.map((op) => <option key={op} value={op}>{op}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Demandante</label>
                   <select value={filtroDemandante} onChange={(e) => setFiltroDemandante(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
                     <option value="">Todos</option>
@@ -378,13 +392,16 @@ export default function Aquisicoes() {
               <table className="w-full table-fixed divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[6%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="Nº de ordem na planilha de processos">
+                      Nº
+                    </th>
+                    <th scope="col" className="w-[11%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Nº PAE
                     </th>
-                    <th scope="col" className="w-[27%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[25%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Objeto
                     </th>
-                    <th scope="col" className="w-[21%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[19%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Setor Atual
                     </th>
                     <th scope="col" className="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -396,7 +413,7 @@ export default function Aquisicoes() {
                     <th
                       scope="col"
                       aria-sort={ordemStatus === 'asc' ? 'ascending' : ordemStatus === 'desc' ? 'descending' : 'none'}
-                      className="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="w-[19%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
                       <button
                         type="button"
@@ -425,7 +442,7 @@ export default function Aquisicoes() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filtrados.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                      <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
                         Nenhum processo encontrado.
                       </td>
                     </tr>
@@ -441,6 +458,7 @@ export default function Aquisicoes() {
                           onClick={() => navigate(`/sistema/processos/${proc.id}`)}
                           className="hover:bg-gray-50 cursor-pointer"
                         >
+                          <td className="px-4 py-4 text-sm text-gray-500">{proc.ordem ?? '-'}</td>
                           <td className="px-4 py-4">
                             <div className="flex items-center">
                               {proc.possui_alerta && (

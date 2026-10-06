@@ -95,6 +95,8 @@ export interface DadosProcessoParaPlanilha {
   andamento?: string;
   data_entrada?: string;
   pca_id?: string;
+  /** Nº de ordem a gravar na coluna A quando a linha é nova (senão continua a sequência da linha anterior). */
+  ordem?: number;
   /**
    * Só é gravada na planilha quando informada — o app não gerencia essa
    * coluna no dia a dia (é do RPA/preenchimento manual), então omitir a

@@ -147,6 +147,7 @@ export interface ProcessoDaPlanilha {
   subfase_processo?: string;
   localizacao_atual?: string;
   andamento?: string;
+  ordem?: number;
   data_entrada?: string;
   ultima_tramitacao?: string;
 }
@@ -161,6 +162,10 @@ export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha 
   if (!numeroBruto) return null;
 
   const subfase = celula(linha, 'SUBFASE DO PROCESSO');
+  // A coluna A (Nº de ordem) tem cabeçalho irrelevante na planilha — é sempre a primeira.
+  const primeiraColuna = Object.keys(linha)[0];
+  const ordemTexto = primeiraColuna ? (linha[primeiraColuna] ?? '').toString().trim() : '';
+  const ordem = /^\d+$/.test(ordemTexto) ? Number(ordemTexto) : undefined;
 
   return {
     numero_processo: numeroBruto.replace(/^E-/i, ''),
@@ -175,6 +180,7 @@ export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha 
     subfase_processo: subfase || undefined,
     localizacao_atual: celula(linha, 'SETOR ATUAL') || undefined,
     andamento: celula(linha, 'ANDAMENTO') || undefined,
+    ordem,
     data_entrada: parseDataBR(celula(linha, 'DATA DE CADASTRO') || celula(linha, 'DATA DE ENTRADA')),
     ultima_tramitacao: parseDataBR(celula(linha, 'ÚLTIMA TRAMITAÇÃO')),
   };

@@ -204,6 +204,9 @@ export default function NovoProcesso() {
     try {
       const valorEstimadoNumero = valorEstimado ? Number(valorEstimado.replace(',', '.')) : undefined;
 
+      const agoraIso = new Date().toISOString();
+      // Nº de ordem (coluna A da planilha): processo novo continua a sequência.
+      const proximaOrdem = processos.reduce((maior, p) => Math.max(maior, p.ordem ?? 0), 0) + 1;
       const dadosComuns = {
         numero_processo: numeroProcesso,
         objeto,
@@ -214,6 +217,7 @@ export default function NovoProcesso() {
         checklist_rito: checklistLocal,
         dotacoes_orcamentarias: limparClassificacoes(dotacoesLocal),
         andamento,
+        ...(andamento !== (processo?.andamento ?? '') ? { andamento_editado_em: agoraIso } : {}),
         data_entrada: new Date(dataEntrada).toISOString(),
         natureza_despesa: naturezaDespesa,
         fonte,
@@ -247,6 +251,7 @@ export default function NovoProcesso() {
           ...dadosComuns,
           demandante_id: usuarioAtual?.id || '',
           fase_atual_id: '1',
+          ordem: proximaOrdem,
         });
       }
 
@@ -274,12 +279,16 @@ export default function NovoProcesso() {
               andamento,
               data_entrada: new Date(dataEntrada).toISOString(),
               pca_id: pcaId,
+              ordem: processo?.ordem ?? proximaOrdem,
             },
             processo?.planilha_linha,
           );
-          if (linha !== processo?.planilha_linha) {
-            await updateProcesso(processoId, { planilha_linha: linha });
-          }
+          // O que acabou de ir pra coluna S passa a ser o "retrato" da planilha (ver lib/andamentoProcesso.ts).
+          await updateProcesso(processoId, {
+            planilha_linha: linha,
+            andamento_planilha: andamento,
+            andamento_planilha_em: new Date().toISOString(),
+          });
         } catch (erroPlanilha) {
           console.error('Erro ao gravar o processo na planilha:', erroPlanilha);
           alert(

@@ -123,7 +123,7 @@ export async function sincronizarProcessoNaPlanilha(
 
   if (ehNova && !(linhaExistente?.[COLUNA.ORDEM] ?? '').trim()) {
     const [linhaAnterior] = await getSheetValues(accessToken, spreadsheetId, `A${linha - 1}:A${linha - 1}`);
-    valoresColunas[COLUNA.ORDEM] = proximoNumeroSequencial(linhaAnterior?.[0]);
+    valoresColunas[COLUNA.ORDEM] = dados.ordem ? String(dados.ordem) : proximoNumeroSequencial(linhaAnterior?.[0]);
   }
 
   const linhaFinal = aplicarColunasNaLinha(linhaExistente, valoresColunas);
