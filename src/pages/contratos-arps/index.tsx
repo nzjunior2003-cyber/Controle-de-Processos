@@ -35,6 +35,7 @@ import TabelaSancionatorios from './TabelaSancionatorios';
 import TabelaPortarias from './TabelaPortarias';
 import RegistroModal from './RegistroModal';
 import AditivoArpModal from './AditivoArpModal';
+import AlterarFiscaisModal from './AlterarFiscaisModal';
 import ApostilamentoModal from './ApostilamentoModal';
 import { limparClassificacoes } from '../../lib/orcamento';
 
@@ -75,6 +76,7 @@ export default function ContratosArps() {
   const [contratoAditivosId, setContratoAditivosId] = useState<string | null>(null);
   const [procedimentoAditivosId, setProcedimentoAditivosId] = useState<string | null>(null);
   const [contratoApostilaId, setContratoApostilaId] = useState<string | null>(null);
+  const [contratoFiscaisId, setContratoFiscaisId] = useState<string | null>(null);
 
   const isMasterOrContratos =
     usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'contratos';
@@ -89,6 +91,7 @@ export default function ContratosArps() {
   // Sempre a versão mais atual da ata/contrato aberto no modal (reflete na hora o que acabou de ser registrado).
   const procedimentoAditivos = procedimentos.find((p) => p.id === procedimentoAditivosId) ?? null;
   const contratoApostila = contratos.find((c) => c.id === contratoApostilaId) ?? null;
+  const contratoFiscais = contratos.find((c) => c.id === contratoFiscaisId) ?? null;
   // Dotação em vigor: a do contrato (se um apostilamento já a trocou) ou a lançada no processo de origem.
   const dotacoesDoContrato = (contrato: (typeof contratos)[number]) =>
     contrato.dotacoes_orcamentarias?.length
@@ -394,6 +397,7 @@ export default function ContratosArps() {
               }
               onAditivos={isMasterOrContratos ? (contrato) => setContratoAditivosId(contrato.id) : undefined}
               onApostilamento={isMasterOrContratos ? (contrato) => setContratoApostilaId(contrato.id) : undefined}
+              onFiscais={isMasterOrContratos ? (contrato) => setContratoFiscaisId(contrato.id) : undefined}
               procedimentos={procedimentos}
             />
           )}
@@ -456,6 +460,10 @@ export default function ContratosArps() {
           }
           onFechar={() => setProcedimentoAditivosId(null)}
         />
+      )}
+
+      {contratoFiscais && (
+        <AlterarFiscaisModal key={contratoFiscais.id} contrato={contratoFiscais} onFechar={() => setContratoFiscaisId(null)} />
       )}
 
       {contratoApostila && (

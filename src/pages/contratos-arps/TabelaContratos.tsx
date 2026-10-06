@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, FilePlus2, FileSignature, Pencil } from 'lucide-react';
+import { ChevronDown, ChevronUp, FilePlus2, FileSignature, Pencil, UserCog } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Contrato, ProcedimentoLicitatorio } from '../../types';
 import { formatarMoeda } from '../../lib/contratos';
@@ -15,12 +15,14 @@ export default function TabelaContratos({
   onEditar,
   onAditivos,
   onApostilamento,
+  onFiscais,
   procedimentos = [],
 }: {
   dados: Contrato[];
   onEditar?: (contrato: Contrato) => void;
   onAditivos?: (contrato: Contrato) => void;
   onApostilamento?: (contrato: Contrato) => void;
+  onFiscais?: (contrato: Contrato) => void;
   /** Pra mostrar a ata de origem (ARP/adesão/partícipe) de cada contrato. */
   procedimentos?: ProcedimentoLicitatorio[];
 }) {
@@ -98,6 +100,15 @@ export default function TabelaContratos({
                       >
                         <FilePlus2 className="w-3.5 h-3.5 mr-1.5" />
                         Aditivos
+                      </button>
+                    )}
+                    {onFiscais && (
+                      <button
+                        onClick={() => onFiscais(item)}
+                        className="inline-flex items-center text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-md shadow-sm text-xs font-medium transition-colors"
+                      >
+                        <UserCog className="w-3.5 h-3.5 mr-1.5" />
+                        Alterar Fiscais
                       </button>
                     )}
                     {onApostilamento && (
