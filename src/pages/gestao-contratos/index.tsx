@@ -15,7 +15,6 @@ import KpisContratos, { type FiltroKpi } from '../../components/contratos/KpisCo
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
 import ExecucaoModal from '../../components/contratos/ExecucaoModal';
 import {
-  buscarContratos,
   calcularStatusContrato,
   extrairAnosDisponiveis,
   filtrarContratosPorAno,
@@ -28,6 +27,7 @@ import {
   type ContratoComStatus,
 } from '../../lib/contratos';
 import { exportarCsv } from '../../lib/exportarCsv';
+import { criarBuscaVinculada } from '../../lib/buscaVinculada';
 
 export default function GestaoContratos() {
   const {
@@ -44,6 +44,7 @@ export default function GestaoContratos() {
     addOcorrencia,
     aditivos,
     addAditivo,
+    procedimentos,
   } = useApp();
   const navigate = useNavigate();
 
@@ -80,8 +81,13 @@ export default function GestaoContratos() {
     [contratos],
   );
 
+  const buscaVinculada = useMemo(
+    () => criarBuscaVinculada({ processos, contratos, procedimentos }),
+    [processos, contratos, procedimentos],
+  );
+
   const filtrados = useMemo(() => {
-    let lista = buscarContratos(contratosComStatus, busca);
+    let lista = buscaVinculada.contratos(contratosComStatus, busca);
     // Os cards de KPI (Vigentes/Atenção/Vencidos) só contam contratos em
     // andamento — um concluído não entra em nenhum dos três, então filtrar
     // por eles aqui também exclui concluídos, senão a lista da tabela não
@@ -96,7 +102,7 @@ export default function GestaoContratos() {
     else if (filtroSituacao === 'ativos') lista = lista.filter((c) => !c.concluido);
     lista = filtrarContratosPorAno(lista, filtroAno);
     return ordenarContratosPorNumero(lista, direcaoOrdenacao);
-  }, [contratosComStatus, busca, filtroKpi, filtroNatureza, filtroFonte, filtroSituacao, filtroAno, direcaoOrdenacao]);
+  }, [contratosComStatus, buscaVinculada, busca, filtroKpi, filtroNatureza, filtroFonte, filtroSituacao, filtroAno, direcaoOrdenacao]);
 
   const anosDisponiveis = useMemo(() => extrairAnosDisponiveis(contratos), [contratos]);
 

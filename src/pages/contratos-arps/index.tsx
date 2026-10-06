@@ -7,7 +7,6 @@ import FiltroAno from '../../components/contratos/FiltroAno';
 import ExecucaoModal from '../../components/contratos/ExecucaoModal';
 import { pushSaldoNaPlanilha } from '../../lib/saldoPlanilha';
 import {
-  buscarContratos,
   calcularStatusContrato,
   extrairAnosDisponiveis,
   filtrarContratosPorAno,
@@ -38,6 +37,7 @@ import AditivoArpModal from './AditivoArpModal';
 import AlterarFiscaisModal from './AlterarFiscaisModal';
 import ApostilamentoModal from './ApostilamentoModal';
 import { limparClassificacoes } from '../../lib/orcamento';
+import { criarBuscaVinculada } from '../../lib/buscaVinculada';
 
 export default function ContratosArps() {
   const {
@@ -158,6 +158,12 @@ export default function ContratosArps() {
     [procedimentos, autoProcedimentos],
   );
 
+  // Busca que atravessa os módulos: achar por processo, fornecedor, objeto, fiscal ou nº do contrato/ata.
+  const buscaVinculada = useMemo(
+    () => criarBuscaVinculada({ processos, contratos, procedimentos: todosProcedimentos }),
+    [processos, contratos, todosProcedimentos],
+  );
+
   const filtrarProcedimentos = (tipoModalidade: string) => {
     const termo = busca.toLowerCase();
     return todosProcedimentos.filter(
@@ -166,11 +172,12 @@ export default function ContratosArps() {
         ((p.modalidade ?? '').toLowerCase().includes(termo) ||
           (p.numero ?? '').includes(busca) ||
           (p.objeto ?? '').toLowerCase().includes(termo) ||
-          (p.pae ?? '').includes(busca)),
+          (p.pae ?? '').includes(busca) ||
+          buscaVinculada.procedimentos([p], busca).length > 0),
     );
   };
 
-  const contratosFiltrados = filtrarContratosPorAno(buscarContratos(contratos, busca), filtroAno);
+  const contratosFiltrados = filtrarContratosPorAno(buscaVinculada.contratos(contratos, busca), filtroAno);
   const anosDisponiveis = useMemo(() => extrairAnosDisponiveis(contratos), [contratos]);
   const pregoesFiltrados = filtrarProcedimentos('Pregão');
   const inexigibilidadesFiltradas = filtrarProcedimentos('Inexigibilidade');

@@ -13,6 +13,7 @@ import {
 } from '../../lib/financeiro';
 import { STATUS_PAGAMENTO_LABELS, type StatusPagamento } from '../../types';
 import FichaContrato from './FichaContrato';
+import { casaBusca, criarBuscaVinculada } from '../../lib/buscaVinculada';
 import ControleOrcamentario from './ControleOrcamentario';
 
 type Aba = 'pagamentos' | 'empenhos' | 'dotacoes' | 'ficha' | 'orcamento';
@@ -32,7 +33,11 @@ const formatarMes = (competencia: string) => (competencia ? `${competencia.slice
  * por contrato. Saldos e totais são sempre calculados (src/lib/financeiro.ts).
  */
 export default function Financeiro() {
-  const { pagamentos, dotacoes, empenhos, contratos, usuarioAtual } = useApp();
+  const { pagamentos, dotacoes, empenhos, contratos, usuarioAtual, processos, procedimentos } = useApp();
+  const buscaVinculada = useMemo(
+    () => criarBuscaVinculada({ processos, contratos, procedimentos }),
+    [processos, contratos, procedimentos],
+  );
   const navigate = useNavigate();
   const isMasterOuFinanceiro = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'financeiro';
 
@@ -68,12 +73,15 @@ export default function Financeiro() {
           ...(p.documentos ?? []).map((d) => d.numero),
           ...numerosNe(p), ...numerosOb(p),
         ];
-        return textos.some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
+        return (
+          textos.some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada)) ||
+          (!!contrato && casaBusca(buscaVinculada.textoDoContrato(contrato), busca))
+        );
       })
       .sort((a, b) => competenciaDoPagamento(b).localeCompare(competenciaDoPagamento(a)));
     // numerosNe/numerosOb dependem só de empenhoPorId, já listado.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagamentos, busca, filtroStatus, contratoPorId, empenhoPorId]);
+  }, [pagamentos, busca, filtroStatus, contratoPorId, empenhoPorId, buscaVinculada]);
 
   const empenhosFiltrados = useMemo(() => {
     const buscaNormalizada = busca.toLowerCase();
@@ -180,7 +188,7 @@ export default function Financeiro() {
                 className="block w-full rounded-md border-gray-300 pl-10 focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 border"
                 placeholder={
                   aba === 'pagamentos'
-                    ? 'Buscar por PAE, NF, NE, OB, setor ou contrato...'
+                    ? 'Buscar por PAE, NF, NE, OB, setor, contrato, fornecedor, objeto ou fiscal...'
                     : aba === 'empenhos'
                       ? 'Buscar por NE, PAE ou contrato...'
                       : 'Buscar por código, descrição, fonte ou plano interno...'

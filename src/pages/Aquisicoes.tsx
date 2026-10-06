@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { criarBuscaVinculada } from '../lib/buscaVinculada';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, ListChecks } from 'lucide-react';
@@ -13,7 +14,12 @@ type FiltroTempo = 'todos' | 'verde' | 'amarelo' | 'vermelho' | 'contratado';
 type FiltroPrevisaoPca = 'todos' | 'sim' | 'nao';
 
 export default function Aquisicoes() {
-  const { processos, setores, usuarioAtual, syncProcessosDaPlanilha } = useApp();
+  const { processos, setores, usuarioAtual, syncProcessosDaPlanilha, contratos, procedimentos } = useApp();
+  // Busca que também olha o contrato e a ata ligados ao processo (pelo PAE): fornecedor, nº do contrato, fiscal...
+  const buscaVinculada = useMemo(
+    () => criarBuscaVinculada({ processos, contratos, procedimentos }),
+    [processos, contratos, procedimentos],
+  );
   const navigate = useNavigate();
   const etapasPorRito = useEtapasPorRito();
   const [sincronizando, setSincronizando] = useState(false);
@@ -91,7 +97,8 @@ export default function Aquisicoes() {
       [
         p.numero_processo, p.objeto, p.rito_processual, p.natureza_despesa,
         setorAtualEfetivo, p.fonte, p.unidade_demandante,
-      ].some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada));
+      ].some((campo) => (campo || '').toLowerCase().includes(buscaNormalizada)) ||
+      buscaVinculada.processos([p], busca).length > 0;
 
     if (!matchBusca) return false;
 
