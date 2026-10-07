@@ -416,10 +416,10 @@ export default function Aquisicoes() {
                     <th scope="col" className="w-[6%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="Nº de ordem na planilha de processos">
                       Nº
                     </th>
-                    <th scope="col" className="w-[11%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[13%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Nº PAE
                     </th>
-                    <th scope="col" className="w-[25%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[23%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Objeto
                     </th>
                     <th scope="col" className="w-[19%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -498,7 +498,7 @@ export default function Aquisicoes() {
                               {proc.possui_alerta && (
                                 <AlertCircle className="h-4 w-4 text-amber-500 mr-1.5 flex-shrink-0" />
                               )}
-                              <span className="text-sm font-medium text-gray-900 truncate" title={proc.numero_processo}>
+                              <span className="text-xs font-medium text-gray-900 whitespace-nowrap tracking-tight" title={proc.numero_processo}>
                                 {proc.numero_processo}
                               </span>
                               <button

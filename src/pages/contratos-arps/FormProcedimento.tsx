@@ -126,7 +126,7 @@ export default function FormProcedimento({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              {abaAtiva === 'pregoes'
+              {abaAtiva === 'pregoes' || abaAtiva === 'gerenciador'
                 ? 'Nº do Edital'
                 : abaAtiva === 'adesoes' || abaAtiva === 'participe'
                   ? 'Nº da ARP'

@@ -1,4 +1,4 @@
-import { FilePlus, FileText, Users, type LucideIcon } from 'lucide-react';
+import { FilePlus, FileText, Landmark, Users, type LucideIcon } from 'lucide-react';
 
 export type AbaContratos =
   | 'contratos'
@@ -6,6 +6,7 @@ export type AbaContratos =
   | 'inexigibilidades'
   | 'dispensas'
   | 'adesoes'
+  | 'gerenciador'
   | 'participe'
   | 'sancionatorios'
   | 'portarias';
@@ -16,6 +17,7 @@ export const ABAS_PROCEDIMENTO: AbaContratos[] = [
   'inexigibilidades',
   'dispensas',
   'adesoes',
+  'gerenciador',
   'participe',
 ];
 
@@ -39,7 +41,8 @@ export interface DefinicaoAba {
 }
 
 /**
- * Só 3 cards ficam visíveis (Contratos, ARP's e Partícipes) — os demais
+ * Só 4 cards ficam visíveis (Contratos, Adesões à ARP, Gerenciador da ARP e
+ * Partícipes) — os demais
  * tipos (pregões, inexigibilidades, dispensas, sancionatórios, portarias)
  * continuam com seus dados/telas no código (nada foi apagado do
  * Firestore), só não têm mais card de acesso nesta tela.
@@ -60,7 +63,7 @@ export const MENU_ABAS: DefinicaoAba[] = [
   },
   {
     id: 'adesoes',
-    nome: "ARP's",
+    nome: 'Adesões à ARP',
     icone: FilePlus,
     color: 'teal-500',
     bgClass: 'bg-teal-50/50',
@@ -70,6 +73,20 @@ export const MENU_ABAS: DefinicaoAba[] = [
     textClass: 'text-teal-500',
     textThemeClass: 'text-teal-800',
     textNumClass: 'text-teal-900',
+  },
+  {
+    // Atas em que o CBMPA é o órgão gerenciador (as outras são caronas ou participações).
+    id: 'gerenciador',
+    nome: 'Gerenciador da ARP',
+    icone: Landmark,
+    color: 'amber-500',
+    bgClass: 'bg-amber-50/50',
+    borderLClass: 'border-l-amber-500',
+    ringClass: 'ring-amber-500',
+    borderClass: 'border-amber-200',
+    textClass: 'text-amber-500',
+    textThemeClass: 'text-amber-800',
+    textNumClass: 'text-amber-900',
   },
   {
     id: 'participe',
@@ -97,6 +114,8 @@ export function modalidadePadrao(aba: AbaContratos): string {
       return 'Dispensa';
     case 'adesoes':
       return 'Adesão';
+    case 'gerenciador':
+      return 'Gerenciador da ARP';
     case 'participe':
       return 'Partícipe';
     default:
@@ -115,6 +134,8 @@ export function filtroModalidade(aba: AbaContratos): string {
       return 'Dispensa';
     case 'adesoes':
       return 'Adesão';
+    case 'gerenciador':
+      return 'Gerenciador';
     case 'participe':
       return 'Partícipe';
     default:
@@ -132,6 +153,8 @@ export const rotuloNovoRegistro = (aba: AbaContratos): string => {
       return 'Nova Dispensa';
     case 'adesoes':
       return 'Nova Adesão';
+    case 'gerenciador':
+      return 'Nova Ata (Gerenciador)';
     case 'participe':
       return 'Novo Partícipe';
     case 'sancionatorios':

@@ -127,7 +127,7 @@ export default function ContratosArps() {
         .map((p) => {
           let modalidade = '';
           if (p.rito_processual === RITO_ADESAO_ARP) modalidade = 'Adesão';
-          else if (p.rito_processual === RITO_GERENCIADOR_ARP) modalidade = 'Pregão Eletrônico (Gerenciador)';
+          else if (p.rito_processual === RITO_GERENCIADOR_ARP) modalidade = 'Gerenciador da ARP';
           else if (p.rito_processual === RITO_PARTICIPE_ARP) modalidade = 'Partícipe';
           else if (p.rito_processual?.includes('Pregão')) modalidade = 'Pregão Eletrônico';
           else if (p.rito_processual?.includes('Dispensa')) modalidade = 'Dispensa';
@@ -183,6 +183,7 @@ export default function ContratosArps() {
   const inexigibilidadesFiltradas = filtrarProcedimentos('Inexigibilidade');
   const dispensasFiltradas = filtrarProcedimentos('Dispensa');
   const adesoesFiltradas = filtrarProcedimentos('Adesão');
+  const gerenciadorFiltradas = filtrarProcedimentos('Gerenciador');
   const participesFiltradas = filtrarProcedimentos('Partícipe');
 
   const sancionatoriosFiltrados = sancionatorios.filter((s) => {
@@ -211,6 +212,7 @@ export default function ContratosArps() {
     inexigibilidades: inexigibilidadesFiltradas.length,
     dispensas: dispensasFiltradas.length,
     adesoes: adesoesFiltradas.length,
+    gerenciador: gerenciadorFiltradas.length,
     participe: participesFiltradas.length,
     sancionatorios: sancionatoriosFiltrados.length,
     portarias: portariasFiltradas.length,
@@ -310,7 +312,7 @@ export default function ContratosArps() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {MENU_ABAS.map((item) => {
           const Icone = item.icone;
           const isAtivo = abaAtiva === item.id;
