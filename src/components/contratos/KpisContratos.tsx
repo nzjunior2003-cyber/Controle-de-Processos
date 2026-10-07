@@ -1,7 +1,7 @@
-import { AlertTriangle, CheckCircle, Clock, FileSignature } from 'lucide-react';
+import { AlertTriangle, Archive, CheckCircle, Clock, FileSignature } from 'lucide-react';
 import type { ContratoComStatus } from '../../lib/contratos';
 
-export type FiltroKpi = 'vigentes' | 'atencao' | 'vencidos' | null;
+export type FiltroKpi = 'vigentes' | 'atencao' | 'vencidos' | 'concluidos' | null;
 
 interface Props {
   contratos: ContratoComStatus[];
@@ -17,6 +17,8 @@ export default function KpisContratos({ contratos, filtro, onFiltrar }: Props) {
   const vigentes = contratosAtivos.filter((c) => c.diasRestantes > 90).length;
   const atencao = contratosAtivos.filter((c) => c.diasRestantes >= 0 && c.diasRestantes <= 90).length;
   const vencidos = contratosAtivos.filter((c) => c.diasRestantes < 0).length;
+  // Concluídos/encerrados (marcados pelo Gestor) — ficam fora de vigência e vencimento.
+  const concluidos = contratos.filter((c) => c.concluido).length;
   const valorTotalVigente = contratosAtivos
     .filter((c) => c.diasRestantes >= 0)
     .reduce((acumulado, atual) => acumulado + (atual.valorGlobal || 0), 0);
@@ -32,7 +34,7 @@ export default function KpisContratos({ contratos, filtro, onFiltrar }: Props) {
     }`;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       <div
         onClick={() => onFiltrar?.(filtro === 'vigentes' ? null : 'vigentes')}
         className={classeCard('vigentes', 'border-l-emerald-500', 'ring-2 ring-emerald-500 bg-emerald-50')}
@@ -69,6 +71,19 @@ export default function KpisContratos({ contratos, filtro, onFiltrar }: Props) {
             <h3 className="text-2xl font-bold text-gray-900 mt-1">{vencidos}</h3>
           </div>
           <AlertTriangle className="w-5 h-5 text-red-600" />
+        </div>
+      </div>
+
+      <div
+        onClick={() => onFiltrar?.(filtro === 'concluidos' ? null : 'concluidos')}
+        className={classeCard('concluidos', 'border-l-slate-500', 'ring-2 ring-slate-500 bg-slate-50')}
+      >
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Concluídos / Encerrados</p>
+            <h3 className="text-2xl font-bold text-gray-900 mt-1">{concluidos}</h3>
+          </div>
+          <Archive className="w-5 h-5 text-slate-500" />
         </div>
       </div>
 

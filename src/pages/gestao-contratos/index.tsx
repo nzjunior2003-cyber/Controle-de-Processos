@@ -96,9 +96,13 @@ export default function GestaoContratos() {
     else if (filtroKpi === 'atencao') {
       lista = lista.filter((c) => c.diasRestantes >= 0 && c.diasRestantes <= 90 && !c.concluido);
     } else if (filtroKpi === 'vencidos') lista = lista.filter((c) => c.diasRestantes < 0 && !c.concluido);
+    else if (filtroKpi === 'concluidos') lista = lista.filter((c) => c.concluido);
     if (filtroNatureza) lista = lista.filter((c) => c.naturezaDespesa === filtroNatureza);
     if (filtroFonte) lista = lista.filter((c) => c.fonteRecurso === filtroFonte);
-    if (filtroSituacao === 'concluidos') lista = lista.filter((c) => c.concluido);
+    // O card de concluídos já define a situação; o filtro de situação não deve esvaziá-lo.
+    if (filtroKpi === 'concluidos') {
+      // nada a acrescentar
+    } else if (filtroSituacao === 'concluidos') lista = lista.filter((c) => c.concluido);
     else if (filtroSituacao === 'ativos') lista = lista.filter((c) => !c.concluido);
     lista = filtrarContratosPorAno(lista, filtroAno);
     return ordenarContratosPorNumero(lista, direcaoOrdenacao);
