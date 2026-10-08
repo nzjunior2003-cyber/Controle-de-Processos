@@ -21,3 +21,23 @@ services:
       - "3001:3000"
     volumes:
       - ./.env:/app/.env:ro
+
+  # Robô que atualiza os andamentos da planilha a partir do PAE (sem PC ligado).
+  # Usa o mesmo .env: ROBO_WEBAPP_URL, ROBO_TOKEN, PAE_USUARIO, PAE_SENHA.
+  robo_pae:
+    image: robo-pae-cbmpa
+    build:
+      context: ./robo
+    container_name: robo_pae
+    restart: unless-stopped
+    init: true
+    shm_size: "1gb"
+    env_file:
+      - .env
+    environment:
+      - TZ=America/Belem
+    volumes:
+      - robo_dados:/root/RastreadorPAE
+
+volumes:
+  robo_dados:
