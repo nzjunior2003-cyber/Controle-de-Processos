@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileCheck, FileText, Package, CheckSquare, LayoutDashboard } from 'lucide-react';
+import { BarChart3, FileCheck, FileText, Package, CheckSquare, LayoutDashboard } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ehPerfilDiretoria } from '../types';
 import DashboardApoio from './dashboards/DashboardApoio';
@@ -7,6 +7,7 @@ import DashboardContratosArps from './dashboards/DashboardContratosArps';
 import DashboardGestaoContratos from './dashboards/DashboardGestaoContratos';
 import DashboardFiscalContrato from './dashboards/DashboardFiscalContrato';
 import DashboardDga from './dashboards/DashboardDga';
+import PainelProcessos from './dashboards/PainelProcessos';
 
 /**
  * Dashboard Corporativo: um dashboard distinto por módulo, cada um com
@@ -26,6 +27,7 @@ export default function Dashboard() {
 
   const abas = [
     { id: 'apoio', nome: 'Apoio e Suprimento', icon: Package, show: verTodosOsModulos || perfil === 'apoio', Componente: DashboardApoio },
+    { id: 'painel-processos', nome: 'Painel de Processos', icon: BarChart3, show: verTodosOsModulos || perfil === 'apoio', Componente: PainelProcessos },
     { id: 'contratos-arps', nome: "Contratos e ARP's", icon: FileText, show: verTodosOsModulos || perfil === 'contratos', Componente: DashboardContratosArps },
     { id: 'gestao-contratos', nome: 'Gestão de Contratos', icon: CheckSquare, show: verTodosOsModulos || perfil === 'gestao', Componente: DashboardGestaoContratos },
     { id: 'fiscal-contrato', nome: 'Fiscal do Contrato', icon: FileCheck, show: verTodosOsModulos || perfil === 'fiscal', Componente: DashboardFiscalContrato },

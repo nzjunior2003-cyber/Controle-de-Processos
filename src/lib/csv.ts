@@ -147,6 +147,7 @@ export interface ProcessoDaPlanilha {
   subfase_processo?: string;
   localizacao_atual?: string;
   andamento?: string;
+  previsao_pca?: string;
   ordem?: number;
   data_entrada?: string;
   ultima_tramitacao?: string;
@@ -180,6 +181,7 @@ export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha 
     subfase_processo: subfase || undefined,
     localizacao_atual: celula(linha, 'SETOR ATUAL') || undefined,
     andamento: celula(linha, 'ANDAMENTO') || undefined,
+    previsao_pca: celula(linha, 'PREVISÃO NO PCA').toUpperCase() || undefined,
     ordem,
     data_entrada: parseDataBR(celula(linha, 'DATA DE CADASTRO') || celula(linha, 'DATA DE ENTRADA')),
     ultima_tramitacao: parseDataBR(celula(linha, 'ÚLTIMA TRAMITAÇÃO')),

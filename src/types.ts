@@ -219,6 +219,8 @@ export interface Processo {
   rito_processual?: string;
   /** Nº de ordem do processo na planilha de processos (coluna A) — sequencial, o sistema continua a numeração ao criar. */
   ordem?: number;
+  /** "SIM"/"NÃO" da coluna "Previsão no PCA" da planilha de processos (o painel de processos usa). */
+  previsao_pca?: string;
   /** PRD (Pedido de Reconhecimento de Despesa) do processo — só é digitado no módulo Apoio e Suprimento; os demais módulos apenas leem. */
   prd?: string;
   prd_validade?: string;
