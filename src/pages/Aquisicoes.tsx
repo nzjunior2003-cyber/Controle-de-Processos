@@ -6,6 +6,7 @@ import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, Lis
 import { differenceInDays, format } from 'date-fns';
 import { formatarMoeda } from '../lib/contratos';
 import IntegracaoPCA from './IntegracaoPCA';
+import StatusRobo from '../components/StatusRobo';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS, type StatusProcesso } from '../types';
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
 import { calcularProgressoChecklist, ordenarPorProgresso } from '../lib/fluxoProcesso';
@@ -205,6 +206,8 @@ export default function Aquisicoes() {
           </div>
         )}
       </div>
+
+      <StatusRobo />
 
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">

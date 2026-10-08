@@ -248,6 +248,44 @@ async function startServer() {
     }
   });
 
+  // Pedido de "Atualizar agora" ao robô de atualização de processos (RPA que
+  // roda no PC da equipe). O servidor repassa o pedido ao Apps Script da
+  // planilha — a URL e o token ficam só aqui no servidor (ROBO_WEBAPP_URL e
+  // ROBO_TOKEN no .env), nunca no bundle do front. O "vigia" do robô consulta
+  // o Apps Script a cada minuto e, vendo o pedido, inicia a rodada.
+  app.post("/api/robo/solicitar", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization ?? "";
+      const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+      if (!(await idTokenValido(idToken))) {
+        return res.status(401).json({ error: "Não autenticado." });
+      }
+
+      const urlRobo = process.env.ROBO_WEBAPP_URL;
+      if (!urlRobo) {
+        return res.status(500).json({
+          error: "O robô não está configurado no servidor (falta ROBO_WEBAPP_URL no .env).",
+        });
+      }
+
+      const quem = String(req.body?.quem ?? "").slice(0, 80);
+      const resposta = await fetch(urlRobo, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ acao: "solicitar_execucao", token: process.env.ROBO_TOKEN ?? "", quem }),
+        redirect: "follow",
+      });
+      const dados = (await resposta.json().catch(() => null)) as { status?: string; erro?: string } | null;
+      if (!resposta.ok || !dados || dados.status !== "success") {
+        return res.status(502).json({ error: dados?.erro ?? "O Apps Script do robô recusou o pedido." });
+      }
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error("Error requesting robot run:", error);
+      res.status(500).json({ error: "Falha ao enviar o pedido ao robô." });
+    }
+  });
+
   // Notificações push (Web Push/VAPID) — disparadas pelo próprio cliente
   // que gerou o evento (mudança de setor/fase/conclusão de um processo,
   // ver `dispararNotificacoesProcesso`, AppContext.tsx). Sem Cloud
