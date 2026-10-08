@@ -72,6 +72,7 @@ describe('PainelProcessos', () => {
     renderizar();
     const linha = screen.getByText('2026/111').closest('tr') as HTMLElement;
     expect(within(linha).getByText('Atrasado (+30d)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Insights/ }));
     expect(screen.getByText(/Processo parado há mais tempo: 2026\/111/)).toBeTruthy();
   });
 

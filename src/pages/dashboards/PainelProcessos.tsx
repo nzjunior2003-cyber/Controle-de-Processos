@@ -137,20 +137,28 @@ function Indicadores({
 
 function Insights({ processos }: { processos: ProcessoPainel[] }) {
   const insights = useMemo(() => calcularInsights(processos), [processos]);
+  const [aberto, setAberto] = useState(false);
   if (insights.length === 0) return null;
   const cor = { danger: 'border-red-200 bg-red-50 text-red-800', warn: 'border-amber-200 bg-amber-50 text-amber-800', info: 'border-blue-200 bg-blue-50 text-blue-800', ok: 'border-emerald-200 bg-emerald-50 text-emerald-800' } as const;
   return (
-    <section aria-label="Insights" className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
-        <Lightbulb className="h-4 w-4 text-amber-500" aria-hidden /> Pontos de atenção
-      </h3>
-      <ul className="space-y-2">
-        {insights.map((i) => (
-          <li key={i.id} className={`rounded-md border px-3 py-2 text-sm ${cor[i.tom]}`}>
-            {i.texto}
-          </li>
-        ))}
-      </ul>
+    <section aria-label="Insights" className="flex flex-col items-end gap-2">
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        aria-expanded={aberto}
+        className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 shadow-sm hover:bg-gray-50"
+      >
+        <Lightbulb className="h-3.5 w-3.5 text-amber-500" aria-hidden /> Insights ({insights.length})
+      </button>
+      {aberto && (
+        <ul className="w-full space-y-2 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+          {insights.map((i) => (
+            <li key={i.id} className={`rounded-md border px-3 py-2 text-sm ${cor[i.tom]}`}>
+              {i.texto}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -541,7 +549,6 @@ export default function PainelProcessos() {
 
       <Indicadores processos={todos} filtroContratado={apenasContratados} alternarContratado={() => setApenasContratados((v) => !v)} />
       <Insights processos={todos} />
-      <Graficos processos={todos} />
 
       {apenasContratados && (
         <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
@@ -553,6 +560,7 @@ export default function PainelProcessos() {
       )}
 
       <TabelaProcessos processos={naLista} aoAbrir={setSelecionado} />
+      <Graficos processos={todos} />
       {selecionado && <PainelDetalhe processo={selecionado} aoFechar={() => setSelecionado(null)} />}
     </div>
   );

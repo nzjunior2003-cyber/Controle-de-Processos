@@ -55,6 +55,7 @@ describe('PainelPca', () => {
 
   it('o card "Sem PAE" filtra a lista e gera ponto de atenção de alta prioridade', () => {
     renderizar();
+    fireEvent.click(screen.getByRole('button', { name: /Insights/ }));
     expect(screen.getByText(/1 item de prioridade ALTA está sem PAE/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Sem PAE/ }));
     expect(screen.getByText('Caminhão tanque')).toBeTruthy();
