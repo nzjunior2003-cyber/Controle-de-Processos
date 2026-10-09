@@ -29,6 +29,7 @@ services:
     build:
       context: ./robo
     container_name: robo_pae
+    hostname: robo-vps
     restart: unless-stopped
     init: true
     shm_size: "1gb"
