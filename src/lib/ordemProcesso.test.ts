@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chavesPae, ordensFaltantes } from './ordemProcesso';
+import { acharProcessoDaLinha, chavesPae, observacaoComPaesVinculados, ordensFaltantes, separarPaes } from './ordemProcesso';
 
 const proc = (id: string, numero: string, objeto: string, ordem?: number, criado = '2026-01-01') => ({
   id, numero_processo: numero, objeto, ordem, criado_em: criado,
@@ -55,5 +55,32 @@ describe('ordensFaltantes', () => {
     expect(r.get('novo1')).toBe(11);
     expect(r.get('novo2')).toBe(12);
     expect(r.has('x')).toBe(false);
+  });
+});
+
+describe('PAEs múltiplos', () => {
+  it('separa o principal dos vinculados', () => {
+    expect(separarPaes('E-2026/2379178 E-2026/3155997  E-2025/2517810')).toEqual({ principal: '2026/2379178', vinculados: ['2026/3155997', '2025/2517810'] });
+    expect(separarPaes('(Principal) E-2025/2918786  E-2026/2725052')).toEqual({ principal: '2025/2918786', vinculados: ['2026/2725052'] });
+    expect(separarPaes('E-2026/2725052 (Principal) E-2025/2918786').principal).toBe('2025/2918786');
+    expect(separarPaes('E-2026/1')).toEqual({ principal: '2026/1', vinculados: [] });
+  });
+
+  it('a observação ganha a linha de PAEs vinculados sem apagar o texto e sem duplicar', () => {
+    const primeira = observacaoComPaesVinculados('Urgente', ['2026/3155997']);
+    expect(primeira).toBe('Urgente\nPAEs vinculados: E-2026/3155997');
+    expect(observacaoComPaesVinculados(primeira, ['2026/3155997', '2025/1'])).toBe('Urgente\nPAEs vinculados: E-2026/3155997, E-2025/1');
+    expect(observacaoComPaesVinculados(undefined, [])).toBe('');
+  });
+
+  it('acha o processo do sistema mesmo com PAE escrito diferente; PAE repetido desempata pelo objeto', () => {
+    const lista = [
+      { numero_processo: '2026/2379178 E-2026/3155997  E-2025/2517810', objeto: 'Revisão' },
+      { numero_processo: 'E-2026/353535', objeto: 'Aquisição de porteira' },
+      { numero_processo: '2026/353535', objeto: 'Aquisição de bateria portátil' },
+    ];
+    expect(acharProcessoDaLinha(lista, { numero_processo: '2026/2379178', objeto: 'Revisão' })).toBe(lista[0]);
+    expect(acharProcessoDaLinha(lista, { numero_processo: '2026/353535', objeto: 'Aquisição de bateria portátil' })).toBe(lista[2]);
+    expect(acharProcessoDaLinha(lista, { numero_processo: '2026/999', objeto: 'x' })).toBeUndefined();
   });
 });

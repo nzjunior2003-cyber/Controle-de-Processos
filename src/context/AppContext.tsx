@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { ordensFaltantes } from '../lib/ordemProcesso';
+import { acharProcessoDaLinha, chavesPae, observacaoComPaesVinculados, ordensFaltantes } from '../lib/ordemProcesso';
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -935,13 +935,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const agora = new Date().toISOString();
 
         validas.slice(inicio, inicio + 400).forEach((dados) => {
-          const { numero_processo, ...resto } = dados;
+          const { numero_processo, paes_vinculados, ...resto } = dados;
           const campos = Object.fromEntries(
             Object.entries(resto).filter(([, v]) => v !== undefined),
           );
 
-          const processoExistente = processos.find((p) => p.numero_processo === numero_processo);
+          const processoExistente = acharProcessoDaLinha(processos, dados);
           const idExistente = processoExistente?.id ?? idsCriadosNestaSincronizacao.get(numero_processo);
+
+          // Processo com mais de um PAE: os demais vão para a observação (sem apagar o que já está escrito).
+          if (paes_vinculados?.length) {
+            campos.descricao = observacaoComPaesVinculados(processoExistente?.descricao, paes_vinculados);
+          }
 
           // Andamento (coluna S): vale quem mudou por último (planilha ou sistema).
           if (processoExistente) {
@@ -1026,9 +1031,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         processos.map((p) => ({ ...p, ordem: p.ordem ?? ordemDoLote.get(p.id) })),
         validas,
       );
+      const ordensDaPlanilha = new Set(validas.map((v) => v.ordem));
+      const paraPlanilha: Array<{ paes: string[]; objeto: string; ordem: number }> = [];
       for (const [processoId, ordem] of ordensPendentes) {
         await updateDoc(doc(db, 'processos', processoId), { ordem, atualizado_em: new Date().toISOString() });
         atualizados++;
+        // Só o que o sistema inventou precisa ir para a coluna A da planilha; o resto já veio dela.
+        const alvo = processos.find((p) => p.id === processoId);
+        if (alvo && !ordensDaPlanilha.has(ordem)) {
+          paraPlanilha.push({ paes: chavesPae(alvo.numero_processo), objeto: alvo.objeto, ordem });
+        }
+      }
+      if (paraPlanilha.length > 0) {
+        try {
+          const idToken = await getFirebaseAuth()?.currentUser?.getIdToken();
+          const resposta = await fetch('/api/planilha/ordens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken ?? ''}` },
+            body: JSON.stringify({ itens: paraPlanilha }),
+          });
+          if (!resposta.ok) console.warn('Não foi possível gravar os nºs de ordem na planilha:', await resposta.text());
+        } catch (erro) {
+          console.warn('Não foi possível gravar os nºs de ordem na planilha:', erro);
+        }
       }
 
       // Sequencial (não em paralelo): sincronizarEstada lê o estado atual

@@ -286,6 +286,48 @@ async function startServer() {
     }
   });
 
+  // Grava na coluna A da planilha de processos o nº de ordem que o sistema deu a
+  // processos que ainda não tinham (o Apps Script acha a linha pelo PAE/objeto e
+  // só preenche célula vazia). Mesmo caminho do robô: URL e token só no servidor.
+  app.post("/api/planilha/ordens", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization ?? "";
+      const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+      if (!(await idTokenValido(idToken))) {
+        return res.status(401).json({ error: "Não autenticado." });
+      }
+
+      const urlRobo = process.env.ROBO_WEBAPP_URL;
+      if (!urlRobo) {
+        return res.status(500).json({ error: "Falta ROBO_WEBAPP_URL no .env do servidor." });
+      }
+
+      const itens = (Array.isArray(req.body?.itens) ? req.body.itens : [])
+        .slice(0, 200)
+        .map((i: { paes?: unknown; objeto?: unknown; ordem?: unknown }) => ({
+          paes: Array.isArray(i.paes) ? i.paes.map((p) => String(p).slice(0, 30)).slice(0, 5) : [],
+          objeto: String(i.objeto ?? "").slice(0, 300),
+          ordem: Number(i.ordem) || 0,
+        }))
+        .filter((i: { ordem: number }) => i.ordem > 0);
+
+      const resposta = await fetch(urlRobo, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ acao: "gravar_ordens", token: process.env.ROBO_TOKEN ?? "", itens }),
+        redirect: "follow",
+      });
+      const dados = (await resposta.json().catch(() => null)) as { status?: string; erro?: string; gravados?: number } | null;
+      if (!resposta.ok || !dados || dados.status !== "success") {
+        return res.status(502).json({ error: dados?.erro ?? "O Apps Script recusou o pedido." });
+      }
+      return res.json({ ok: true, gravados: dados.gravados ?? 0 });
+    } catch (error) {
+      console.error("Error writing order numbers:", error);
+      res.status(500).json({ error: "Falha ao gravar os nºs de ordem na planilha." });
+    }
+  });
+
   // Notificações push (Web Push/VAPID) — disparadas pelo próprio cliente
   // que gerou o evento (mudança de setor/fase/conclusão de um processo,
   // ver `dispararNotificacoesProcesso`, AppContext.tsx). Sem Cloud

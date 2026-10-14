@@ -67,3 +67,46 @@ export function ordensFaltantes(processos: ProcessoParaOrdem[], linhas: LinhaCom
   }
   return resultado;
 }
+
+/**
+ * PAE principal e PAEs vinculados de uma célula da planilha ("E-2026/1 E-2026/2",
+ * "(Principal) E-2025/9  E-2026/8"). O principal é o marcado com "(Principal)";
+ * sem marca, o primeiro.
+ */
+export function separarPaes(texto: string | undefined): { principal: string; vinculados: string[] } {
+  const chaves = chavesPae(texto);
+  if (chaves.length === 0) return { principal: '', vinculados: [] };
+  const marcado = (texto ?? '').match(/\(\s*principal\s*\)\s*e?\s*-?\s*(\d{4})\s*\/\s*(\d+)/i);
+  const principal = marcado ? `${marcado[1]}/${marcado[2]}` : chaves[0];
+  return { principal, vinculados: chaves.filter((c, i) => c !== principal && chaves.indexOf(c) === i) };
+}
+
+/**
+ * Processo do sistema que corresponde a uma linha da planilha: pelo PAE
+ * principal (aceitando "E-", espaços e textos longos no sistema) e, se mais de
+ * um processo tiver esse PAE, o de mesmo objeto.
+ */
+export function acharProcessoDaLinha<T extends Pick<Processo, 'numero_processo' | 'objeto'>>(
+  processos: T[],
+  linha: { numero_processo: string; objeto?: string },
+): T | undefined {
+  const chave = separarPaes(linha.numero_processo).principal || linha.numero_processo.trim();
+  const candidatos = processos.filter(
+    (p) => p.numero_processo === linha.numero_processo || (chave && separarPaes(p.numero_processo).principal === chave),
+  );
+  if (candidatos.length <= 1) return candidatos[0];
+  const objeto = normalizarObjeto(linha.objeto);
+  return (
+    candidatos.find((p) => normalizarObjeto(p.objeto) === objeto) ??
+    candidatos.find((p) => p.numero_processo === linha.numero_processo) ??
+    candidatos[0]
+  );
+}
+
+/** Linha de observação com os outros PAEs do processo, sem apagar o que a pessoa escreveu. */
+export function observacaoComPaesVinculados(atual: string | undefined, vinculados: string[]): string {
+  const base = (atual ?? '').split('\n').filter((l) => !l.startsWith('PAEs vinculados:')).join('\n').trim();
+  if (vinculados.length === 0) return base;
+  const linha = `PAEs vinculados: ${vinculados.map((v) => `E-${v}`).join(', ')}`;
+  return base ? `${base}\n${linha}` : linha;
+}

@@ -2,6 +2,7 @@
  * Parsing de planilhas do PCA (Google Sheets exportado como CSV).
  * Lógica pura, extraída do AppContext para poder ser testada isoladamente.
  */
+import { separarPaes } from './ordemProcesso';
 import type { PCA, StatusProcesso } from '../types';
 import { normalizarRito } from './ritosProcessuais';
 
@@ -136,6 +137,8 @@ function inferirStatusProcesso(subfase: string): StatusProcesso {
  */
 export interface ProcessoDaPlanilha {
   numero_processo: string;
+  /** Outros PAEs que a célula do PAE traz além do principal (vão para a observação do processo). */
+  paes_vinculados?: string[];
   objeto: string;
   unidade_demandante: string;
   status: StatusProcesso;
@@ -161,6 +164,7 @@ export interface ProcessoDaPlanilha {
 export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha | null {
   const numeroBruto = celula(linha, 'N° PAE');
   if (!numeroBruto) return null;
+  const { principal, vinculados } = separarPaes(numeroBruto);
 
   const subfase = celula(linha, 'SUBFASE DO PROCESSO');
   // A coluna A (Nº de ordem) tem cabeçalho irrelevante na planilha — é sempre a primeira.
@@ -169,7 +173,8 @@ export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha 
   const ordem = /^\d+$/.test(ordemTexto) ? Number(ordemTexto) : undefined;
 
   return {
-    numero_processo: numeroBruto.replace(/^E-/i, ''),
+    numero_processo: principal || numeroBruto.replace(/^E-/i, ''),
+    ...(vinculados.length > 0 ? { paes_vinculados: vinculados } : {}),
     objeto: celula(linha, 'OBJETO'),
     unidade_demandante: celula(linha, 'SETOR DEMANDANTE'),
     status: inferirStatusProcesso(subfase),
