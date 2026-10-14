@@ -60,9 +60,9 @@ describe('ordensFaltantes', () => {
 
 describe('PAEs múltiplos', () => {
   it('separa o principal dos vinculados', () => {
-    expect(separarPaes('E-2026/2379178 E-2026/3155997  E-2025/2517810')).toEqual({ principal: '2026/2379178', vinculados: ['2026/3155997', '2025/2517810'] });
-    expect(separarPaes('(Principal) E-2025/2918786  E-2026/2725052')).toEqual({ principal: '2025/2918786', vinculados: ['2026/2725052'] });
-    expect(separarPaes('E-2026/2725052 (Principal) E-2025/2918786').principal).toBe('2025/2918786');
+    expect(separarPaes('E-2026/2379178 E-2026/3155997  E-2025/2517810')).toEqual({ principal: '2026/3155997', vinculados: ['2026/2379178', '2025/2517810'] });
+    expect(separarPaes('(Principal) E-2025/2918786  E-2026/2725052')).toEqual({ principal: '2026/2725052', vinculados: ['2025/2918786'] });
+    expect(separarPaes('E-2025/2918786 E-2026/2725052').principal).toBe('2026/2725052');
     expect(separarPaes('E-2026/1')).toEqual({ principal: '2026/1', vinculados: [] });
   });
 
@@ -79,7 +79,9 @@ describe('PAEs múltiplos', () => {
       { numero_processo: 'E-2026/353535', objeto: 'Aquisição de porteira' },
       { numero_processo: '2026/353535', objeto: 'Aquisição de bateria portátil' },
     ];
-    expect(acharProcessoDaLinha(lista, { numero_processo: '2026/2379178', objeto: 'Revisão' })).toBe(lista[0]);
+    expect(acharProcessoDaLinha(lista, { numero_processo: '2026/3155997', objeto: 'Revisão' })).toBe(lista[0]);
+    // o sistema ainda guarda o antigo principal, mas a linha traz o PAE antigo como vinculado: acha do mesmo jeito
+    expect(acharProcessoDaLinha([{ numero_processo: '2025/2918786', objeto: 'X' }], { numero_processo: '2026/2725052', objeto: 'X', paes_vinculados: ['2025/2918786'] })).toBeDefined();
     expect(acharProcessoDaLinha(lista, { numero_processo: '2026/353535', objeto: 'Aquisição de bateria portátil' })).toBe(lista[2]);
     expect(acharProcessoDaLinha(lista, { numero_processo: '2026/999', objeto: 'x' })).toBeUndefined();
   });

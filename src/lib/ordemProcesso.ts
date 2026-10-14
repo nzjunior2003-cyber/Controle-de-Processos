@@ -68,31 +68,40 @@ export function ordensFaltantes(processos: ProcessoParaOrdem[], linhas: LinhaCom
   return resultado;
 }
 
+/** "AAAA/NNNN" -> [ano, número], para comparar qual PAE é o mais recente. */
+const pesoPae = (chave: string): [number, number] => {
+  const [ano, numero] = chave.split('/');
+  return [Number(ano), Number(numero)];
+};
+
 /**
- * PAE principal e PAEs vinculados de uma célula da planilha ("E-2026/1 E-2026/2",
- * "(Principal) E-2025/9  E-2026/8"). O principal é o marcado com "(Principal)";
- * sem marca, o primeiro.
+ * PAE principal e PAEs vinculados de uma célula da planilha ("E-2026/1 E-2025/2",
+ * "(Principal) E-2025/9  E-2026/8"). O principal é o mais recente: maior ano e,
+ * no mesmo ano, o de número maior (protocolado depois).
  */
 export function separarPaes(texto: string | undefined): { principal: string; vinculados: string[] } {
-  const chaves = chavesPae(texto);
+  const chaves = [...new Set(chavesPae(texto))];
   if (chaves.length === 0) return { principal: '', vinculados: [] };
-  const marcado = (texto ?? '').match(/\(\s*principal\s*\)\s*e?\s*-?\s*(\d{4})\s*\/\s*(\d+)/i);
-  const principal = marcado ? `${marcado[1]}/${marcado[2]}` : chaves[0];
-  return { principal, vinculados: chaves.filter((c, i) => c !== principal && chaves.indexOf(c) === i) };
+  const principal = [...chaves].sort((a, b) => {
+    const [anoA, numA] = pesoPae(a);
+    const [anoB, numB] = pesoPae(b);
+    return anoB - anoA || numB - numA;
+  })[0];
+  return { principal, vinculados: chaves.filter((c) => c !== principal) };
 }
 
 /**
- * Processo do sistema que corresponde a uma linha da planilha: pelo PAE
- * principal (aceitando "E-", espaços e textos longos no sistema) e, se mais de
- * um processo tiver esse PAE, o de mesmo objeto.
+ * Processo do sistema que corresponde a uma linha da planilha: por qualquer um
+ * dos PAEs da linha (aceitando "E-", espaços e textos longos no sistema) e, se
+ * mais de um processo bater, o de mesmo objeto.
  */
 export function acharProcessoDaLinha<T extends Pick<Processo, 'numero_processo' | 'objeto'>>(
   processos: T[],
-  linha: { numero_processo: string; objeto?: string },
+  linha: { numero_processo: string; objeto?: string; paes_vinculados?: string[] },
 ): T | undefined {
-  const chave = separarPaes(linha.numero_processo).principal || linha.numero_processo.trim();
+  const chavesDaLinha = new Set([...chavesPae(linha.numero_processo), ...(linha.paes_vinculados ?? [])]);
   const candidatos = processos.filter(
-    (p) => p.numero_processo === linha.numero_processo || (chave && separarPaes(p.numero_processo).principal === chave),
+    (p) => p.numero_processo === linha.numero_processo || chavesPae(p.numero_processo).some((c) => chavesDaLinha.has(c)),
   );
   if (candidatos.length <= 1) return candidatos[0];
   const objeto = normalizarObjeto(linha.objeto);
