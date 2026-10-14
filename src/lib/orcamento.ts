@@ -57,7 +57,6 @@ export function classificacaoDaDotacao(d: DotacaoOrcamentaria): ClassificacaoOrc
   const bruta: ClassificacaoOrcamentaria = {
     unidadeGestora: d.unidadeGestora,
     programaTrabalho: d.funcionalProgramatica,
-    projetoAtividade: d.projetoAtividade,
     naturezaDespesa: d.naturezaDespesa,
     fonte: d.fonteCodigo ?? d.fonteRecurso,
     detalhamento: d.detalhamento,

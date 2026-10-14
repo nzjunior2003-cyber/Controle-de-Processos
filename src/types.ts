@@ -668,7 +668,6 @@ export interface Apostilamento {
 export const CAMPOS_ORCAMENTARIOS = [
   { chave: 'unidadeGestora', rotulo: 'Unidade Gestora', exemplo: 'Ex.: 180101' },
   { chave: 'programaTrabalho', rotulo: 'Funcional / Programa de Trabalho', exemplo: 'Ex.: 06.122.1297-8338' },
-  { chave: 'projetoAtividade', rotulo: 'Projeto-Atividade', exemplo: 'Ex.: 8338' },
   { chave: 'naturezaDespesa', rotulo: 'Natureza da Despesa', exemplo: 'Ex.: 339033' },
   { chave: 'fonte', rotulo: 'Fonte', exemplo: 'Ex.: 01500.000001' },
   { chave: 'detalhamento', rotulo: 'Detalhamento', exemplo: 'Ex.: 006359' },
