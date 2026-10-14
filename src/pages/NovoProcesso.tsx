@@ -383,6 +383,22 @@ export default function NovoProcesso() {
       <div className="bg-white shadow-sm rounded-lg border border-gray-200">
         <form onSubmit={handleSalvar} className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <label htmlFor="nOrdem" className="block text-sm font-medium text-gray-700">
+                Nº de ordem
+              </label>
+              <input
+                id="nOrdem"
+                type="text"
+                readOnly
+                disabled
+                value={emEdicao ? (processo?.ordem ?? '—') : processos.reduce((maior, p) => Math.max(maior, p.ordem ?? 0), 0) + 1}
+                className="mt-1 block w-32 rounded-md border-gray-300 bg-gray-50 text-gray-700 sm:text-sm py-2 px-3 border font-semibold"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                {emEdicao ? 'Número sequencial na planilha de processos.' : 'Gerado automaticamente, seguindo a sequência da planilha.'}
+              </p>
+            </div>
             <div>
               <label htmlFor="numeroProcesso" className="block text-sm font-medium text-gray-700">
                 Número do Processo <span className="text-red-500">*</span>
