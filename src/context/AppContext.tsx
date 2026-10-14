@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { ordensFaltantes } from '../lib/ordemProcesso';
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -915,6 +916,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       // ainda não foi confirmado, então `processos` não reflete as
       // criações anteriores deste mesmo lote).
       const idsCriadosNestaSincronizacao = new Map<string, string>();
+      // Nº de ordem que o lote principal já deu a processos existentes (os demais, sem número, são tratados depois).
+      const ordemDoLote = new Map<string, number>();
       const mudancasDeLocalizacao: Array<{
         processoId: string;
         localizacao: string;
@@ -951,6 +954,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             campos.andamento_planilha = dados.andamento ?? '';
             campos.andamento_planilha_em = agora;
           }
+
+          if (processoExistente && typeof campos.ordem === 'number') ordemDoLote.set(processoExistente.id, campos.ordem);
 
           if (idExistente) {
             if (!processoExistente || algumCampoMudou(processoExistente, { ...campos, numero_processo })) {
@@ -1013,6 +1018,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         });
 
         await lote.commit();
+      }
+
+      // Processos sem Nº de ordem (criados antes dele existir, ou com PAE escrito diferente da planilha):
+      // pega o número da linha correspondente da planilha ou continua a sequência.
+      const ordensPendentes = ordensFaltantes(
+        processos.map((p) => ({ ...p, ordem: p.ordem ?? ordemDoLote.get(p.id) })),
+        validas,
+      );
+      for (const [processoId, ordem] of ordensPendentes) {
+        await updateDoc(doc(db, 'processos', processoId), { ordem, atualizado_em: new Date().toISOString() });
+        atualizados++;
       }
 
       // Sequencial (não em paralelo): sincronizarEstada lê o estado atual
