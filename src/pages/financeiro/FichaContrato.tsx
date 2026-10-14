@@ -215,7 +215,7 @@ export default function FichaContrato({ contratoIdInicial = '' }: { contratoIdIn
           <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-gray-200 bg-gray-50">
             <div><p className="text-[11px] uppercase text-gray-500">Total do ano (não arquivado)</p><p className="text-sm font-bold">{formatarMoeda(totalAno)}</p></div>
             <div><p className="text-[11px] uppercase text-gray-500">Já pago (com OB)</p><p className="text-sm font-bold text-emerald-700">{formatarMoeda(totalPago)}</p></div>
-            <div><p className="text-[11px] uppercase text-gray-500">Empenhado (origem + reforços)</p><p className="text-sm font-bold">{formatarMoeda(saldo.empenhado)}</p></div>
+            <div><p className="text-[11px] uppercase text-gray-500">Empenhado (original + notas de reforço)</p><p className="text-sm font-bold">{formatarMoeda(saldo.empenhado)}</p></div>
             <div><p className="text-[11px] uppercase text-gray-500">Saldo de NE</p><p className={`text-sm font-bold ${saldo.saldo < 0 ? 'text-red-700' : ''}`}>{formatarMoeda(saldo.saldo)}</p></div>
           </div>
         </div>

@@ -1,11 +1,13 @@
 import { competenciaDoPagamento, descreverAndamento, statusDoPagamento, totalPagoDoContrato, valorDoPagamento } from '../../lib/financeiro';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, FileText, PlusCircle, Save, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Contrato, ItemContrato } from '../../types';
 import { ehProcedimentoArp, saldoDaArp } from '../../lib/arp';
 import { STATUS_PAGAMENTO_LABELS } from '../../types';
+import DotacaoOrcamentariaEditor from '../../components/processo/DotacaoOrcamentariaEditor';
+import { limparClassificacoes } from '../../lib/orcamento';
 import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
 import { uploadArquivoContrato } from '../../lib/driveUploadService';
@@ -184,7 +186,7 @@ function contratoParaFormulario(contrato?: Contrato | null): FormState {
 export default function ContratoForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { contratos, addContrato, updateContrato, deleteContrato, usuarioAtual, pagamentos, procedimentos } = useApp();
+  const { contratos, addContrato, updateContrato, deleteContrato, usuarioAtual, pagamentos, procedimentos, processos } = useApp();
 
   const contrato = id ? contratos.find((c) => c.id === id) ?? null : null;
   const emEdicao = !!id;
@@ -265,12 +267,51 @@ export default function ContratoForm() {
     0,
   );
 
+  // Ata (ARP / adesão / partícipe) deste contrato: escolhida à mão ou achada pelo PAE informado.
+  const ataDoPae = useMemo(
+    () => (form.pae.trim() ? procedimentos.filter(ehProcedimentoArp).find((proc) => proc.pae.trim() === form.pae.trim()) : undefined),
+    [procedimentos, form.pae],
+  );
+  const ataEscolhida = procedimentos.find((proc) => proc.id === form.arpId);
+  const saldoAta = useMemo(() => {
+    if (!ataEscolhida) return null;
+    const saldo = saldoDaArp(ataEscolhida, contratos.filter((c) => c.id !== contrato?.id));
+    return { ...saldo, restante: saldo.registrado - saldo.utilizado - (parseValorMonetario(form.valorGlobal) || 0) };
+  }, [ataEscolhida, contratos, contrato?.id, form.valorGlobal]);
+
+  const preencherDaAta = (ata: (typeof procedimentos)[number]) =>
+    setForm((anterior) => ({
+      ...anterior,
+      objeto: anterior.objeto || ata.objeto || '',
+      cnpj: anterior.cnpj || (/\d/.test(ata.fornecedor ?? '') ? (ata.fornecedor ?? '') : ''),
+    }));
+
+  const escolherAta = (valor: string) => {
+    handleChange('arpId', valor);
+    const ata = procedimentos.find((proc) => proc.id === valor);
+    if (ata) preencherDaAta(ata);
+  };
+
+  // Ao informar o PAE de uma ata, o contrato é vinculado a ela sozinho.
+  useEffect(() => {
+    if (ataDoPae && !form.arpId) {
+      setForm((anterior) => (anterior.arpId ? anterior : { ...anterior, arpId: ataDoPae.id }));
+      preencherDaAta(ataDoPae);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ataDoPae?.id]);
+
+  // Dotação orçamentária que já veio do Apoio e Suprimento (checklist do processo) ou do próprio contrato.
+  const processoDoContrato = processos.find((p) => p.numero_processo === form.pae.trim());
+  const dotacoesDoContrato = contrato?.dotacoes_orcamentarias?.length
+    ? limparClassificacoes(contrato.dotacoes_orcamentarias)
+    : limparClassificacoes(processoDoContrato?.dotacoes_orcamentarias ?? []);
+
   const camposInvalidos =
     !form.numero ||
     !form.objeto ||
     !form.empresa ||
     !form.valorGlobal ||
-    !form.saldoInicialFinanceiro ||
     !form.inicioVigencia ||
     !form.fimVigencia ||
     totalItensDivergente;
@@ -352,15 +393,18 @@ export default function ContratoForm() {
         contatoEmail: form.contatoEmail || '',
         contatoTelefone: form.contatoTelefone || '',
         valorGlobal: parseValorMonetario(form.valorGlobal) || 0,
-        saldoInicialFinanceiro: parseValorMonetario(form.saldoInicialFinanceiro) || 0,
+        // O saldo inicial e sempre o valor inicial do contrato (no cadastro); depois so os pagamentos o abatem.
+        saldoInicialFinanceiro: emEdicao
+          ? (contrato?.saldoInicialFinanceiro ?? (parseValorMonetario(form.valorGlobal) || 0))
+          : parseValorMonetario(form.valorGlobal) || 0,
         // Em cadastro, o AppContext força saldoAtual = saldoInicial; em
         // edição, o saldo atual só muda se o master usar o campo de
         // correção manual — do contrário mantém o valor já existente.
         saldoAtualFinanceiro: emEdicao
           ? (form.saldoAtualFinanceiroCorrigido !== ''
               ? parseValorMonetario(form.saldoAtualFinanceiroCorrigido)
-              : (contrato?.saldoAtualFinanceiro ?? (parseValorMonetario(form.saldoInicialFinanceiro) || 0)))
-          : parseValorMonetario(form.saldoInicialFinanceiro) || 0,
+              : (contrato?.saldoAtualFinanceiro ?? (parseValorMonetario(form.valorGlobal) || 0)))
+          : parseValorMonetario(form.valorGlobal) || 0,
         ...(form.controlaQuantidade
           ? {
               // O saldo quantitativo agregado agora vem da soma das
@@ -619,6 +663,47 @@ export default function ContratoForm() {
                   className={CLASSE_INPUT}
                 />
               </div>
+              <div className="hidden md:block" />
+              <div className="md:col-span-2 rounded-md border border-teal-200 bg-teal-50/40 p-4">
+                <label className={CLASSE_LABEL}>Origem do contrato — ARP / Adesão / Partícipe</label>
+                <select
+                  value={form.arpId}
+                  onChange={(e) => escolherAta(e.target.value)}
+                  className={`${CLASSE_INPUT} bg-white`}
+                >
+                  <option value="">Nenhuma — contrato não vem de ata</option>
+                  {procedimentos.filter(ehProcedimentoArp).map((proc) => (
+                    <option key={proc.id} value={proc.id}>
+                      {proc.modalidade} {proc.documento_referencia || proc.numero} — {proc.pae || 'sem PAE'} — {proc.fornecedor || proc.objeto}
+                    </option>
+                  ))}
+                </select>
+                {ataDoPae && form.arpId === ataDoPae.id && (
+                  <p className="mt-1 text-xs text-teal-700">Vinculada automaticamente pelo número do PAE.</p>
+                )}
+                {ataEscolhida ? (
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs text-gray-700">
+                    <p><span className="block text-gray-500">Tipo</span><strong>{ataEscolhida.modalidade}</strong></p>
+                    <p><span className="block text-gray-500">Nº da ARP</span><strong>{ataEscolhida.documento_referencia || ataEscolhida.numero || '—'}</strong></p>
+                    <p><span className="block text-gray-500">PAE da ata</span><strong>{ataEscolhida.pae || '—'}</strong></p>
+                    <p><span className="block text-gray-500">Órgão gerenciador</span><strong>{ataEscolhida.orgaoGerenciador || '—'}</strong></p>
+                    <p><span className="block text-gray-500">Vigência da ARP</span><strong>{ataEscolhida.vigenciaArp ? new Date(ataEscolhida.vigenciaArp + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</strong></p>
+                    <p><span className="block text-gray-500">Fornecedor</span><strong>{ataEscolhida.fornecedor || '—'}</strong></p>
+                    <p className="sm:col-span-3"><span className="block text-gray-500">Objeto</span><strong>{ataEscolhida.objeto || '—'}</strong></p>
+                    {saldoAta && (
+                      <p className={`sm:col-span-3 ${saldoAta.registrado > 0 && saldoAta.restante < 0 ? 'text-red-700' : ''}`}>
+                        {saldoAta.registrado > 0
+                          ? `Registrado ${formatarMoeda(saldoAta.registrado)} · já contratado por outros ${formatarMoeda(saldoAta.utilizado)} · saldo após este contrato ${formatarMoeda(saldoAta.restante)}`
+                          : 'Informe o valor homologado ou os itens solicitados na ata para calcular o saldo dela.'}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Se o PAE informado for de uma ata (ARP, adesão ou partícipe), ela é vinculada sozinha. O vínculo controla o saldo da ata nas compras futuras.
+                  </p>
+                )}
+              </div>
               <div>
                 <label className={CLASSE_LABEL}>Nº do Contrato (nnnn/aaaa)</label>
                 <input
@@ -761,18 +846,13 @@ export default function ContratoForm() {
                 <label className={CLASSE_LABEL}>Saldo Financeiro Inicial (R$)</label>
                 <input
                   type="text"
-                  inputMode="decimal"
-                  placeholder="Ex.: 19.239,92"
-                  value={form.saldoInicialFinanceiro}
-                  onChange={(e) => handleChange('saldoInicialFinanceiro', e.target.value)}
-                  className={CLASSE_INPUT}
-                  disabled={emEdicao}
-                  title={
-                    emEdicao
-                      ? 'O saldo inicial não é alterado na edição; ele é abatido pelas execuções lançadas.'
-                      : undefined
-                  }
+                  value={formatarMoeda(emEdicao ? (contrato?.saldoInicialFinanceiro ?? valorGlobalNumero) : valorGlobalNumero)}
+                  className={`${CLASSE_INPUT} bg-gray-50 text-gray-600`}
+                  disabled
+                  readOnly
+                  title="O saldo inicial é igual ao valor do contrato e é abatido conforme os pagamentos são lançados."
                 />
+                <p className="mt-1 text-xs text-gray-500">Igual ao valor do contrato; é abatido conforme os pagamentos forem lançados.</p>
               </div>
               {emEdicao && usuarioAtual?.perfil === 'master' && (
                 <div>
@@ -1062,6 +1142,23 @@ export default function ContratoForm() {
               Dados Orçamentários
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <p className={CLASSE_LABEL}>Dotação orçamentária</p>
+                {dotacoesDoContrato.length > 0 ? (
+                  <div className="mt-1">
+                    <DotacaoOrcamentariaEditor linhas={dotacoesDoContrato} onChange={() => undefined} somenteLeitura />
+                    <p className="mt-1 text-xs text-gray-500">
+                      {contrato?.dotacoes_orcamentarias?.length
+                        ? 'Dotação do contrato.'
+                        : 'Vem do checklist do processo no Apoio e Suprimento (para alterar, edite lá).'}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                    Ainda não preenchida no Apoio e Suprimento. Ela poderá ser informada depois pelo módulo Financeiro (em Novo pagamento).
+                  </p>
+                )}
+              </div>
               <div>
                 <label className={CLASSE_LABEL}>Fonte de Recurso</label>
                 <select
@@ -1074,35 +1171,6 @@ export default function ContratoForm() {
                     <option key={opcao} value={opcao}>{opcao}</option>
                   ))}
                 </select>
-              </div>
-              <div className="md:col-span-2">
-                <label className={CLASSE_LABEL}>Ata de origem (ARP / adesão / partícipe)</label>
-                <select
-                  value={form.arpId}
-                  onChange={(e) => handleChange('arpId', e.target.value)}
-                  className={`${CLASSE_INPUT} bg-white`}
-                >
-                  <option value="">Nenhuma — contrato não vem de ata</option>
-                  {procedimentos.filter(ehProcedimentoArp).map((proc) => (
-                    <option key={proc.id} value={proc.id}>
-                      {proc.modalidade} {proc.numero} — {proc.fornecedor || proc.objeto}
-                    </option>
-                  ))}
-                </select>
-                {(() => {
-                  const ata = procedimentos.find((proc) => proc.id === form.arpId);
-                  if (!ata) return <p className="mt-1 text-xs text-gray-500">Vincule o contrato à ata para controlar o saldo dela nas compras futuras.</p>;
-                  const saldo = saldoDaArp(ata, contratos.filter((c) => c.id !== contrato?.id));
-                  const valorDesteContrato = parseValorMonetario(form.valorGlobal) || 0;
-                  const restante = saldo.registrado - saldo.utilizado - valorDesteContrato;
-                  return (
-                    <p className={`mt-1 text-xs ${saldo.registrado > 0 && restante < 0 ? 'text-red-700' : 'text-gray-500'}`}>
-                      {saldo.registrado > 0
-                        ? `Registrado ${formatarMoeda(saldo.registrado)} · já contratado por outros ${formatarMoeda(saldo.utilizado)} · saldo após este contrato ${formatarMoeda(restante)}`
-                        : 'Informe o valor homologado no procedimento da ata para calcular o saldo.'}
-                    </p>
-                  );
-                })()}
               </div>
               <div>
                 <label className={CLASSE_LABEL}>Natureza de Despesa</label>

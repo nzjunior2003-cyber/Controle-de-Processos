@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import DotacaoOrcamentariaEditor from '../../components/processo/DotacaoOrcamentariaEditor';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, PlusCircle, Save, Trash2, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -79,7 +80,7 @@ export default function PagamentoForm() {
   const [searchParams] = useSearchParams();
   const {
     pagamentos, contratos, dotacoes, empenhos, execucoes, processos,
-    addPagamento, updatePagamento, deletePagamento, usuarioAtual,
+    addPagamento, updatePagamento, deletePagamento, updateContrato, usuarioAtual,
   } = useApp();
   const navigate = useNavigate();
 
@@ -140,6 +141,23 @@ export default function PagamentoForm() {
     if (contrato?.dotacoes_orcamentarias?.length) return limparClassificacoes(contrato.dotacoes_orcamentarias);
     return limparClassificacoes(processo?.dotacoes_orcamentarias ?? []);
   }, [contrato, processos]);
+  // Contrato sem dotação no Apoio e Suprimento: o Financeiro pode informá-la aqui, depois.
+  const [dotacoesContrato, setDotacoesContrato] = useState<ClassificacaoOrcamentaria[]>([{}]);
+  const [salvandoDotacao, setSalvandoDotacao] = useState(false);
+  const salvarDotacaoDoContrato = async () => {
+    if (!contrato) return;
+    const linhas = limparClassificacoes(dotacoesContrato);
+    if (linhas.length === 0) return;
+    setSalvandoDotacao(true);
+    try {
+      await updateContrato(contrato.id, { dotacoes_orcamentarias: linhas });
+      if (linhas.length === 1) setClassificacao(linhas[0]);
+    } catch (erro) {
+      alert('Não foi possível salvar a dotação: ' + (erro instanceof Error ? erro.message : String(erro)));
+    } finally {
+      setSalvandoDotacao(false);
+    }
+  };
   const rotuloClassificacao = (c: ClassificacaoOrcamentaria) =>
     CAMPOS_ORCAMENTARIOS.map(({ chave }) => c[chave]).filter(Boolean).join(' · ') || '(vazia)';
 
@@ -153,6 +171,9 @@ export default function PagamentoForm() {
 
   // NEs do contrato no exercício da fatura.
   const empenhosDoContrato = empenhos.filter((e) => e.contratoId === contratoId && e.exercicio === exercicio);
+  // Contrato estimativo: as NEs que cobrem as faturas são Notas de Reforço do empenho original.
+  const contratoEstimativo = empenhosDoContrato.some((e) => e.tipo === 'origem' && e.estimativo);
+  const empenhoOriginal = empenhosDoContrato.find((e) => e.tipo === 'origem');
 
   // Execuções (NFs) do contrato que ainda não estão em outra fatura.
   const execucoesDisponiveis = useMemo(() => {
@@ -490,9 +511,23 @@ export default function PagamentoForm() {
               </select>
               <p className="mt-1 text-xs text-gray-500">
                 {linhasDoProcesso.length === 0
-                  ? 'O processo deste contrato ainda não tem dotação lançada no checklist (item "Dotação Orçamentária").'
+                  ? 'Este contrato ainda não tem dotação preenchida (nem no Apoio e Suprimento, nem no cadastro do contrato). Informe abaixo.'
                   : 'Alimenta o controle de pagamentos por fonte, programa de trabalho, natureza, plano interno e UG.'}
               </p>
+              {contrato && linhasDoProcesso.length === 0 && (
+                <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/50 p-3 space-y-3">
+                  <p className="text-sm font-medium text-gray-800">Dotação orçamentária do contrato {contrato.numero}</p>
+                  <DotacaoOrcamentariaEditor linhas={dotacoesContrato} onChange={setDotacoesContrato} />
+                  <button
+                    type="button"
+                    onClick={salvarDotacaoDoContrato}
+                    disabled={salvandoDotacao || limparClassificacoes(dotacoesContrato).length === 0}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {salvandoDotacao ? 'Salvando...' : 'Salvar dotação no contrato'}
+                  </button>
+                </div>
+              )}
             </div>
             <div>
               <label htmlFor="dotacaoId" className="block text-sm font-medium text-gray-700">Dotação (ficha orçamentária)</label>
@@ -591,38 +626,45 @@ export default function PagamentoForm() {
 
         <section className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900">Notas de Empenho (NE) que cobrem a fatura</h2>
+            <h2 className="text-sm font-semibold text-gray-900">
+              {contratoEstimativo
+                ? `Notas de Reforço do empenho original${empenhoOriginal ? ` (NE ${empenhoOriginal.numero})` : ''} que cobrem a fatura`
+                : 'Notas de Empenho (NE) que cobrem a fatura'}
+            </h2>
             {contratoId && (
               <Link
                 to={`/sistema/financeiro/empenhos/novo?contratoId=${contratoId}`}
                 target="_blank"
                 className="text-sm font-medium text-red-700 hover:underline"
               >
-                Cadastrar NE (nova aba)
+                {contratoEstimativo ? 'Cadastrar Nota de Reforço (nova aba)' : 'Cadastrar NE (nova aba)'}
               </Link>
             )}
           </div>
           {!contratoId ? (
-            <p className="text-sm text-gray-500">Selecione o contrato para ver as NEs do exercício {exercicio}.</p>
+            <p className="text-sm text-gray-500">Selecione o contrato para ver as notas de empenho do exercício {exercicio}.</p>
           ) : empenhosDoContrato.length === 0 ? (
-            <p className="text-sm text-gray-500">Nenhuma NE cadastrada para este contrato em {exercicio}.</p>
+            <p className="text-sm text-gray-500">{contratoEstimativo ? 'Nenhuma Nota de Reforço' : 'Nenhuma NE'} cadastrada para este contrato em {exercicio}.</p>
           ) : (
             <div className="space-y-2">
               {empenhosDoContrato.map((emp) => (
                 <label key={emp.id} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                   <input type="checkbox" checked={empenhoIds.includes(emp.id)} onChange={() => alternarEmpenho(emp.id)} className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded cursor-pointer" />
-                  NE {emp.numero} — {emp.tipo === 'origem' ? 'origem' : 'reforço'} — {formatarMoeda(emp.valor)}
+                  {emp.tipo === 'origem'
+                    ? `NE ${emp.numero} — empenho original`
+                    : `${contratoEstimativo ? 'Nota de Reforço' : 'NE'} ${emp.numero} — reforço${empenhoOriginal ? ` do empenho original NE ${empenhoOriginal.numero}` : ''}`}{' '}
+                  — {formatarMoeda(emp.valor)}
                 </label>
               ))}
               <div className="mt-3 rounded-md bg-gray-50 border border-gray-200 p-3 text-sm text-gray-700 space-y-1">
-                <p>Empenhado no exercício (origem + reforços): <strong>{formatarMoeda(saldoNe.empenhado)}</strong></p>
+                <p>Empenhado no exercício (empenho original + notas de reforço): <strong>{formatarMoeda(saldoNe.empenhado)}</strong></p>
                 <p>Já comprometido por outras faturas: <strong>{formatarMoeda(saldoNe.comprometido)}</strong></p>
-                <p>Saldo de NE: <strong className={saldoNe.saldo < 0 ? 'text-red-700' : ''}>{formatarMoeda(saldoNe.saldo)}</strong></p>
+                <p>Saldo de empenho: <strong className={saldoNe.saldo < 0 ? 'text-red-700' : ''}>{formatarMoeda(saldoNe.saldo)}</strong></p>
                 {valorTotalNumero > 0 && (
                   faltaReforco > 0 ? (
-                    <p className="text-amber-800">Para cobrir esta fatura falta reforçar <strong>{formatarMoeda(faltaReforco)}</strong>.</p>
+                    <p className="text-amber-800">Para cobrir esta fatura falta emitir Nota de Reforço de <strong>{formatarMoeda(faltaReforco)}</strong>.</p>
                   ) : (
-                    <p className="text-emerald-700">O saldo de NE cobre esta fatura.</p>
+                    <p className="text-emerald-700">O saldo de empenho cobre esta fatura.</p>
                   )
                 )}
               </div>

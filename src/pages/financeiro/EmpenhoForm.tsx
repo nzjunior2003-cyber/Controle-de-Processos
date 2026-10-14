@@ -119,7 +119,7 @@ export default function EmpenhoForm() {
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">{emEdicao ? 'Editar NE' : 'Nova Nota de Empenho (NE)'}</h1>
           <p className="mt-1 text-sm text-gray-500">
-            NE de origem (despesa estimativa, valor simbólico) ou NE de reforço de uma fatura.
+            Empenho original (despesa estimativa, valor simbólico) ou Nota de Reforço desse empenho para cobrir uma fatura.
           </p>
         </div>
         {emEdicao && (
@@ -153,8 +153,8 @@ export default function EmpenhoForm() {
             <div>
               <label htmlFor="tipo" className="block text-sm font-medium text-gray-700">Tipo</label>
               <select id="tipo" value={tipo} onChange={(e) => setTipo(e.target.value as TipoEmpenho)} className={`${CLASSE_INPUT} bg-white`}>
-                <option value="origem">NE de origem</option>
-                <option value="reforco">NE de reforço</option>
+                <option value="origem">Empenho original (NE de origem)</option>
+                <option value="reforco">Nota de Reforço</option>
               </select>
             </div>
 
@@ -176,7 +176,7 @@ export default function EmpenhoForm() {
               <label htmlFor="valor" className="block text-sm font-medium text-gray-700">
                 Valor (R$) <span className="text-red-500">*</span>
               </label>
-              <input type="number" id="valor" required step="0.01" min="0" value={valor} onChange={(e) => setValor(e.target.value)} className={CLASSE_INPUT} placeholder={tipo === 'origem' ? '1,00 (simbólico, se estimativo)' : 'Valor do reforço'} />
+              <input type="number" id="valor" required step="0.01" min="0" value={valor} onChange={(e) => setValor(e.target.value)} className={CLASSE_INPUT} placeholder={tipo === 'origem' ? '1,00 (simbólico, se estimativo)' : 'Valor da Nota de Reforço'} />
             </div>
 
             <div>
@@ -196,7 +196,7 @@ export default function EmpenhoForm() {
 
             {tipo === 'reforco' && (
               <div className="md:col-span-2">
-                <label htmlFor="neOrigemId" className="block text-sm font-medium text-gray-700">NE de origem que este reforço reforça</label>
+                <label htmlFor="neOrigemId" className="block text-sm font-medium text-gray-700">Empenho original que esta Nota de Reforço reforça</label>
                 <select id="neOrigemId" value={neOrigemId} onChange={(e) => setNeOrigemId(e.target.value)} className={`${CLASSE_INPUT} bg-white`}>
                   <option value="">Não informada</option>
                   {origensDoContrato.map((o) => (
@@ -211,7 +211,7 @@ export default function EmpenhoForm() {
                 <div className="md:col-span-2 flex items-center">
                   <input id="estimativo" type="checkbox" checked={estimativo} onChange={(e) => setEstimativo(e.target.checked)} className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded cursor-pointer" />
                   <label htmlFor="estimativo" className="ml-2 block text-sm text-gray-700 cursor-pointer">
-                    Despesa estimativa (valor mensal não fixo — cada fatura exige um reforço)
+                    Despesa estimativa (valor mensal não fixo — cada fatura exige uma Nota de Reforço)
                   </label>
                 </div>
                 <div>

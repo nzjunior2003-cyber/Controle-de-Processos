@@ -335,7 +335,7 @@ export default function Financeiro() {
                       <td className="px-4 py-3 text-sm font-medium">{e.numero}</td>
                       <td className="px-4 py-3 text-sm max-w-[18rem] truncate" title={textoContrato(e.contratoId)}>{textoContrato(e.contratoId)}</td>
                       <td className="px-4 py-3 text-sm">
-                        {e.tipo === 'origem' ? 'Origem' : 'Reforço'}
+                        {e.tipo === 'origem' ? 'Original' : 'Nota de Reforço'}
                         {e.tipo === 'origem' && e.estimativo ? <span className="text-xs text-gray-500"> (estimativa)</span> : null}
                       </td>
                       <td className="px-4 py-3 text-sm text-right whitespace-nowrap">{formatarMoeda(e.valor)}</td>

@@ -461,7 +461,7 @@ export default function FormProcedimento({
             </div>
           </div>
         </div>
-      ) : (
+      ) : abaAtiva === 'adesoes' || abaAtiva === 'participe' ? null : (
         <div>
           <h4 className="text-base font-medium text-gray-900 mb-4">Dados do Contrato / ARP</h4>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
