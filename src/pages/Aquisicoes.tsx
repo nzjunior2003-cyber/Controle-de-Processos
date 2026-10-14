@@ -7,6 +7,8 @@ import { differenceInDays, format } from 'date-fns';
 import { formatarMoeda } from '../lib/contratos';
 import IntegracaoPCA from './IntegracaoPCA';
 import StatusRobo from '../components/StatusRobo';
+import { limparClassificacoes, descricaoDoCodigo } from '../lib/orcamento';
+import type { ClassificacaoOrcamentaria } from '../types';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS, type StatusProcesso } from '../types';
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
 import { calcularProgressoChecklist, ordenarPorProgresso } from '../lib/fluxoProcesso';
@@ -14,6 +16,36 @@ import { useEtapasPorRito } from '../hooks/useEtapasPorRito';
 
 type FiltroTempo = 'todos' | 'verde' | 'amarelo' | 'vermelho' | 'contratado';
 type FiltroPrevisaoPca = 'todos' | 'sim' | 'nao';
+
+/** Dotação orçamentária do processo em linha: unidade, fonte, programa de trabalho, natureza e plano interno. */
+const CAMPOS_EM_LINHA = [
+  { chave: 'unidadeGestora', rotulo: 'Unidade' },
+  { chave: 'fonte', rotulo: 'Fonte' },
+  { chave: 'programaTrabalho', rotulo: 'Programa de trabalho' },
+  { chave: 'naturezaDespesa', rotulo: 'Natureza de despesa' },
+  { chave: 'planoInterno', rotulo: 'Plano interno' },
+] as const;
+
+function DotacaoEmLinha({ dotacoes }: { dotacoes?: ClassificacaoOrcamentaria[] }) {
+  const { catalogoOrcamentario } = useApp();
+  const linhas = limparClassificacoes(dotacoes ?? []);
+  if (linhas.length === 0) return null;
+  return (
+    <div className="flex-1 min-w-[280px] space-y-1.5" aria-label="Dotação orçamentária">
+      <p className="text-xs font-medium text-gray-500 uppercase">Dotação orçamentária</p>
+      {linhas.map((linha, i) => (
+        <p key={i} className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-900">
+          {CAMPOS_EM_LINHA.filter(({ chave }) => linha[chave]).map(({ chave, rotulo }) => (
+            <span key={chave} title={descricaoDoCodigo(catalogoOrcamentario, chave, linha[chave] ?? '') || undefined}>
+              <span className="text-xs text-gray-500">{rotulo}: </span>
+              <span className="font-medium">{linha[chave]}</span>
+            </span>
+          ))}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 export default function Aquisicoes() {
   const { processos, setores, usuarioAtual, syncProcessosDaPlanilha, contratos, procedimentos } = useApp();
@@ -595,7 +627,8 @@ export default function Aquisicoes() {
                                     procedimentoDoProcesso ? `${procedimentoDoProcesso.modalidade} ${procedimentoDoProcesso.numero}` : undefined,
                                   )}
                                 </div>
-                                <div className="flex flex-wrap gap-3">
+                                <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
+                                  <div className="flex flex-wrap gap-3">
                                   <Link
                                     to={`/sistema/processos/${proc.id}`}
                                     className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800"
@@ -610,6 +643,8 @@ export default function Aquisicoes() {
                                       <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
                                     </Link>
                                   )}
+                                  </div>
+                                  <DotacaoEmLinha dotacoes={proc.dotacoes_orcamentarias} />
                                 </div>
                               </div>
                             </td>

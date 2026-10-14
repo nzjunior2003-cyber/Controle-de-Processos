@@ -476,15 +476,20 @@ export default function DetalheProcesso() {
                                 onChange={setDotacoesDraft}
                                 somenteLeitura={!isMasterOrApoio}
                               />
-                              {isMasterOrApoio && dotacoesDraft && (
-                                <button
-                                  type="button"
-                                  disabled={salvandoDotacoes}
-                                  onClick={handleSalvarDotacoes}
-                                  className="mt-3 inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400"
-                                >
-                                  {salvandoDotacoes ? 'Salvando...' : 'Salvar dotação'}
-                                </button>
+                              {isMasterOrApoio && (
+                                <div className="mt-3 flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    disabled={salvandoDotacoes || !dotacoesDraft}
+                                    onClick={handleSalvarDotacoes}
+                                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                  >
+                                    {salvandoDotacoes ? 'Salvando...' : 'Salvar dotação'}
+                                  </button>
+                                  {!dotacoesDraft && (processo.dotacoes_orcamentarias?.length ?? 0) > 0 && (
+                                    <span className="text-xs text-emerald-700">Dotação salva</span>
+                                  )}
+                                </div>
                               )}
                             </div>
                           )}
