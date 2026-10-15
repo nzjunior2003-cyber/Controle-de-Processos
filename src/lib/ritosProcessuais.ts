@@ -53,6 +53,28 @@ const RITOS_REMOVIDOS_DO_MENU = [
 ];
 
 /**
+ * Ritos que precisam ter o item "Dotação Orçamentária" no checklist (é ele que
+ * abre os campos da dotação na tela do processo). A planilha nem sempre traz o
+ * item nesses ritos, então ele é garantido aqui.
+ */
+const RITOS_COM_DOTACAO = [
+  'Inexigibilidade',
+  'Inexigibilidade p/ Cursos',
+  'Prorrogação de contrato',
+  'Acréscimo ou supressão',
+  'Reequilíbrio, Repacotamento ....',
+];
+const ITEM_DOTACAO = 'Dotação Orçamentária';
+
+/** Garante o item da dotação, antes da primeira aprovação/autorização (ou no fim, se não houver). */
+function garantirItemDotacao(itens: string[]): string[] {
+  if (itens.some((item) => chave(item).startsWith('dotacaoorcamentaria'))) return itens;
+  const posicao = itens.findIndex((item) => /^(aprova|autoriza)/i.test(item.normalize('NFD').replace(/[̀-ͯ]/g, '')));
+  if (posicao < 0) return [...itens, ITEM_DOTACAO];
+  return [...itens.slice(0, posicao), ITEM_DOTACAO, ...itens.slice(posicao)];
+}
+
+/**
  * Chave de comparação: sem acentos, caixa, pontuação, espaços/quebras de
  * linha nem valores em reais — as grafias da planilha variam nisso tudo.
  */
@@ -102,7 +124,7 @@ export function unificarEtapasPorRito(...fontes: Record<string, string[]>[]): Re
   const resultado: Record<string, string[]> = {};
   Object.keys(RITOS_CANONICOS).forEach((canonico) => {
     const itens = porRito.get(canonico);
-    if (itens) resultado[canonico] = itens;
+    if (itens) resultado[canonico] = RITOS_COM_DOTACAO.includes(canonico) ? garantirItemDotacao(itens) : itens;
   });
   porRito.forEach((itens, canonico) => {
     if (!(canonico in resultado)) resultado[canonico] = itens;

@@ -60,8 +60,8 @@ describe('unificarEtapasPorRito', () => {
   });
 
   it('em empate de tamanho, vale a fonte que vem por último', () => {
-    const resultado = unificarEtapasPorRito({ Inexigibilidade: ['x', 'y'] }, { Inexigibilidade: ['p', 'q'] });
-    expect(resultado.Inexigibilidade).toEqual(['p', 'q']);
+    const resultado = unificarEtapasPorRito({ 'Pregão Eletrônico': ['x', 'y'] }, { 'Pregão Eletrônico': ['p', 'q'] });
+    expect(resultado['Pregão Eletrônico']).toEqual(['p', 'q']);
   });
 
   it('não repete o mesmo rito sob nomes diferentes', () => {
@@ -94,5 +94,18 @@ describe('ETAPAS_PADRAO', () => {
     expect(nomes).not.toContain('Pregão Eletrônico (SRP)');
     expect(nomes).not.toContain('Adesão ARP');
     expect(nomes).not.toContain('Dispensa de Licitação (com suas variantes)');
+  });
+});
+
+describe('item de dotação nos ritos de aditivo e inexigibilidade', () => {
+  it('garante "Dotação Orçamentária" antes da aprovação, sem duplicar', () => {
+    const r = unificarEtapasPorRito({
+      Inexigibilidade: ['DOD', 'Aprovação da Autoridade Competente', 'Parecer Jurídico'],
+      'Prorrogação de contrato': ['Relatório', 'Dotação Orçamentária', 'Parecer Jurídico'],
+      'Pregão Eletrônico': ['DFD'],
+    });
+    expect(r.Inexigibilidade).toEqual(['DOD', 'Dotação Orçamentária', 'Aprovação da Autoridade Competente', 'Parecer Jurídico']);
+    expect(r['Prorrogação de contrato']).toEqual(['Relatório', 'Dotação Orçamentária', 'Parecer Jurídico']);
+    expect(r['Pregão Eletrônico']).toEqual(['DFD']);
   });
 });
