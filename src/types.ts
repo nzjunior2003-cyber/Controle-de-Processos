@@ -192,6 +192,87 @@ export const CHECKLISTS_RITOS: Record<string, string[]> = {
     'Assinatura do Termo Aditivo',
     'Publicação do Extrato'
   ],
+  'Inexigibilidade p/ Cursos': [
+    'Documento de Oficialização da Demanda (DOD)',
+    'Termo de Referência (TR)',
+    'Justificativa de Inexigibilidade',
+    'Comprovação de Notória Especialização',
+    'Justificativa de Preço',
+    'Aprovação da Autoridade Competente',
+    'Parecer Jurídico',
+    'Publicação da Inexigibilidade',
+    'Assinatura do Contrato / Empenho'
+  ],
+  'Dispensa em Situação de Emergência': [
+    'Documento de Oficialização da Demanda (DOD)',
+    'Termo de Referência (TR)',
+    'Justificativa da Dispensa',
+    'Pesquisa de Preços',
+    'Aprovação da Autoridade Competente',
+    'Parecer Jurídico',
+    'Publicação da Dispensa',
+    'Assinatura do Contrato / Empenho'
+  ],
+  'Dispensa por legislação (IOEPA - Lei 14.133, Art. 75, IX)': [
+    'Documento de Oficialização da Demanda (DOD)',
+    'Termo de Referência (TR)',
+    'Justificativa da Dispensa',
+    'Pesquisa de Preços',
+    'Aprovação da Autoridade Competente',
+    'Parecer Jurídico',
+    'Publicação da Dispensa',
+    'Assinatura do Contrato / Empenho'
+  ],
+  'Dispensa por valor (Decreto 2.787, Art. 3º, II. Lei 14.133, Art. 75, II.)': [
+    'Documento de Oficialização da Demanda (DOD)',
+    'Termo de Referência (TR)',
+    'Justificativa da Dispensa',
+    'Pesquisa de Preços',
+    'Aprovação da Autoridade Competente',
+    'Parecer Jurídico',
+    'Publicação da Dispensa',
+    'Assinatura do Contrato / Empenho'
+  ],
+  'Dispensa por valor irrisório (Dec. N°2.787/22, Art. 3º, §6º)': [
+    'Documento de Oficialização da Demanda (DOD)',
+    'Termo de Referência (TR)',
+    'Justificativa da Dispensa',
+    'Pesquisa de Preços',
+    'Aprovação da Autoridade Competente',
+    'Parecer Jurídico',
+    'Publicação da Dispensa',
+    'Assinatura do Contrato / Empenho'
+  ],
+  'Prorrogação de contrato': [
+    'Relatório Técnico / Justificativa',
+    'Cronograma Físico-Financeiro (se aplicável)',
+    'Manifestação da Contratada',
+    'Pesquisa de Mercado (para aditivo de valor)',
+    'Adequação Orçamentária',
+    'Parecer Jurídico',
+    'Assinatura do Termo Aditivo',
+    'Publicação do Extrato'
+  ],
+  'Acréscimo ou supressão': [
+    'Relatório Técnico / Justificativa',
+    'Cronograma Físico-Financeiro (se aplicável)',
+    'Manifestação da Contratada',
+    'Pesquisa de Mercado (para aditivo de valor)',
+    'Adequação Orçamentária',
+    'Parecer Jurídico',
+    'Assinatura do Termo Aditivo',
+    'Publicação do Extrato'
+  ],
+  'Reequilíbrio, Repacotamento ....': [
+    'Relatório Técnico / Justificativa',
+    'Cronograma Físico-Financeiro (se aplicável)',
+    'Manifestação da Contratada',
+    'Pesquisa de Mercado (para aditivo de valor)',
+    'Adequação Orçamentária',
+    'Parecer Jurídico',
+    'Assinatura do Termo Aditivo',
+    'Publicação do Extrato'
+  ],
   'Outro': [
     'Abertura do Processo',
     'Instrução',
