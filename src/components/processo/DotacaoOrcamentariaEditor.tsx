@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, PlusCircle, X } from 'lucide-react';
+import { Pencil, PlusCircle, Trash2, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { descricaoDoCodigo, normalizarCodigoOrcamentario, trocarCodigoNasClassificacoes } from '../../lib/orcamento';
 import { CAMPOS_ORCAMENTARIOS, type CampoOrcamentario, type ClassificacaoOrcamentaria } from '../../types';
@@ -20,7 +20,7 @@ const CLASSE_INPUT =
  * pra acrescentar mais linhas (ex.: duas fontes ou duas naturezas).
  */
 export default function DotacaoOrcamentariaEditor({ linhas, onChange, somenteLeitura = false }: Props) {
-  const { catalogoOrcamentario, salvarItemCatalogo, renomearCodigoCatalogo, usuarioAtual } = useApp();
+  const { catalogoOrcamentario, salvarItemCatalogo, renomearCodigoCatalogo, excluirCodigoCatalogo, usuarioAtual } = useApp();
   const ehMaster = usuarioAtual?.perfil === 'master';
   // Descrições digitadas pra códigos ainda sem cadastro — gravadas no catálogo ao sair do campo.
   const [rascunho, setRascunho] = useState<Record<string, string>>({});
@@ -60,6 +60,16 @@ export default function DotacaoOrcamentariaEditor({ linhas, onChange, somenteLei
     }
   };
 
+  // Só master: apaga o código do catálogo (salvo por engano). Processos que já o usam mantêm o texto, só ficam sem descrição.
+  const excluirCodigo = async (campo: CampoOrcamentario, rotulo: string, codigoAtual: string) => {
+    if (!window.confirm(`Excluir o código "${codigoAtual}" (${rotulo}) do catálogo?\nProcessos que já o usam mantêm o código, mas ficam sem descrição.`)) return;
+    try {
+      await excluirCodigoCatalogo(campo, codigoAtual);
+    } catch (erro) {
+      alert('Não foi possível excluir o código: ' + (erro instanceof Error ? erro.message : String(erro)));
+    }
+  };
+
   const codigosDoCampo = (campo: CampoOrcamentario) => catalogoOrcamentario.filter((i) => i.campo === campo);
 
   return (
@@ -90,6 +100,18 @@ export default function DotacaoOrcamentariaEditor({ linhas, onChange, somenteLei
                   <div className="flex items-center justify-between gap-1">
                     <label className="block text-[11px] font-medium text-gray-600 uppercase" htmlFor={`${idLista}-input`}>{rotulo}</label>
                     {ehMaster && !somenteLeitura && codigoLimpo && (
+                      <span className="flex items-center">
+                      {descricao && (
+                        <button
+                          type="button"
+                          onClick={() => excluirCodigo(chave, rotulo, codigoLimpo)}
+                          className="p-0.5 text-gray-400 hover:text-red-600"
+                          title="Excluir este código do catálogo (master)"
+                          aria-label={`Excluir código de ${rotulo}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => renomearCodigo(chave, rotulo, codigoLimpo)}
@@ -99,6 +121,7 @@ export default function DotacaoOrcamentariaEditor({ linhas, onChange, somenteLei
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
+                      </span>
                     )}
                   </div>
                   <input
