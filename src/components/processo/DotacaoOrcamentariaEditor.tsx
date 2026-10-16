@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { PlusCircle, X } from 'lucide-react';
+import { Pencil, PlusCircle, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { descricaoDoCodigo, normalizarCodigoOrcamentario } from '../../lib/orcamento';
+import { descricaoDoCodigo, normalizarCodigoOrcamentario, trocarCodigoNasClassificacoes } from '../../lib/orcamento';
 import { CAMPOS_ORCAMENTARIOS, type CampoOrcamentario, type ClassificacaoOrcamentaria } from '../../types';
 
 interface Props {
@@ -20,7 +20,8 @@ const CLASSE_INPUT =
  * pra acrescentar mais linhas (ex.: duas fontes ou duas naturezas).
  */
 export default function DotacaoOrcamentariaEditor({ linhas, onChange, somenteLeitura = false }: Props) {
-  const { catalogoOrcamentario, salvarItemCatalogo } = useApp();
+  const { catalogoOrcamentario, salvarItemCatalogo, renomearCodigoCatalogo, usuarioAtual } = useApp();
+  const ehMaster = usuarioAtual?.perfil === 'master';
   // Descrições digitadas pra códigos ainda sem cadastro — gravadas no catálogo ao sair do campo.
   const [rascunho, setRascunho] = useState<Record<string, string>>({});
 
@@ -38,6 +39,24 @@ export default function DotacaoOrcamentariaEditor({ linhas, onChange, somenteLei
       });
     } catch (erro) {
       alert('Não foi possível salvar a descrição: ' + (erro instanceof Error ? erro.message : String(erro)));
+    }
+  };
+
+  // Só master: troca o código no catálogo e em todos os processos que o usam; o rascunho em tela acompanha.
+  const renomearCodigo = async (campo: CampoOrcamentario, rotulo: string, codigoAtual: string) => {
+    const novo = window.prompt(
+      `Novo código para "${codigoAtual}" (${rotulo}).\nEle será trocado em todos os processos, contratos e no Financeiro que usam esse código.`,
+      codigoAtual,
+    );
+    if (novo === null) return;
+    const novoLimpo = normalizarCodigoOrcamentario(novo);
+    if (!novoLimpo || novoLimpo === codigoAtual) return;
+    try {
+      const qtd = await renomearCodigoCatalogo(campo, codigoAtual, novoLimpo);
+      onChange(linhas.map((linha) => trocarCodigoNasClassificacoes([linha], campo, codigoAtual, novoLimpo).linhas[0]));
+      alert(`Código renomeado. ${qtd} registro(s) atualizado(s) (processos, contratos e Financeiro).`);
+    } catch (erro) {
+      alert('Não foi possível renomear o código: ' + (erro instanceof Error ? erro.message : String(erro)));
     }
   };
 
@@ -68,7 +87,20 @@ export default function DotacaoOrcamentariaEditor({ linhas, onChange, somenteLei
               const idLista = `catalogo-${chave}-${indice}`;
               return (
                 <div key={chave}>
-                  <label className="block text-[11px] font-medium text-gray-600 uppercase" htmlFor={`${idLista}-input`}>{rotulo}</label>
+                  <div className="flex items-center justify-between gap-1">
+                    <label className="block text-[11px] font-medium text-gray-600 uppercase" htmlFor={`${idLista}-input`}>{rotulo}</label>
+                    {ehMaster && !somenteLeitura && codigoLimpo && (
+                      <button
+                        type="button"
+                        onClick={() => renomearCodigo(chave, rotulo, codigoLimpo)}
+                        className="p-0.5 text-gray-400 hover:text-red-600"
+                        title="Renomear este código (master)"
+                        aria-label={`Renomear código de ${rotulo}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                   <input
                     id={`${idLista}-input`}
                     type="text"
