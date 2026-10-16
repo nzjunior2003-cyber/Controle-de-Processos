@@ -241,6 +241,8 @@ interface AppContextData {
   salvarItemCatalogo: (campo: CampoOrcamentario, codigo: string, descricao: string) => Promise<void>;
   /** Só master: troca um código do catálogo e nas dotações de todos os processos que o usam (mantém a descrição). */
   renomearCodigoCatalogo: (campo: CampoOrcamentario, codigoAntigo: string, codigoNovo: string) => Promise<number>;
+  /** Só master: apaga um código do catálogo (cadastrado por engano). Os registros que já usam o texto do código não são alterados. */
+  excluirCodigoCatalogo: (campo: CampoOrcamentario, codigo: string) => Promise<void>;
   addEmpenho: (dados: Omit<Empenho, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
   updateEmpenho: (id: string, dados: Partial<Empenho>) => Promise<void>;
   deleteEmpenho: (id: string) => Promise<void>;
@@ -2064,6 +2066,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [catalogoOrcamentario, registrarAuditoria],
   );
 
+  const excluirCodigoCatalogo = useCallback(
+    async (campo: CampoOrcamentario, codigo: string) => {
+      if (usuarioAtual?.perfil !== 'master') throw new Error('Apenas o master pode excluir códigos do catálogo.');
+      const id = idItemCatalogo(campo, normalizarCodigoOrcamentario(codigo));
+      const existente = catalogoOrcamentario.find((i) => i.id === id);
+      if (!existente) throw new Error('Esse código não está no catálogo.');
+      await deleteDoc(doc(requireDb(), 'catalogo_orcamentario', id));
+      await registrarAuditoria('catalogo_orcamentario', id, 'DELETE', {}, existente);
+    },
+    [usuarioAtual, catalogoOrcamentario, registrarAuditoria],
+  );
+
   const renomearCodigoCatalogo = useCallback(
     async (campo: CampoOrcamentario, codigoAntigo: string, codigoNovo: string) => {
       if (usuarioAtual?.perfil !== 'master') throw new Error('Apenas o master pode renomear códigos da dotação.');
@@ -2260,6 +2274,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       catalogoOrcamentario,
       salvarItemCatalogo,
       renomearCodigoCatalogo,
+      excluirCodigoCatalogo,
       ajustesRito,
       salvarAjusteRito,
       aditivosArp,
@@ -2346,6 +2361,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       catalogoOrcamentario,
       salvarItemCatalogo,
       renomearCodigoCatalogo,
+      excluirCodigoCatalogo,
       ajustesRito,
       salvarAjusteRito,
       aditivosArp,
