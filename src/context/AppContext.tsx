@@ -108,7 +108,7 @@ import {
   PushSubscriptionRegistro,
   TipoEventoProcesso,
 } from '../types';
-import { idItemCatalogo, normalizarCodigoOrcamentario } from '../lib/orcamento';
+import { idItemCatalogo, normalizarCodigoOrcamentario, trocarCodigoNasClassificacoes } from '../lib/orcamento';
 import { resolverAndamento } from '../lib/andamentoProcesso';
 import { idAjusteRito, type AjusteRito } from '../lib/ajustesRito';
 import {
@@ -238,6 +238,8 @@ interface AppContextData {
   deleteDotacao: (id: string) => Promise<void>;
   /** Cadastra (ou atualiza) a descrição de um código orçamentário no catálogo. */
   salvarItemCatalogo: (campo: CampoOrcamentario, codigo: string, descricao: string) => Promise<void>;
+  /** Só master: troca um código do catálogo e nas dotações de todos os processos que o usam (mantém a descrição). */
+  renomearCodigoCatalogo: (campo: CampoOrcamentario, codigoAntigo: string, codigoNovo: string) => Promise<number>;
   addEmpenho: (dados: Omit<Empenho, 'id' | 'criado_em' | 'atualizado_em'>) => Promise<string>;
   updateEmpenho: (id: string, dados: Partial<Empenho>) => Promise<void>;
   deleteEmpenho: (id: string) => Promise<void>;
@@ -2061,6 +2063,44 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [catalogoOrcamentario, registrarAuditoria],
   );
 
+  const renomearCodigoCatalogo = useCallback(
+    async (campo: CampoOrcamentario, codigoAntigo: string, codigoNovo: string) => {
+      if (usuarioAtual?.perfil !== 'master') throw new Error('Apenas o master pode renomear códigos da dotação.');
+      const antigo = normalizarCodigoOrcamentario(codigoAntigo);
+      const novo = normalizarCodigoOrcamentario(codigoNovo);
+      if (!antigo || !novo) throw new Error('Informe o novo código.');
+      const idAntigo = idItemCatalogo(campo, antigo);
+      const idNovo = idItemCatalogo(campo, novo);
+      if (idAntigo === idNovo && antigo === novo) return 0;
+      if (idAntigo !== idNovo && catalogoOrcamentario.some((i) => i.id === idNovo)) {
+        throw new Error(`O código ${novo} já existe no catálogo deste campo.`);
+      }
+      const db = requireDb();
+      const agora = new Date().toISOString();
+      const existente = catalogoOrcamentario.find((i) => i.id === idAntigo);
+      const afetados = processos
+        .map((p) => ({ p, troca: trocarCodigoNasClassificacoes(p.dotacoes_orcamentarias, campo, antigo, novo) }))
+        .filter(({ troca }) => troca.mudou);
+
+      // Processos primeiro (em lotes de 400); o catálogo só muda depois que todos foram gravados.
+      for (let i = 0; i < afetados.length; i += 400) {
+        const lote = writeBatch(db);
+        afetados.slice(i, i + 400).forEach(({ p, troca }) =>
+          lote.update(doc(db, 'processos', p.id), { dotacoes_orcamentarias: troca.linhas, atualizado_em: agora }),
+        );
+        await lote.commit();
+      }
+      if (existente) {
+        const dados = { campo, codigo: novo, descricao: existente.descricao, criado_em: existente.criado_em, atualizado_em: agora };
+        await setDoc(doc(db, 'catalogo_orcamentario', idNovo), dados);
+        if (idNovo !== idAntigo) await deleteDoc(doc(db, 'catalogo_orcamentario', idAntigo));
+        await registrarAuditoria('catalogo_orcamentario', idNovo, 'UPDATE', { campo, codigo: novo, anterior: antigo, processosAtualizados: afetados.length }, existente);
+      }
+      return afetados.length;
+    },
+    [usuarioAtual, catalogoOrcamentario, processos, registrarAuditoria],
+  );
+
   const addEmpenho = useCallback(
     async (dados: Omit<Empenho, 'id' | 'criado_em' | 'atualizado_em'>) => {
       const id = await criarEm('empenhos', dados);
@@ -2186,6 +2226,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       empenhos,
       catalogoOrcamentario,
       salvarItemCatalogo,
+      renomearCodigoCatalogo,
       ajustesRito,
       salvarAjusteRito,
       aditivosArp,
@@ -2271,6 +2312,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       empenhos,
       catalogoOrcamentario,
       salvarItemCatalogo,
+      renomearCodigoCatalogo,
       ajustesRito,
       salvarAjusteRito,
       aditivosArp,

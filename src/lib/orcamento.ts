@@ -52,6 +52,23 @@ export function limparClassificacoes(linhas: ClassificacaoOrcamentaria[]): Class
     .filter((linha) => Object.keys(linha).length > 0);
 }
 
+/** Troca um código por outro (ignora caixa/espaços) em todas as linhas; devolve `mudou` pra saber se vale gravar. */
+export function trocarCodigoNasClassificacoes(
+  linhas: ClassificacaoOrcamentaria[] | undefined,
+  campo: CampoOrcamentario,
+  codigoAntigo: string,
+  codigoNovo: string,
+): { linhas: ClassificacaoOrcamentaria[]; mudou: boolean } {
+  const chave = chaveCodigo(codigoAntigo);
+  let mudou = false;
+  const resultado = (linhas ?? []).map((linha) => {
+    if (!linha[campo] || chaveCodigo(linha[campo] as string) !== chave) return linha;
+    mudou = true;
+    return { ...linha, [campo]: normalizarCodigoOrcamentario(codigoNovo) };
+  });
+  return { linhas: resultado, mudou };
+}
+
 /** Classificação de uma ficha orçamentária cadastrada no Financeiro (DotacaoOrcamentaria). */
 export function classificacaoDaDotacao(d: DotacaoOrcamentaria): ClassificacaoOrcamentaria {
   const bruta: ClassificacaoOrcamentaria = {

@@ -7,6 +7,7 @@ import {
   idItemCatalogo,
   limparClassificacoes,
   totaisPorCampoOrcamentario,
+  trocarCodigoNasClassificacoes,
 } from './orcamento';
 import type { DotacaoOrcamentaria, PagamentoContrato } from '../types';
 
@@ -90,5 +91,21 @@ describe('totaisPorCampoOrcamentario', () => {
     const totais = totaisPorCampoOrcamentario(pagamentos, [], 'planoInterno', 2026);
     expect(totais).toHaveLength(1);
     expect(totais[0].pago).toBe(3);
+  });
+});
+
+describe('trocarCodigoNasClassificacoes', () => {
+  it('troca só o código do campo informado, ignorando caixa e espaços', () => {
+    const r = trocarCodigoNasClassificacoes(
+      [{ naturezaDespesa: '339033', fonte: '339033' }, { naturezaDespesa: '339030' }],
+      'naturezaDespesa',
+      ' 339033 ',
+      '339039',
+    );
+    expect(r.mudou).toBe(true);
+    expect(r.linhas).toEqual([{ naturezaDespesa: '339039', fonte: '339033' }, { naturezaDespesa: '339030' }]);
+  });
+  it('não muda nada quando o código não existe', () => {
+    expect(trocarCodigoNasClassificacoes(undefined, 'fonte', 'x', 'y')).toEqual({ linhas: [], mudou: false });
   });
 });
