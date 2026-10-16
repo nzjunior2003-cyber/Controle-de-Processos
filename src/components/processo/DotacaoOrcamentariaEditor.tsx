@@ -45,7 +45,7 @@ export default function DotacaoOrcamentariaEditor({ linhas, onChange, somenteLei
   // Só master: troca o código no catálogo e em todos os processos que o usam; o rascunho em tela acompanha.
   const renomearCodigo = async (campo: CampoOrcamentario, rotulo: string, codigoAtual: string) => {
     const novo = window.prompt(
-      `Novo código para "${codigoAtual}" (${rotulo}).\nEle será trocado em todos os processos que usam esse código.`,
+      `Novo código para "${codigoAtual}" (${rotulo}).\nEle será trocado em todos os processos, contratos e no Financeiro que usam esse código.`,
       codigoAtual,
     );
     if (novo === null) return;
@@ -54,7 +54,7 @@ export default function DotacaoOrcamentariaEditor({ linhas, onChange, somenteLei
     try {
       const qtd = await renomearCodigoCatalogo(campo, codigoAtual, novoLimpo);
       onChange(linhas.map((linha) => trocarCodigoNasClassificacoes([linha], campo, codigoAtual, novoLimpo).linhas[0]));
-      alert(`Código renomeado. ${qtd} processo(s) atualizado(s).`);
+      alert(`Código renomeado. ${qtd} registro(s) atualizado(s) (processos, contratos e Financeiro).`);
     } catch (erro) {
       alert('Não foi possível renomear o código: ' + (erro instanceof Error ? erro.message : String(erro)));
     }

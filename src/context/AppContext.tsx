@@ -103,12 +103,13 @@ import {
   AditivoArp,
   Apostilamento,
   ItemCatalogoOrcamentario,
+  ClassificacaoOrcamentaria,
   PagamentoContrato,
   Notificacao,
   PushSubscriptionRegistro,
   TipoEventoProcesso,
 } from '../types';
-import { idItemCatalogo, normalizarCodigoOrcamentario, trocarCodigoNasClassificacoes } from '../lib/orcamento';
+import { idItemCatalogo, normalizarCodigoOrcamentario, trocarCodigoNaFicha, trocarCodigoNasClassificacoes } from '../lib/orcamento';
 import { resolverAndamento } from '../lib/andamentoProcesso';
 import { idAjusteRito, type AjusteRito } from '../lib/ajustesRito';
 import {
@@ -2078,15 +2079,47 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const db = requireDb();
       const agora = new Date().toISOString();
       const existente = catalogoOrcamentario.find((i) => i.id === idAntigo);
-      const afetados = processos
-        .map((p) => ({ p, troca: trocarCodigoNasClassificacoes(p.dotacoes_orcamentarias, campo, antigo, novo) }))
-        .filter(({ troca }) => troca.mudou);
+      // Tudo que guarda esse código: dotação dos processos e dos contratos, apostilamentos, pagamentos e fichas do Financeiro.
+      const atualizacoes: { colecao: string; id: string; dados: Record<string, unknown> }[] = [];
+      const trocar = (linhas?: ClassificacaoOrcamentaria[]) => trocarCodigoNasClassificacoes(linhas, campo, antigo, novo);
+      let processosAfetados = 0;
+      processos.forEach((p) => {
+        const t = trocar(p.dotacoes_orcamentarias);
+        if (!t.mudou) return;
+        processosAfetados += 1;
+        atualizacoes.push({ colecao: 'processos', id: p.id, dados: { dotacoes_orcamentarias: t.linhas } });
+      });
+      contratos.forEach((c) => {
+        const t = trocar(c.dotacoes_orcamentarias);
+        if (t.mudou) atualizacoes.push({ colecao: 'contratos', id: c.id, dados: { dotacoes_orcamentarias: t.linhas } });
+      });
+      apostilamentos.forEach((a) => {
+        const novas = trocar(a.dotacoesNovas);
+        const anteriores = trocar(a.dotacoesAnteriores);
+        if (!novas.mudou && !anteriores.mudou) return;
+        atualizacoes.push({
+          colecao: 'apostilamentos',
+          id: a.id,
+          dados: {
+            ...(novas.mudou ? { dotacoesNovas: novas.linhas } : {}),
+            ...(anteriores.mudou ? { dotacoesAnteriores: anteriores.linhas } : {}),
+          },
+        });
+      });
+      pagamentos.forEach((pg) => {
+        const t = trocar(pg.classificacao ? [pg.classificacao] : undefined);
+        if (t.mudou) atualizacoes.push({ colecao: 'pagamentos', id: pg.id, dados: { classificacao: t.linhas[0] } });
+      });
+      dotacoes.forEach((d) => {
+        const mudanca = trocarCodigoNaFicha(d, campo, antigo, novo);
+        if (mudanca) atualizacoes.push({ colecao: 'dotacoes', id: d.id, dados: mudanca });
+      });
 
-      // Processos primeiro (em lotes de 400); o catálogo só muda depois que todos foram gravados.
-      for (let i = 0; i < afetados.length; i += 400) {
+      // Documentos primeiro (em lotes de 400); o catálogo só muda depois que todos foram gravados.
+      for (let i = 0; i < atualizacoes.length; i += 400) {
         const lote = writeBatch(db);
-        afetados.slice(i, i + 400).forEach(({ p, troca }) =>
-          lote.update(doc(db, 'processos', p.id), { dotacoes_orcamentarias: troca.linhas, atualizado_em: agora }),
+        atualizacoes.slice(i, i + 400).forEach(({ colecao, id, dados }) =>
+          lote.update(doc(db, colecao, id), { ...dados, atualizado_em: agora }),
         );
         await lote.commit();
       }
@@ -2094,11 +2127,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const dados = { campo, codigo: novo, descricao: existente.descricao, criado_em: existente.criado_em, atualizado_em: agora };
         await setDoc(doc(db, 'catalogo_orcamentario', idNovo), dados);
         if (idNovo !== idAntigo) await deleteDoc(doc(db, 'catalogo_orcamentario', idAntigo));
-        await registrarAuditoria('catalogo_orcamentario', idNovo, 'UPDATE', { campo, codigo: novo, anterior: antigo, processosAtualizados: afetados.length }, existente);
+        await registrarAuditoria('catalogo_orcamentario', idNovo, 'UPDATE', { campo, codigo: novo, anterior: antigo, processosAtualizados: processosAfetados, documentosAtualizados: atualizacoes.length }, existente);
       }
-      return afetados.length;
+      return atualizacoes.length;
     },
-    [usuarioAtual, catalogoOrcamentario, processos, registrarAuditoria],
+    [usuarioAtual, catalogoOrcamentario, processos, contratos, apostilamentos, pagamentos, dotacoes, registrarAuditoria],
   );
 
   const addEmpenho = useCallback(

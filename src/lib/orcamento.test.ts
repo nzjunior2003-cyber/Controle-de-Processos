@@ -7,6 +7,7 @@ import {
   idItemCatalogo,
   limparClassificacoes,
   totaisPorCampoOrcamentario,
+  trocarCodigoNaFicha,
   trocarCodigoNasClassificacoes,
 } from './orcamento';
 import type { DotacaoOrcamentaria, PagamentoContrato } from '../types';
@@ -107,5 +108,17 @@ describe('trocarCodigoNasClassificacoes', () => {
   });
   it('não muda nada quando o código não existe', () => {
     expect(trocarCodigoNasClassificacoes(undefined, 'fonte', 'x', 'y')).toEqual({ linhas: [], mudou: false });
+  });
+});
+
+describe('trocarCodigoNaFicha', () => {
+  const ficha = { id: 'd', exercicio: 2026, codigo: 'x', descricao: '', fonteRecurso: 'TESOURO', valorDotado: 0, naturezaDespesa: '339033', fonteCodigo: '01500', criado_em: '', atualizado_em: '' } as DotacaoOrcamentaria;
+  it('troca o campo certo da ficha', () => {
+    expect(trocarCodigoNaFicha(ficha, 'naturezaDespesa', '339033', '339039')).toEqual({ naturezaDespesa: '339039' });
+    expect(trocarCodigoNaFicha(ficha, 'fonte', '01500', '01600')).toEqual({ fonteCodigo: '01600' });
+  });
+  it('devolve null quando não há o que trocar', () => {
+    expect(trocarCodigoNaFicha(ficha, 'planoInterno', 'a', 'b')).toBeNull();
+    expect(trocarCodigoNaFicha(ficha, 'naturezaDespesa', '000000', '1')).toBeNull();
   });
 });

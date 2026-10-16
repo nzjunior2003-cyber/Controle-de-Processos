@@ -69,6 +69,37 @@ export function trocarCodigoNasClassificacoes(
   return { linhas: resultado, mudou };
 }
 
+/** Campo da ficha do Financeiro (DotacaoOrcamentaria) onde cada campo orçamentário é guardado. */
+const CAMPO_NA_FICHA = {
+  unidadeGestora: 'unidadeGestora',
+  programaTrabalho: 'funcionalProgramatica',
+  naturezaDespesa: 'naturezaDespesa',
+  fonte: 'fonteCodigo',
+  detalhamento: 'detalhamento',
+  planoInterno: 'planoInterno',
+} as const satisfies Record<CampoOrcamentario, keyof DotacaoOrcamentaria>;
+
+/**
+ * Troca o código numa ficha do Financeiro; devolve só o que muda (ou null).
+ * A fonte também cai em `fonteRecurso` quando a ficha não tem `fonteCodigo` (é o que `classificacaoDaDotacao` lê).
+ */
+export function trocarCodigoNaFicha(
+  ficha: DotacaoOrcamentaria,
+  campo: CampoOrcamentario,
+  codigoAntigo: string,
+  codigoNovo: string,
+): Partial<DotacaoOrcamentaria> | null {
+  const chave = chaveCodigo(codigoAntigo);
+  const novo = normalizarCodigoOrcamentario(codigoNovo);
+  const nome = CAMPO_NA_FICHA[campo];
+  const atual = ficha[nome];
+  if (typeof atual === 'string' && atual && chaveCodigo(atual) === chave) return { [nome]: novo };
+  if (campo === 'fonte' && !ficha.fonteCodigo && ficha.fonteRecurso && chaveCodigo(ficha.fonteRecurso) === chave) {
+    return { fonteRecurso: novo };
+  }
+  return null;
+}
+
 /** Classificação de uma ficha orçamentária cadastrada no Financeiro (DotacaoOrcamentaria). */
 export function classificacaoDaDotacao(d: DotacaoOrcamentaria): ClassificacaoOrcamentaria {
   const bruta: ClassificacaoOrcamentaria = {
