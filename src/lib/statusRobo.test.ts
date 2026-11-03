@@ -9,6 +9,9 @@ describe('parseDataHoraRobo', () => {
   it('lê data e hora no fuso de Brasília', () => {
     expect(parseDataHoraRobo('07/10/2026 14:30:15')?.toISOString()).toBe('2026-10-07T17:30:15.000Z');
     expect(parseDataHoraRobo('lixo')).toBeNull();
+    // a planilha às vezes devolve dia e hora sem o zero à esquerda
+    expect(parseDataHoraRobo('3/11/2026 9:05:07')?.toISOString()).toBe('2026-11-03T12:05:07.000Z');
+    expect(parseDataHoraRobo('3/11/2026 14:45:14')?.toISOString()).toBe('2026-11-03T17:45:14.000Z');
   });
 });
 

@@ -40,10 +40,12 @@ const cabecalhoConfere = (linha: string[] | undefined, esperado: string[]) =>
 
 /** 'dd/MM/yyyy HH:mm:ss' (horário de Brasília, que é como o Apps Script grava) -> Date. */
 export function parseDataHoraRobo(texto: string): Date | null {
-  const m = texto.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  // A planilha às vezes mostra dia/mês/hora com um dígito só ("3/11/2026 9:05:00"): aceita os dois formatos.
+  const m = texto.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if (!m) return null;
-  const [, dia, mes, ano, hora = '00', minuto = '00', segundo = '00'] = m;
-  const data = new Date(`${ano}-${mes}-${dia}T${hora}:${minuto}:${segundo}-03:00`);
+  const [, dia, mes, ano, hora = '0', minuto = '00', segundo = '00'] = m;
+  const dois = (n: string) => n.padStart(2, '0');
+  const data = new Date(`${ano}-${dois(mes)}-${dois(dia)}T${dois(hora)}:${minuto}:${segundo}-03:00`);
   return Number.isNaN(data.getTime()) ? null : data;
 }
 
