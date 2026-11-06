@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { criarBuscaVinculada } from '../lib/buscaVinculada';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, ListChecks, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, ListChecks, Stethoscope, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
 import { formatarMoeda } from '../lib/contratos';
 import IntegracaoPCA from './IntegracaoPCA';
@@ -272,6 +272,16 @@ export default function Aquisicoes() {
               >
                 <ListChecks className="-ml-1 mr-2 h-5 w-5" />
                 Checklists dos ritos
+              </Link>
+            )}
+            {usuarioAtual?.perfil === 'master' && (
+              <Link
+                to="/sistema/diagnostico-processos"
+                title="Compara os processos do sistema com a planilha (só leitura)"
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                <Stethoscope className="-ml-1 mr-2 h-5 w-5" />
+                Diagnóstico
               </Link>
             )}
             <Link

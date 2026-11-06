@@ -25,6 +25,7 @@ import PcaForm from './pages/pca/PcaForm';
 import RelatorioPca from './pages/pca/RelatorioPca';
 import Financeiro from './pages/financeiro';
 import AjustarRitos from './pages/ritos';
+import DiagnosticoProcessos from './pages/diagnostico';
 import PagamentoForm from './pages/financeiro/PagamentoForm';
 import DotacaoForm from './pages/financeiro/DotacaoForm';
 import EmpenhoForm from './pages/financeiro/EmpenhoForm';
@@ -73,6 +74,7 @@ export default function App() {
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="usuarios" element={<Usuarios />} />
                 <Route path="ritos" element={<AjustarRitos />} />
+                <Route path="diagnostico-processos" element={<DiagnosticoProcessos />} />
                 <Route path="auditoria" element={<Auditoria />} />
               </Route>
             </Route>
