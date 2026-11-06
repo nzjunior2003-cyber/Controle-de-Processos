@@ -13,6 +13,16 @@ export function chavesPae(texto: string | undefined): string[] {
   return [...(texto ?? '').matchAll(/(\d{4})\s*\/\s*(\d+)/g)].map((m) => `${m[1]}/${m[2]}`);
 }
 
+/**
+ * Id fixo do documento do processo, derivado do PAE principal ("2026/3155997" -> "pae-2026-3155997").
+ * Com id fixo, duas sincronizações simultâneas gravam no mesmo documento em vez de criar cópias.
+ * Devolve '' quando o número não tem um PAE reconhecível (aí vale o id automático).
+ */
+export function idProcessoPorPae(numeroProcesso: string | undefined): string {
+  const chave = chavesPae(numeroProcesso)[0];
+  return chave ? `pae-${chave.replace('/', '-')}` : '';
+}
+
 export const normalizarObjeto = (t: string | undefined) =>
   semAcento(t ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
 

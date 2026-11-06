@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acharProcessoDaLinha, chavesPae, observacaoComPaesVinculados, ordensFaltantes, separarPaes } from './ordemProcesso';
+import { acharProcessoDaLinha, chavesPae, idProcessoPorPae, observacaoComPaesVinculados, ordensFaltantes, separarPaes } from './ordemProcesso';
 
 const proc = (id: string, numero: string, objeto: string, ordem?: number, criado = '2026-01-01') => ({
   id, numero_processo: numero, objeto, ordem, criado_em: criado,
@@ -84,5 +84,14 @@ describe('PAEs múltiplos', () => {
     expect(acharProcessoDaLinha([{ numero_processo: '2025/2918786', objeto: 'X' }], { numero_processo: '2026/2725052', objeto: 'X', paes_vinculados: ['2025/2918786'] })).toBeDefined();
     expect(acharProcessoDaLinha(lista, { numero_processo: '2026/353535', objeto: 'Aquisição de bateria portátil' })).toBe(lista[2]);
     expect(acharProcessoDaLinha(lista, { numero_processo: '2026/999', objeto: 'x' })).toBeUndefined();
+  });
+});
+
+describe('idProcessoPorPae', () => {
+  it('deriva um id fixo do PAE, ignorando prefixo e espaços', () => {
+    expect(idProcessoPorPae('E-2026/3155997')).toBe('pae-2026-3155997');
+    expect(idProcessoPorPae(' 2026 / 3155997 ')).toBe('pae-2026-3155997');
+    expect(idProcessoPorPae('SEM PAE')).toBe('');
+    expect(idProcessoPorPae(undefined)).toBe('');
   });
 });
