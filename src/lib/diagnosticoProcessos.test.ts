@@ -69,5 +69,10 @@ describe('planoDeLimpeza', () => {
     );
     expect(plano.excluiveis.map((d) => d.id)).toEqual(['a']);
     expect(plano.revisar.map((d) => d.id)).toEqual(['b', 'c', 'd']);
+    expect(plano.revisar.map((d) => d.motivosRevisao)).toEqual([
+      ['tem dados próprios ()'],
+      ['ligado a um contrato ou ata'],
+      ['status Contratado/Aditivado'],
+    ]);
   });
 });

@@ -22,6 +22,8 @@ export default function DiagnosticoProcessos() {
   const [erro, setErro] = useState('');
   const [excluindo, setExcluindo] = useState(false);
   const [aviso, setAviso] = useState('');
+  // Registros barrados pela regra de segurança que o master escolheu incluir na exclusão.
+  const [extras, setExtras] = useState<Set<string>>(new Set());
 
   const plano = useMemo(() => {
     if (!resultado) return null;
@@ -30,6 +32,8 @@ export default function DiagnosticoProcessos() {
       paesVinculados: [...contratos.map((c) => c.pae), ...procedimentos.map((p) => p.pae)],
     });
   }, [resultado, processos, contratos, procedimentos]);
+
+  const totalSelecionado = plano ? plano.excluiveis.length + plano.revisar.filter((d) => extras.has(d.id)).length : 0;
 
   if (usuarioAtual?.perfil !== 'master') {
     return <div className="p-8 text-center text-gray-500">Você não tem permissão para acessar esta página.</div>;
@@ -57,8 +61,9 @@ export default function DiagnosticoProcessos() {
   };
 
   const limpar = async () => {
-    if (!plano || plano.excluiveis.length === 0) return;
-    const ids = new Set(plano.excluiveis.map((d) => d.id));
+    if (!plano) return;
+    const ids = new Set([...plano.excluiveis.map((d) => d.id), ...plano.revisar.filter((d) => extras.has(d.id)).map((d) => d.id)]);
+    if (ids.size === 0) return;
     // 1) Backup: baixa os registros inteiros antes de apagar.
     const backup = processos.filter((p) => ids.has(p.id));
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -74,6 +79,7 @@ export default function DiagnosticoProcessos() {
     try {
       const total = await excluirProcessosEmLote([...ids]);
       setResultado(null);
+      setExtras(new Set());
       setAviso(`${total} processo(s) excluído(s). Rode o diagnóstico de novo para conferir.`);
     } catch (e) {
       setErro('Não foi possível excluir: ' + (e instanceof Error ? e.message : String(e)));
@@ -133,7 +139,8 @@ export default function DiagnosticoProcessos() {
                 {plano.revisar.length > 0 && (
                   <>
                     {' '}
-                    Outros <strong>{plano.revisar.length}</strong> têm dados ou vínculo e ficam para revisão manual (continuam na lista abaixo).
+                    Outros <strong>{plano.revisar.length}</strong> foram barrados pela regra de segurança (dados, vínculo ou status Contratado/Aditivado):
+                    o motivo aparece em cada um na lista abaixo, onde você pode marcar os que também quer excluir.
                   </>
                 )}
               </p>
@@ -144,10 +151,10 @@ export default function DiagnosticoProcessos() {
               <button
                 type="button"
                 onClick={limpar}
-                disabled={excluindo || plano.excluiveis.length === 0}
+                disabled={excluindo || totalSelecionado === 0}
                 className="mt-3 inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-400"
               >
-                {excluindo ? 'Excluindo...' : `Baixar backup e excluir ${plano.excluiveis.length} processos`}
+                {excluindo ? 'Excluindo...' : `Baixar backup e excluir ${totalSelecionado} processos`}
               </button>
             </section>
           )}
@@ -202,15 +209,36 @@ export default function DiagnosticoProcessos() {
             <p className="text-xs text-gray-500 mb-2">Linha removida, movida para outra aba ou com o PAE trocado na planilha.</p>
             {resultado.orfaos.length === 0 && <p className="text-sm text-gray-500">Nenhum.</p>}
             <ul className="divide-y divide-gray-100">
-              {resultado.orfaos.slice(0, LIMITE_LISTA).map((d) => (
+              {resultado.orfaos.slice(0, LIMITE_LISTA).map((d) => {
+                const barrado = plano?.revisar.find((r) => r.id === d.id);
+                return (
                 <li key={d.id} className="py-1.5 text-xs text-gray-600 flex flex-wrap gap-x-4">
+                  {barrado && (
+                    <label className="inline-flex items-center gap-1 text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={extras.has(d.id)}
+                        onChange={(e) =>
+                          setExtras((anterior) => {
+                            const proximo = new Set(anterior);
+                            if (e.target.checked) proximo.add(d.id);
+                            else proximo.delete(d.id);
+                            return proximo;
+                          })
+                        }
+                      />
+                      excluir também
+                    </label>
+                  )}
                   <Link to={`/sistema/processos/${d.id}`} className="text-red-700 hover:underline">abrir</Link>
                   <strong className="text-gray-900">{d.numero_processo}</strong>
                   <span>criado {formatarData(d.criado_em)}</span>
                   <span className="truncate max-w-md">{d.objeto}</span>
                   <span>{d.motivos.length ? d.motivos.join(', ') : 'sem dados próprios'}</span>
+                  {barrado && <strong className="text-amber-700">barrado: {barrado.motivosRevisao.join('; ')}</strong>}
                 </li>
-              ))}
+                );
+              })}
             </ul>
             {resultado.orfaos.length > LIMITE_LISTA && (
               <p className="mt-2 text-xs text-gray-500">Mostrando os {LIMITE_LISTA} primeiros de {resultado.orfaos.length}.</p>
