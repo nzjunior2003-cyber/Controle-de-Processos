@@ -18,6 +18,7 @@ import { processoParaDadosPlanilha, SUBFASE_CONTRATADO } from '../lib/planilhaPr
 import { calcularEconomicidade, encontrarVinculosPorPae, formatarMoeda } from '../lib/contratos';
 import { calcularDataPrevista, prazoAlvoDoRito } from '../lib/prazosProcesso';
 import { ehItemDotacaoOrcamentaria, limparClassificacoes } from '../lib/orcamento';
+import PaesAcessoriosCard from '../components/PaesAcessoriosCard';
 import DotacaoOrcamentariaEditor from '../components/processo/DotacaoOrcamentariaEditor';
 import { AdicionarEtapa, BotaoExcluirEtapa } from '../components/processo/ControlesChecklistMaster';
 import type { ClassificacaoOrcamentaria } from '../types';
@@ -436,6 +437,14 @@ export default function DetalheProcesso() {
               </dl>
             </div>
           )}
+
+          <PaesAcessoriosCard
+            escopo="processo"
+            donoId={processo.id}
+            paes={processo.paes_acessorios}
+            jaExistentes={[processo.numero_processo]}
+            podeEditar={isMasterOrApoio}
+          />
 
           {checklistDisponivel && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">

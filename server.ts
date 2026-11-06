@@ -328,6 +328,51 @@ async function startServer() {
     }
   });
 
+  // Publica na aba PAES_ACESSORIOS da planilha a lista de PAEs acessórios (de
+  // processos e de contratos) para o robô consultá-los. Mesmo caminho do robô:
+  // URL e token só no servidor. O Apps Script reescreve a aba e preserva o
+  // setor que o robô já achou para os PAEs que continuam na lista.
+  app.post("/api/planilha/paes-acessorios", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization ?? "";
+      const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+      if (!(await idTokenValido(idToken))) {
+        return res.status(401).json({ error: "Não autenticado." });
+      }
+
+      const urlRobo = process.env.ROBO_WEBAPP_URL;
+      if (!urlRobo) {
+        return res.status(500).json({ error: "Falta ROBO_WEBAPP_URL no .env do servidor." });
+      }
+
+      const itens = (Array.isArray(req.body?.itens) ? req.body.itens : [])
+        .slice(0, 500)
+        .map((i: { pae?: unknown; escopo?: unknown; referencia?: unknown; finalidade?: unknown; relatorio?: unknown }) => ({
+          pae: String(i.pae ?? "").slice(0, 30),
+          escopo: i.escopo === "contrato" ? "contrato" : "processo",
+          referencia: String(i.referencia ?? "").slice(0, 60),
+          finalidade: String(i.finalidade ?? "").slice(0, 120),
+          relatorio: i.relatorio === true,
+        }))
+        .filter((i: { pae: string }) => /\d{4}\s*[/-]\s*\d+/.test(i.pae));
+
+      const resposta = await fetch(urlRobo, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ acao: "gravar_paes_acessorios", token: process.env.ROBO_TOKEN ?? "", itens }),
+        redirect: "follow",
+      });
+      const dados = (await resposta.json().catch(() => null)) as { status?: string; erro?: string; gravados?: number } | null;
+      if (!resposta.ok || !dados || dados.status !== "success") {
+        return res.status(502).json({ error: dados?.erro ?? "O Apps Script recusou o pedido." });
+      }
+      return res.json({ ok: true, gravados: dados.gravados ?? itens.length });
+    } catch (error) {
+      console.error("Error writing accessory PAEs:", error);
+      res.status(500).json({ error: "Falha ao publicar os PAEs acessórios na planilha." });
+    }
+  });
+
   // Notificações push (Web Push/VAPID) — disparadas pelo próprio cliente
   // que gerou o evento (mudança de setor/fase/conclusão de um processo,
   // ver `dispararNotificacoesProcesso`, AppContext.tsx). Sem Cloud

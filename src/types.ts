@@ -281,6 +281,21 @@ export const CHECKLISTS_RITOS: Record<string, string[]> = {
   ]
 };
 
+/**
+ * PAE aberto à parte, ligado a um processo (solicitação de análise a outro
+ * órgão) ou a um contrato (fatura, recebimento de objeto, pagamento). O robô
+ * rastreia o setor atual dele como o do PAE principal.
+ */
+export interface PaeAcessorio {
+  id: string;
+  /** Nº do PAE, com o prefixo "E-" (ex.: E-2026/2617141). */
+  numero: string;
+  /** Uma das finalidades sugeridas ou texto livre. */
+  finalidade: string;
+  observacao?: string;
+  criado_em: string;
+}
+
 export interface Processo {
   id: string;
   numero_processo: string;
@@ -307,6 +322,8 @@ export interface Processo {
   prd_validade?: string;
   valor_prd?: number;
   checklist_rito?: string[];
+  /** PAEs acessórios do processo (solicitações de análise a outros órgãos do Estado). */
+  paes_acessorios?: PaeAcessorio[];
   /** Dotações orçamentárias do processo (item "Dotação Orçamentária" do checklist) — uma ou mais linhas com os campos da ficha da Finanças. */
   dotacoes_orcamentarias?: ClassificacaoOrcamentaria[];
   /** Só usados quando o rito é a Adesão à ata de registro de preços (RITO_ADESAO_ARP). */
@@ -460,6 +477,8 @@ export interface Contrato {
   historicoFiscal?: HistoricoFiscalContrato[];
   portaria?: string;
   fonteRecurso?: string;
+  /** PAEs acessórios do contrato (fatura, recebimento de objeto, pagamento). */
+  paes_acessorios?: PaeAcessorio[];
   /** Dotação orçamentária do contrato (apostilamento de dotação pode trocá-la); sem ela vale a do processo de origem. */
   dotacoes_orcamentarias?: ClassificacaoOrcamentaria[];
   /** Ata (procedimento de ARP/adesão/partícipe) de onde o contrato se originou — o valor dele sai do saldo da ata. */
