@@ -7,7 +7,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { acharProcessoDaLinha, chavesPae, observacaoComPaesVinculados, ordensFaltantes } from '../lib/ordemProcesso';
+import { acharProcessoDaLinha, chavesPae, idProcessoPorPae, observacaoComPaesVinculados, ordensFaltantes } from '../lib/ordemProcesso';
+import { diagnosticarProcessos } from '../lib/diagnosticoProcessos';
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -207,7 +208,9 @@ interface AppContextData {
   syncPcasFromPublicUrl: (url: string) => Promise<void>;
   syncProcessosDaPlanilha: (
     url: string,
-  ) => Promise<{ criados: number; atualizados: number; ignorados: number }>;
+  ) => Promise<{ criados: number; atualizados: number; ignorados: number; semLinha: number }>;
+  /** Processos do sistema sem linha na planilha na última sincronização; null enquanto não sincronizou nesta sessão. */
+  processosSemLinha: number | null;
   syncContratosDaPlanilha: (
     url: string,
   ) => Promise<{ criados: number; atualizados: number; ignorados: number }>;
@@ -282,13 +285,15 @@ const SETORES: Setor[] = [
 const AppContext = createContext<AppContextData>({} as AppContextData);
 
 /** Assina uma coleção do Firestore em tempo real (somente quando autenticado). */
-function useColecao<T extends { id: string }>(nome: string, ativo: boolean): T[] {
+function useColecaoCarregada<T extends { id: string }>(nome: string, ativo: boolean): { dados: T[]; carregado: boolean } {
   const [dados, setDados] = useState<T[]>([]);
+  const [carregado, setCarregado] = useState(false);
 
   useEffect(() => {
     const db = getDb();
     if (!ativo || !db) {
       setDados([]);
+      setCarregado(false);
       return;
     }
 
@@ -301,6 +306,8 @@ function useColecao<T extends { id: string }>(nome: string, ativo: boolean): T[]
             id: documento.id,
           })) as T[],
         );
+        // Só vale como "carregado" depois que o servidor respondeu (a primeira entrega pode vir do cache, incompleta).
+        if (!snapshot.metadata.fromCache) setCarregado(true);
       },
       (erro) => {
         console.error(`Erro ao carregar a coleção "${nome}":`, erro);
@@ -310,7 +317,11 @@ function useColecao<T extends { id: string }>(nome: string, ativo: boolean): T[]
     return () => cancelar();
   }, [nome, ativo]);
 
-  return dados;
+  return { dados, carregado };
+}
+
+function useColecao<T extends { id: string }>(nome: string, ativo: boolean): T[] {
+  return useColecaoCarregada<T>(nome, ativo).dados;
 }
 
 /**
@@ -427,7 +438,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Coleções -----------------------------------------------------------
   const usuarios = useColecao<Usuario>('usuarios', isAuthenticated);
-  const processosBrutos = useColecao<Processo>('processos', isAuthenticated);
+  const { dados: processosBrutos, carregado: processosCarregados } = useColecaoCarregada<Processo>('processos', isAuthenticated);
+  // Processos do sistema sem linha na planilha na última sincronização (null = ainda não sincronizou nesta sessão).
+  const [processosSemLinha, setProcessosSemLinha] = useState<number | null>(null);
   // Todo o sistema enxerga o rito pelo nome canônico (ritos unificados — ver
   // src/lib/ritosProcessuais.ts), mesmo que o documento ainda guarde um nome
   // antigo ou a grafia da planilha; o documento é regravado com o nome
@@ -891,6 +904,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const syncProcessosDaPlanilha = useCallback(
     async (url: string) => {
+      // Sincronizar com a lista ainda vazia faria o sistema achar que nenhum processo existe e criar tudo de novo.
+      if (!processosCarregados) {
+        throw new Error('Os dados do sistema ainda estão carregando. Aguarde alguns segundos e tente de novo.');
+      }
       const db = requireDb();
       const correspondencia = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
       if (!correspondencia) {
@@ -945,7 +962,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const lote = writeBatch(db);
         const agora = new Date().toISOString();
 
-        validas.slice(inicio, inicio + 400).forEach((dados) => {
+        for (const dados of validas.slice(inicio, inicio + 400)) {
           const { numero_processo, paes_vinculados, ...resto } = dados;
           const campos = Object.fromEntries(
             Object.entries(resto).filter(([, v]) => v !== undefined),
@@ -1007,19 +1024,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               }
             }
           } else {
-            const novaRef = doc(collection(db, 'processos'));
+            // Id fixo derivado do PAE: duas sincronizações simultâneas gravam no mesmo documento em vez de criar cópias.
+            const idFixo = idProcessoPorPae(numero_processo);
+            const novaRef = idFixo ? doc(db, 'processos', idFixo) : doc(collection(db, 'processos'));
             idsCriadosNestaSincronizacao.set(numero_processo, novaRef.id);
-            lote.set(novaRef, {
-              ...campos,
-              numero_processo,
-              demandante_id: '',
-              fase_atual_id: '1',
-              possui_alerta: false,
-              data_abertura: dados.data_entrada || agora,
-              criado_em: agora,
-              atualizado_em: agora,
-            });
-            criados++;
+            // Se o documento já existe (a lista local estava defasada), só atualiza: recriar apagaria fase e checklist.
+            const jaExiste = idFixo ? (await getDoc(novaRef)).exists() : false;
+            if (jaExiste) {
+              lote.set(novaRef, { ...campos, numero_processo, atualizado_em: agora }, { merge: true });
+              atualizados++;
+            } else {
+              lote.set(novaRef, {
+                ...campos,
+                numero_processo,
+                demandante_id: '',
+                fase_atual_id: '1',
+                possui_alerta: false,
+                data_abertura: dados.data_entrada || agora,
+                criado_em: agora,
+                atualizado_em: agora,
+              });
+              criados++;
+            }
             if (dados.localizacao_atual) {
               // Primeira estada: melhor estimativa possível é "desde a
               // data de entrada" — o histórico anterior a esta
@@ -1031,7 +1057,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               });
             }
           }
-        });
+        }
 
         await lote.commit();
       }
@@ -1103,9 +1129,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      return { criados, atualizados, ignorados: linhas.length - validas.length };
+      // Processos do sistema que não têm mais linha na planilha (a sincronização nunca apaga): avisa o master.
+      const semLinha = diagnosticarProcessos(processos, validas).orfaos.length;
+      setProcessosSemLinha(semLinha);
+
+      return { criados, atualizados, ignorados: linhas.length - validas.length, semLinha };
     },
-    [processos, sincronizarEstada, dispararNotificacoesProcesso],
+    [processos, processosCarregados, sincronizarEstada, dispararNotificacoesProcesso],
   );
 
   /**
@@ -2360,6 +2390,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addMovimentacao,
       syncPcasFromPublicUrl,
       syncProcessosDaPlanilha,
+      processosSemLinha,
       syncContratosDaPlanilha,
       updateUsuario,
       addUsuario,
@@ -2448,6 +2479,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addMovimentacao,
       syncPcasFromPublicUrl,
       syncProcessosDaPlanilha,
+      processosSemLinha,
       syncContratosDaPlanilha,
       updateUsuario,
       addUsuario,

@@ -94,7 +94,7 @@ function DotacaoEmLinha({ dotacoes }: { dotacoes?: ClassificacaoOrcamentaria[] }
 }
 
 export default function Aquisicoes() {
-  const { processos, setores, usuarioAtual, syncProcessosDaPlanilha, contratos, procedimentos } = useApp();
+  const { processos, setores, usuarioAtual, syncProcessosDaPlanilha, processosSemLinha, contratos, procedimentos } = useApp();
   // Busca que também olha o contrato e a ata ligados ao processo (pelo PAE): fornecedor, nº do contrato, fiscal...
   const buscaVinculada = useMemo(
     () => criarBuscaVinculada({ processos, contratos, procedimentos }),
@@ -233,7 +233,8 @@ export default function Aquisicoes() {
       alert(
         `Sincronização concluída: ${resultado.criados} processo(s) novo(s), ` +
           `${resultado.atualizados} atualizado(s)` +
-          (resultado.ignorados > 0 ? `, ${resultado.ignorados} linha(s) ignorada(s) (sem número).` : '.'),
+          (resultado.ignorados > 0 ? `, ${resultado.ignorados} linha(s) ignorada(s) (sem número).` : '.') +
+          (resultado.semLinha > 0 ? `\n\nAtenção: ${resultado.semLinha} processo(s) do sistema não têm mais linha na planilha.` : ''),
       );
     } catch (erro) {
       alert(
@@ -247,6 +248,14 @@ export default function Aquisicoes() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
+      {usuarioAtual?.perfil === 'master' && processosSemLinha !== null && processosSemLinha > 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+          <strong>{processosSemLinha}</strong> processo(s) do sistema não têm mais linha na planilha (linha removida, movida de aba ou PAE trocado).{' '}
+          <Link to="/sistema/diagnostico-processos" className="font-medium underline">
+            Ver no Diagnóstico
+          </Link>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Apoio e Suprimento</h1>
