@@ -126,3 +126,32 @@ export function diagnosticarProcessos(processos: ProcessoParaDiagnostico[], linh
     porDia: [...porDiaMapa.entries()].map(([dia, quantidade]) => ({ dia, quantidade })).sort((a, b) => a.dia.localeCompare(b.dia)),
   };
 }
+
+export interface VinculosParaLimpeza {
+  /** PAEs (texto) dos contratos e dos procedimentos/atas do sistema — um processo ligado a eles não é apagado. */
+  paesVinculados: string[];
+}
+
+export interface PlanoDeLimpeza {
+  /** Sem linha na planilha, sem dados próprios e sem vínculo: podem ser excluídos (com confirmação). */
+  excluiveis: DocDiagnostico[];
+  /** Sem linha na planilha, mas com dados ou vínculo: ficam para revisão manual. */
+  revisar: DocDiagnostico[];
+}
+
+/** Separa os registros sem linha na planilha entre os que podem ser excluídos com segurança e os que pedem revisão. */
+export function planoDeLimpeza(
+  orfaos: DocDiagnostico[],
+  statusPorId: Map<string, string | undefined>,
+  vinculos: VinculosParaLimpeza,
+): PlanoDeLimpeza {
+  const chavesVinculadas = new Set(vinculos.paesVinculados.flatMap((t) => chavesPae(t)));
+  const excluiveis: DocDiagnostico[] = [];
+  const revisar: DocDiagnostico[] = [];
+  orfaos.forEach((d) => {
+    const vinculado = chavesPae(d.numero_processo).some((c) => chavesVinculadas.has(c));
+    const contratado = statusPorId.get(d.id) === 'contratado_aditivado';
+    (d.pontos === 0 && !vinculado && !contratado ? excluiveis : revisar).push(d);
+  });
+  return { excluiveis, revisar };
+}

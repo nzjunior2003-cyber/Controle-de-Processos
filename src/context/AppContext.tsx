@@ -193,6 +193,8 @@ interface AppContextData {
     >,
   ) => Promise<string>;
   deleteProcesso: (id: string) => Promise<void>;
+  /** Só master: exclui vários processos de uma vez (com o histórico de estadas e movimentações deles). Devolve quantos processos foram excluídos. */
+  excluirProcessosEmLote: (ids: string[]) => Promise<number>;
   updateProcessoStatus: (
     id: string,
     status: Processo['status'],
@@ -1328,6 +1330,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [processos, registrarAuditoria],
   );
 
+  const excluirProcessosEmLote = useCallback(
+    async (ids: string[]) => {
+      if (usuarioAtual?.perfil !== 'master') throw new Error('Apenas o master pode excluir processos em lote.');
+      const alvo = new Set(ids);
+      const existentes = processos.filter((p) => alvo.has(p.id));
+      if (existentes.length === 0) return 0;
+      const db = requireDb();
+      const refs = [
+        ...existentes.map((p) => doc(db, 'processos', p.id)),
+        ...estadasProcesso.filter((e) => alvo.has(e.processo_id)).map((e) => doc(db, 'estadas_processo', e.id)),
+        ...movimentacoes.filter((m) => alvo.has(m.processo_id)).map((m) => doc(db, 'movimentacoes', m.id)),
+      ];
+      for (let i = 0; i < refs.length; i += 400) {
+        const lote = writeBatch(db);
+        refs.slice(i, i + 400).forEach((ref) => lote.delete(ref));
+        await lote.commit();
+      }
+      await registrarAuditoria('processos', `lote-${Date.now()}`, 'DELETE', {
+        total: existentes.length,
+        processos: existentes.map((p) => `${p.id}:${p.numero_processo}`),
+      });
+      return existentes.length;
+    },
+    [usuarioAtual, processos, estadasProcesso, movimentacoes, registrarAuditoria],
+  );
+
   const updateProcesso = useCallback(
     async (id: string, dados: Partial<Processo>) => {
       const db = requireDb();
@@ -2326,6 +2354,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       enviarResetSenha,
       addProcesso,
       deleteProcesso,
+      excluirProcessosEmLote,
       updateProcessoStatus,
       updateProcesso,
       addMovimentacao,
@@ -2413,6 +2442,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       enviarResetSenha,
       addProcesso,
       deleteProcesso,
+      excluirProcessosEmLote,
       updateProcessoStatus,
       updateProcesso,
       addMovimentacao,
