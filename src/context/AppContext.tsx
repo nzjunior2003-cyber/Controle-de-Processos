@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { acharProcessoDaLinha, chavesPae, idProcessoPorPae, observacaoComPaesVinculados, ordensFaltantes } from '../lib/ordemProcesso';
+import { atribuirProcessosAsLinhas, chavesPae, contarLinhasPorPrincipal, idProcessoDaLinha, principalDoProcesso, observacaoComPaesVinculados, ordensFaltantes } from '../lib/ordemProcesso';
 import { diagnosticarProcessos } from '../lib/diagnosticoProcessos';
 import {
   createUserWithEmailAndPassword,
@@ -939,11 +939,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       let criados = 0;
       let atualizados = 0;
-      // Evita criar duplicados quando o mesmo número aparece mais de uma
-      // vez na planilha e ainda não existe no Firestore (o lote inteiro
-      // ainda não foi confirmado, então `processos` não reflete as
-      // criações anteriores deste mesmo lote).
-      const idsCriadosNestaSincronizacao = new Map<string, string>();
+      // Uma linha da planilha = um processo: linhas com o mesmo PAE ficam com processos separados.
+      // A ligação linha → processo é feita antes do loop (o lote ainda não foi confirmado, então
+      // `processos` não reflete o que este mesmo lote cria; o id fixo de cada linha evita cópias).
+      const processoDaLinha = atribuirProcessosAsLinhas(processos, validas);
+      const linhasPorPae = contarLinhasPorPrincipal(validas);
       // Nº de ordem que o lote principal já deu a processos existentes (os demais, sem número, são tratados depois).
       const ordemDoLote = new Map<string, number>();
       const mudancasDeLocalizacao: Array<{
@@ -962,14 +962,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const lote = writeBatch(db);
         const agora = new Date().toISOString();
 
-        for (const dados of validas.slice(inicio, inicio + 400)) {
+        for (const [deslocamento, dados] of validas.slice(inicio, inicio + 400).entries()) {
           const { numero_processo, paes_vinculados, ...resto } = dados;
           const campos = Object.fromEntries(
             Object.entries(resto).filter(([, v]) => v !== undefined),
           );
 
-          const processoExistente = acharProcessoDaLinha(processos, dados);
-          const idExistente = processoExistente?.id ?? idsCriadosNestaSincronizacao.get(numero_processo);
+          const processoExistente = processoDaLinha[inicio + deslocamento];
+          const idExistente = processoExistente?.id;
 
           // Processo com mais de um PAE: os demais vão para a observação (sem apagar o que já está escrito).
           if (paes_vinculados?.length) {
@@ -1024,10 +1024,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               }
             }
           } else {
-            // Id fixo derivado do PAE: duas sincronizações simultâneas gravam no mesmo documento em vez de criar cópias.
-            const idFixo = idProcessoPorPae(numero_processo);
+            // Id fixo derivado do PAE (e do nº de ordem quando o PAE se repete na planilha): sincronizações simultâneas gravam no mesmo documento.
+            const compartilhado = (linhasPorPae.get(principalDoProcesso(numero_processo)) ?? 0) > 1;
+            const idFixo = idProcessoDaLinha(numero_processo, dados.ordem, compartilhado);
             const novaRef = idFixo ? doc(db, 'processos', idFixo) : doc(collection(db, 'processos'));
-            idsCriadosNestaSincronizacao.set(numero_processo, novaRef.id);
             // Se o documento já existe (a lista local estava defasada), só atualiza: recriar apagaria fase e checklist.
             const jaExiste = idFixo ? (await getDoc(novaRef)).exists() : false;
             if (jaExiste) {

@@ -23,6 +23,10 @@ export function idProcessoPorPae(numeroProcesso: string | undefined): string {
   return chave ? `pae-${chave.replace('/', '-')}` : '';
 }
 
+/** PAE principal de um processo ("AAAA/NNNN"; sem PAE reconhecível, o próprio texto em maiúsculas). */
+export const principalDoProcesso = (numero: string | undefined) =>
+  chavesPae(numero)[0] ?? (numero ?? '').trim().toUpperCase();
+
 export const normalizarObjeto = (t: string | undefined) =>
   semAcento(t ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
 
@@ -128,4 +132,66 @@ export function observacaoComPaesVinculados(atual: string | undefined, vinculado
   if (vinculados.length === 0) return base;
   const linha = `PAEs vinculados: ${vinculados.map((v) => `E-${v}`).join(', ')}`;
   return base ? `${base}\n${linha}` : linha;
+}
+
+/** Quantas linhas da planilha têm cada PAE principal (linhas com o mesmo PAE são processos distintos). */
+export function contarLinhasPorPrincipal(linhas: { numero_processo: string }[]): Map<string, number> {
+  const mapa = new Map<string, number>();
+  linhas.forEach((l) => {
+    const chave = principalDoProcesso(l.numero_processo);
+    mapa.set(chave, (mapa.get(chave) ?? 0) + 1);
+  });
+  return mapa;
+}
+
+/**
+ * Id fixo do processo de uma linha: o do PAE ("pae-2026-3155997") ou, quando o
+ * PAE aparece em mais de uma linha, com o nº de ordem da linha
+ * ("pae-2026-3155997-o170"). Devolve '' sem PAE reconhecível (vale o id automático).
+ */
+export function idProcessoDaLinha(numeroProcesso: string, ordem: number | undefined, pae_compartilhado: boolean): string {
+  const base = idProcessoPorPae(numeroProcesso);
+  if (!base) return '';
+  return pae_compartilhado && ordem ? `${base}-o${ordem}` : base;
+}
+
+/**
+ * Uma linha da planilha = um processo. Liga cada linha ao processo existente
+ * dela (índice da linha → processo; `undefined` = processo novo), sem nunca
+ * dar o mesmo processo a duas linhas — linhas com o mesmo PAE ficam com
+ * processos separados. Ordem de preferência: mesmo PAE e mesmo nº de ordem;
+ * mesmo PAE e mesmo objeto (ou o primeiro livre); por fim um processo antigo
+ * cujo PAE principal está entre os "vinculados" da linha.
+ */
+export function atribuirProcessosAsLinhas<T extends Pick<Processo, 'id' | 'numero_processo' | 'objeto' | 'ordem'>>(
+  processos: T[],
+  linhas: { numero_processo: string; objeto?: string; ordem?: number; paes_vinculados?: string[] }[],
+): (T | undefined)[] {
+  const resultado: (T | undefined)[] = linhas.map(() => undefined);
+  const usados = new Set<string>();
+  const livresDoPae = (chave: string) => processos.filter((p) => !usados.has(p.id) && principalDoProcesso(p.numero_processo) === chave);
+  const atribuir = (i: number, p: T) => {
+    resultado[i] = p;
+    usados.add(p.id);
+  };
+
+  linhas.forEach((linha, i) => {
+    if (linha.ordem === undefined) return;
+    const achado = livresDoPae(principalDoProcesso(linha.numero_processo)).find((p) => p.ordem === linha.ordem);
+    if (achado) atribuir(i, achado);
+  });
+  linhas.forEach((linha, i) => {
+    if (resultado[i]) return;
+    const livres = livresDoPae(principalDoProcesso(linha.numero_processo));
+    const objeto = normalizarObjeto(linha.objeto);
+    const achado = livres.find((p) => normalizarObjeto(p.objeto) === objeto) ?? livres[0];
+    if (achado) atribuir(i, achado);
+  });
+  linhas.forEach((linha, i) => {
+    if (resultado[i]) return;
+    const vinculados = new Set(linha.paes_vinculados ?? []);
+    const achado = processos.find((p) => !usados.has(p.id) && vinculados.has(principalDoProcesso(p.numero_processo)));
+    if (achado) atribuir(i, achado);
+  });
+  return resultado;
 }
