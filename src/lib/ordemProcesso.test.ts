@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acharProcessoDaLinha, chavesPae, idProcessoPorPae, observacaoComPaesVinculados, ordensFaltantes, separarPaes } from './ordemProcesso';
+import { acharProcessoDaLinha, atribuirProcessosAsLinhas, contarLinhasPorPrincipal, idProcessoDaLinha, chavesPae, idProcessoPorPae, observacaoComPaesVinculados, ordensFaltantes, separarPaes } from './ordemProcesso';
 
 const proc = (id: string, numero: string, objeto: string, ordem?: number, criado = '2026-01-01') => ({
   id, numero_processo: numero, objeto, ordem, criado_em: criado,
@@ -93,5 +93,47 @@ describe('idProcessoPorPae', () => {
     expect(idProcessoPorPae(' 2026 / 3155997 ')).toBe('pae-2026-3155997');
     expect(idProcessoPorPae('SEM PAE')).toBe('');
     expect(idProcessoPorPae(undefined)).toBe('');
+  });
+});
+
+describe('uma linha = um processo (PAE repetido na planilha)', () => {
+  const linhaDe = (numero: string, ordem: number, objeto = 'obj') => ({ numero_processo: numero, ordem, objeto });
+
+  it('dá a cada linha o seu processo, pelo nº de ordem, sem juntar linhas com o mesmo PAE', () => {
+    const processos = [proc('a', '2026/3283100', 'x', 164), proc('b', '2025/1', 'y', 7)];
+    const atribuidos = atribuirProcessosAsLinhas(processos, [
+      linhaDe('2026/3283100', 145),
+      linhaDe('2026/3283100', 164),
+      linhaDe('2025/1', 7),
+    ]);
+    expect(atribuidos.map((p) => p?.id)).toEqual([undefined, 'a', 'b']);
+  });
+
+  it('sem coincidir o nº de ordem, prefere o mesmo objeto e nunca repete o processo', () => {
+    const processos = [proc('a', '2026/9', 'Prorrogação', 1), proc('b', '2026/9', 'Reajuste', 2)];
+    const atribuidos = atribuirProcessosAsLinhas(processos, [
+      { numero_processo: '2026/9', objeto: 'Reajuste', ordem: 50 },
+      { numero_processo: '2026/9', objeto: 'Prorrogação', ordem: 60 },
+      { numero_processo: '2026/9', objeto: 'Outro', ordem: 70 },
+    ]);
+    expect(atribuidos.map((p) => p?.id)).toEqual(['b', 'a', undefined]);
+  });
+
+  it('um processo antigo cujo PAE principal está entre os vinculados da linha ainda é encontrado', () => {
+    const atribuidos = atribuirProcessosAsLinhas(
+      [proc('a', '2025/2517810', 'x', 1)],
+      [{ numero_processo: '2026/3155997', paes_vinculados: ['2025/2517810'], objeto: 'x', ordem: 120 }],
+    );
+    expect(atribuidos[0]?.id).toBe('a');
+  });
+
+  it('id fixo da linha: com o nº de ordem só quando o PAE se repete na planilha', () => {
+    expect(idProcessoDaLinha('2026/3283100', 145, true)).toBe('pae-2026-3283100-o145');
+    expect(idProcessoDaLinha('2026/3283100', 145, false)).toBe('pae-2026-3283100');
+    expect(idProcessoDaLinha('SEM PAE', 1, true)).toBe('');
+    expect([...contarLinhasPorPrincipal([{ numero_processo: '2026/1' }, { numero_processo: '2026/1' }, { numero_processo: '2026/2' }])]).toEqual([
+      ['2026/1', 2],
+      ['2026/2', 1],
+    ]);
   });
 });

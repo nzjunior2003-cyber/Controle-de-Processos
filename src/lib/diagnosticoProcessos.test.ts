@@ -31,6 +31,14 @@ describe('diagnosticarProcessos', () => {
     expect(d.excedenteDuplicado).toBe(1);
   });
 
+  it('PAE repetido na planilha: só conta como duplicidade o que passa do nº de linhas', () => {
+    const duasLinhas = [{ numero_processo: '2026/1' }, { numero_processo: '2026/1' }];
+    expect(diagnosticarProcessos([proc('a', '2026/1'), proc('b', '2026/1')], duasLinhas).duplicados).toHaveLength(0);
+    const d = diagnosticarProcessos([proc('a', '2026/1'), proc('b', '2026/1'), proc('c', '2026/1')], duasLinhas);
+    expect(d.duplicados).toHaveLength(1);
+    expect(d.excedenteDuplicado).toBe(1);
+  });
+
   it('sugere manter o registro mais completo (empate: o mais antigo)', () => {
     const d = diagnosticarProcessos(
       [proc('novo', '2026/1', { criado_em: '2026-10-05T00:00:00Z' }), proc('antigo', '2026/1', { criado_em: '2026-10-01T00:00:00Z' })],

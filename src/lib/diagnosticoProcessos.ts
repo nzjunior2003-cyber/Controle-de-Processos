@@ -6,7 +6,7 @@
  * criados em duplicidade ou cuja linha saiu da planilha ficam no banco.
  */
 import type { Processo } from '../types';
-import { chavesPae } from './ordemProcesso';
+import { chavesPae, contarLinhasPorPrincipal, principalDoProcesso } from './ordemProcesso';
 
 export interface LinhaDaPlanilha {
   numero_processo: string;
@@ -74,8 +74,8 @@ function avaliar(p: ProcessoParaDiagnostico): DocDiagnostico {
   };
 }
 
-/** Chave do processo: o primeiro PAE "AAAA/NNNN" do número (ou o próprio texto, sem espaços, se não houver). */
-const chaveDoProcesso = (numero: string) => chavesPae(numero)[0] ?? numero.trim().toUpperCase();
+/** Chave do processo: o primeiro PAE "AAAA/NNNN" do número (ou o próprio texto, em maiúsculas, se não houver). */
+const chaveDoProcesso = principalDoProcesso;
 
 export function diagnosticarProcessos(processos: ProcessoParaDiagnostico[], linhas: LinhaDaPlanilha[]): Diagnostico {
   const chavesDaPlanilha = new Set<string>();
@@ -102,8 +102,10 @@ export function diagnosticarProcessos(processos: ProcessoParaDiagnostico[], linh
     const chave = chaveDoProcesso(p.numero_processo);
     grupos.set(chave, [...(grupos.get(chave) ?? []), d]);
   });
+  // Linhas da planilha com o mesmo PAE são processos distintos: só é duplicidade o que passa do nº de linhas.
+  const linhasPorPae = contarLinhasPorPrincipal(linhas);
   const duplicados: GrupoDuplicado[] = [...grupos.entries()]
-    .filter(([, docs]) => docs.length > 1)
+    .filter(([chave, docs]) => docs.length > Math.max(1, linhasPorPae.get(chave) ?? 1))
     .map(([chave, docs]) => {
       const ordenados = [...docs].sort((a, b) => b.pontos - a.pontos || a.criado_em.localeCompare(b.criado_em));
       return { chave, docs: ordenados, manter: ordenados[0].id };
@@ -121,7 +123,7 @@ export function diagnosticarProcessos(processos: ProcessoParaDiagnostico[], linh
     linhasPlanilha: linhas.length,
     casados: processos.length - orfaos.length,
     duplicados,
-    excedenteDuplicado: duplicados.reduce((soma, g) => soma + g.docs.length - 1, 0),
+    excedenteDuplicado: duplicados.reduce((soma, g) => soma + g.docs.length - Math.max(1, linhasPorPae.get(g.chave) ?? 1), 0),
     orfaos,
     porDia: [...porDiaMapa.entries()].map(([dia, quantidade]) => ({ dia, quantidade })).sort((a, b) => a.dia.localeCompare(b.dia)),
   };
