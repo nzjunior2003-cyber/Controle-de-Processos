@@ -117,9 +117,10 @@ atual (que aparece no cartão). Só as **solicitações a outro órgão** que mu
 
 **Como aplicar (uma vez):**
 
-1. **Apps Script:** acrescente o conteúdo de `apps_script_paes_acessorios.gs` ao projeto (não substitui nada) e faça as
-   3 pequenas inclusões descritas no comentário do topo do arquivo (`doGet` devolve `paes_acessorios`; `doPost` ganha
-   `gravar_paes_acessorios` e `atualizar_paes_acessorios`). Publique **nova versão** da implantação.
+1. **Apps Script:** cole o conteúdo de `apps_script_paes_acessorios.gs` no **fim** do projeto (ele usa `tokenOk`,
+   `respostaJson` e `agoraBr`, que o script já tem) e faça as 2 pequenas mudanças descritas no comentário do topo do
+   arquivo: uma linha `paes_acessorios` no JSON do `doGet` e duas linhas `if (payload.acao === ...)` no `doPost`.
+   Publique **nova versão** da implantação.
 2. **Robô:** troque o `rastreador_pae.py` (nos PCs e na VPS) e gere o `.exe` de novo, se usar.
 3. **Servidor:** nada novo no `.env` (usa o mesmo `ROBO_WEBAPP_URL` e `ROBO_TOKEN`).
 

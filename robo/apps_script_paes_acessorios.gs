@@ -1,139 +1,135 @@
-/**
- * PAEs acessórios — trecho para ACRESCENTAR ao Apps Script da planilha
- * (o mesmo projeto que já tem doGet/doPost do robô). Não substitui nada.
- *
- * Aba criada sozinha: PAES_ACESSORIOS
- *   pae | escopo | referencia | finalidade | relatorio | setor_atual | ultima_tramitacao | situacao | consultado_em
- *
- * Como ligar ao código que você já tem (3 pequenas inclusões):
- *
- * 1) No doGet(e) que devolve { processos: [...] } ao robô, acrescente a chave:
- *        paes_acessorios: paesAcessoriosParaRobo_()
- *
- * 2) No doPost(e), onde o código decide pelo campo "acao" (como "gravar_ordens"),
- *    acrescente dois casos (dados = JSON já lido do corpo do pedido):
- *        if (dados.acao === 'gravar_paes_acessorios') {      // vem do sistema (servidor)
- *          if (!tokenPaesOk_(dados.token)) return respostaPaes_({ status: 'error', erro: 'Token inválido' });
- *          return respostaPaes_({ status: 'success', gravados: gravarPaesAcessorios_(dados.itens || []) });
- *        }
- *        if (dados.acao === 'atualizar_paes_acessorios') {   // vem do robô
- *          if (!tokenPaesOk_(dados.token)) return respostaPaes_({ status: 'error', erro: 'Token inválido' });
- *          return respostaPaes_({ status: 'success', atualizados: atualizarPaesAcessorios_(dados.atualizacoes || []) });
- *        }
- *    Se o seu doPost já tem função própria para conferir o token, use-a no lugar de tokenPaesOk_
- *    e de respostaPaes_ (devolver JSON no mesmo formato dos outros casos).
- *
- * 3) Salve e publique NOVA VERSÃO (Implantar > Gerenciar implantações > lápis > Nova versão).
- */
+// ============================================================================
+// PAEs ACESSÓRIOS — bloco para COLAR NO FIM do Apps Script da planilha
+// (usa as funções que o script já tem: tokenOk, respostaJson, agoraBr).
+//
+// Além de colar este bloco, são só 2 mudanças no código existente:
+//
+// 1) No doGet, no JSON final, acrescente a linha paes_acessorios:
+//        return ContentService.createTextOutput(JSON.stringify({
+//          status: "success",
+//          total: processos.length,
+//          processos: processos,
+//          paes_acessorios: paesAcessoriosParaRobo()      // <-- NOVA LINHA (não esqueça da vírgula acima)
+//        })).setMimeType(ContentService.MimeType.JSON);
+//
+// 2) No doPost, logo depois da linha  if (payload.acao === "gravar_ordens") ...
+//        if (payload.acao === "gravar_paes_acessorios") return gravarPaesAcessorios(payload);
+//        if (payload.acao === "atualizar_paes_acessorios") return atualizarPaesAcessorios(payload);
+//
+// Depois: Implantar > Gerenciar implantações > lápis > Versão: Nova versão > Implantar.
+// A aba PAES_ACESSORIOS é criada sozinha na primeira gravação.
+// ============================================================================
 
-var ABA_PAES_ACESSORIOS = 'PAES_ACESSORIOS';
-var CABECALHO_PAES = ['pae', 'escopo', 'referencia', 'finalidade', 'relatorio',
-  'setor_atual', 'ultima_tramitacao', 'situacao', 'consultado_em'];
-
-function tokenPaesOk_(token) {
-  var esperado = PropertiesService.getScriptProperties().getProperty('TOKEN_ROBO');
-  return !!esperado && String(token) === esperado;
-}
-
-function respostaPaes_(objeto) {
-  return ContentService.createTextOutput(JSON.stringify(objeto)).setMimeType(ContentService.MimeType.JSON);
-}
+var ABA_PAES_ACESSORIOS = "PAES_ACESSORIOS";
+var CABECALHO_PAES = ["pae", "escopo", "referencia", "finalidade", "relatorio",
+  "setor_atual", "ultima_tramitacao", "situacao", "consultado_em"];
 
 /** "E-2026/2617141", "2026-2617141" -> "20262617141" (vazio se não for PAE). */
-function chavePaes_(texto) {
-  var m = String(texto || '').match(/(\d{4})\s*[\/-]\s*(\d+)/);
-  return m ? m[1] + m[2] : '';
+function chavePaes(texto) {
+  var m = String(texto || "").match(/(\d{4})\s*[\/-]\s*(\d+)/);
+  return m ? m[1] + m[2] : "";
 }
 
-function abaPaesAcessorios_() {
-  var planilha = SpreadsheetApp.getActiveSpreadsheet();
-  var aba = planilha.getSheetByName(ABA_PAES_ACESSORIOS);
+function abaPaesAcessorios() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var aba = ss.getSheetByName(ABA_PAES_ACESSORIOS);
   if (!aba) {
-    aba = planilha.insertSheet(ABA_PAES_ACESSORIOS);
+    var abaAtiva = ss.getActiveSheet();
+    aba = ss.insertSheet(ABA_PAES_ACESSORIOS);
+    ss.setActiveSheet(abaAtiva);
     aba.getRange(1, 1, 1, CABECALHO_PAES.length).setValues([CABECALHO_PAES]);
     aba.setFrozenRows(1);
   }
   // Texto puro: o Sheets não pode transformar "2026/10" em data.
-  aba.getRange(1, 1, Math.max(aba.getMaxRows(), 2), CABECALHO_PAES.length).setNumberFormat('@');
+  aba.getRange(1, 1, Math.max(aba.getMaxRows(), 2), CABECALHO_PAES.length).setNumberFormat("@");
   return aba;
 }
 
-function lerPaesAcessorios_() {
-  var aba = abaPaesAcessorios_();
+function lerPaesAcessorios() {
+  var aba = abaPaesAcessorios();
   var ultima = aba.getLastRow();
   if (ultima < 2) return [];
   return aba.getRange(2, 1, ultima - 1, CABECALHO_PAES.length).getValues().map(function (l) {
     return {
       pae: String(l[0]), escopo: String(l[1]), referencia: String(l[2]), finalidade: String(l[3]),
-      relatorio: String(l[4]).toUpperCase() === 'SIM',
+      relatorio: String(l[4]).toUpperCase() === "SIM",
       setor_atual: String(l[5]), ultima_tramitacao: String(l[6]), situacao: String(l[7]), consultado_em: String(l[8])
     };
   });
 }
 
-/** Lista que o robô consulta (vai na chave paes_acessorios do doGet). */
-function paesAcessoriosParaRobo_() {
-  return lerPaesAcessorios_().filter(function (p) { return chavePaes_(p.pae); });
+/**
+ * Lista que o robô consulta (chave paes_acessorios do doGet). Nunca derruba o
+ * doGet: se algo falhar aqui, o robô segue com os processos normais.
+ */
+function paesAcessoriosParaRobo() {
+  try {
+    return lerPaesAcessorios().filter(function (p) { return chavePaes(p.pae); });
+  } catch (erro) {
+    return [];
+  }
 }
 
 /**
  * Sistema -> planilha: reescreve a lista inteira. O que o robô já achou
  * (setor, tramitação, situação, data) é mantido para os PAEs que continuam na lista.
  */
-function gravarPaesAcessorios_(itens) {
-  var trava = LockService.getScriptLock();
-  trava.waitLock(20000);
+function gravarPaesAcessorios(payload) {
+  if (!tokenOk(payload.token)) return respostaJson({ status: "erro", erro: "Token inválido." });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
   try {
     var anteriores = {};
-    lerPaesAcessorios_().forEach(function (p) { anteriores[chavePaes_(p.pae)] = p; });
+    lerPaesAcessorios().forEach(function (p) { anteriores[chavePaes(p.pae)] = p; });
     var vistos = {};
     var linhas = [];
-    itens.forEach(function (i) {
-      var chave = chavePaes_(i.pae);
+    (payload.itens || []).forEach(function (i) {
+      var chave = chavePaes(i.pae);
       if (!chave || vistos[chave]) return;
       vistos[chave] = true;
       var antes = anteriores[chave] || {};
-      linhas.push([String(i.pae), String(i.escopo || ''), String(i.referencia || ''), String(i.finalidade || ''),
-        i.relatorio ? 'SIM' : 'NÃO', antes.setor_atual || '', antes.ultima_tramitacao || '', antes.situacao || '', antes.consultado_em || '']);
+      linhas.push([String(i.pae), String(i.escopo || ""), String(i.referencia || ""), String(i.finalidade || ""),
+        i.relatorio ? "SIM" : "NÃO", antes.setor_atual || "", antes.ultima_tramitacao || "", antes.situacao || "", antes.consultado_em || ""]);
     });
-    var aba = abaPaesAcessorios_();
+    var aba = abaPaesAcessorios();
     var ultima = aba.getLastRow();
     if (ultima > 1) aba.getRange(2, 1, ultima - 1, CABECALHO_PAES.length).clearContent();
     if (linhas.length) aba.getRange(2, 1, linhas.length, CABECALHO_PAES.length).setValues(linhas);
-    return linhas.length;
+    return respostaJson({ status: "success", gravados: linhas.length });
   } finally {
-    trava.releaseLock();
+    lock.releaseLock();
   }
 }
 
 /** Robô -> planilha: grava o resultado da consulta de cada PAE acessório. */
-function atualizarPaesAcessorios_(atualizacoes) {
-  var trava = LockService.getScriptLock();
-  trava.waitLock(20000);
+function atualizarPaesAcessorios(payload) {
+  if (!tokenOk(payload.token)) return respostaJson({ status: "erro", erro: "Token inválido." });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
   try {
-    var aba = abaPaesAcessorios_();
+    var aba = abaPaesAcessorios();
     var ultima = aba.getLastRow();
-    if (ultima < 2) return 0;
+    if (ultima < 2) return respostaJson({ status: "success", atualizados: 0 });
     var linhaPorChave = {};
     aba.getRange(2, 1, ultima - 1, 1).getValues().forEach(function (l, idx) {
-      linhaPorChave[chavePaes_(l[0])] = idx + 2;
+      linhaPorChave[chavePaes(l[0])] = idx + 2;
     });
-    var agora = Utilities.formatDate(new Date(), 'America/Belem', 'dd/MM/yyyy HH:mm:ss');
+    var agora = agoraBr();
     var feitos = 0;
-    atualizacoes.forEach(function (a) {
-      var linha = linhaPorChave[chavePaes_(a.pae)];
+    (payload.atualizacoes || []).forEach(function (a) {
+      var linha = linhaPorChave[chavePaes(a.pae)];
       if (!linha) return;
-      var situacao = String(a.situacao || '');
-      if (situacao === 'SUCESSO') {
+      var situacao = String(a.situacao || "");
+      if (situacao === "SUCESSO") {
         // Setor e tramitação só mudam quando a consulta deu certo.
-        aba.getRange(linha, 6, 1, 4).setValues([[String(a.setor_atual || ''), String(a.ultima_tramitacao || ''), situacao, agora]]);
+        aba.getRange(linha, 6, 1, 4).setValues([[String(a.setor_atual || ""), String(a.ultima_tramitacao || ""), situacao, agora]]);
       } else {
-        aba.getRange(linha, 8, 1, 2).setValues([[situacao + (a.motivo ? ': ' + a.motivo : ''), agora]]);
+        aba.getRange(linha, 8, 1, 2).setValues([[situacao + (a.motivo ? ": " + a.motivo : ""), agora]]);
       }
       feitos++;
     });
-    return feitos;
+    return respostaJson({ status: "success", atualizados: feitos });
   } finally {
-    trava.releaseLock();
+    lock.releaseLock();
   }
 }
