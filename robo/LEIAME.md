@@ -103,3 +103,25 @@ se algum deles também estiver com o vigia ligado, o Apps Script garante que só
 - Se o login falhar (senha errada/mudou), o sistema mostra "Robô PAE: falhou" com o motivo.
 - Para ver o robô trabalhando no seu PC (com janela), continue usando `iniciar_vigia.bat` ou `python rastreador_pae.py`.
 - O Dockerfile foi escrito sem poder ser testado aqui (sem Docker): se o `build` reclamar de algo, mande a mensagem.
+
+---
+
+## PAEs acessórios (solicitações a outros órgãos, faturas, recebimento, pagamento)
+
+No sistema, o processo (Apoio e Suprimento) e o contrato (Gestão de Contratos) têm o cartão **PAEs acessórios**.
+O processo guarda as *solicitações de análise a outro órgão do Estado*; o contrato guarda *fatura, recebimento
+de objeto e pagamento* (a finalidade também aceita texto livre). O sistema publica a lista na aba
+`PAES_ACESSORIOS` da planilha e o robô consulta cada PAE depois dos processos principais, gravando ali o setor
+atual (que aparece no cartão). Só as **solicitações a outro órgão** que mudarem de setor entram no e-mail do relatório
+(com "ACESSÓRIO" no lugar do nº de ordem); a primeira leitura de um PAE não conta como mudança.
+
+**Como aplicar (uma vez):**
+
+1. **Apps Script:** acrescente o conteúdo de `apps_script_paes_acessorios.gs` ao projeto (não substitui nada) e faça as
+   3 pequenas inclusões descritas no comentário do topo do arquivo (`doGet` devolve `paes_acessorios`; `doPost` ganha
+   `gravar_paes_acessorios` e `atualizar_paes_acessorios`). Publique **nova versão** da implantação.
+2. **Robô:** troque o `rastreador_pae.py` (nos PCs e na VPS) e gere o `.exe` de novo, se usar.
+3. **Servidor:** nada novo no `.env` (usa o mesmo `ROBO_WEBAPP_URL` e `ROBO_TOKEN`).
+
+Sem o passo 1 o sistema continua guardando os PAEs, mas avisa que a planilha não respondeu e o robô não os enxerga.
+Ao final de cada rodada o robô consulta os PAEs acessórios (um a um, como os principais), então a rodada fica um pouco mais longa.

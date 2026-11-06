@@ -436,6 +436,74 @@ async def consultar_processo_modal(page, pae_raw: str) -> Dict[str, str]:
     return resultado
 
 
+async def rastrear_paes_acessorios(context, page, page_pae, webapp_url: str, token: str,
+                                   itens: List[Dict], mudancas_totais: List[Dict]):
+    """
+    Consulta os PAEs acessórios (solicitações a outros órgãos, faturas,
+    recebimento de objeto, pagamento) cadastrados no sistema e grava o setor
+    atual de cada um na aba PAES_ACESSORIOS. Só os de "solicitação a outro
+    órgão" (relatorio = true) que MUDARAM de setor entram no relatório por
+    e-mail. Devolve a página do PAE (pode ter sido recarregada).
+    """
+    itens_validos = [i for i in itens if re.search(r'\d{4}[/-]?\s*\d+', str(i.get("pae", "")))]
+    if not itens_validos:
+        return page_pae
+
+    print(f"\n--- PAEs acessórios: {len(itens_validos)} para consultar ---")
+    atualizacoes: List[Dict] = []
+    erros_seguidos = 0
+    for item in itens_validos:
+        fmt, _ = formatar_para_pae(item["pae"])
+        print(f"Consultando PAE acessório E-{fmt} ({item.get('finalidade', '')})...")
+        page_pae = obter_pagina_pae(context) or page_pae
+        res = await consultar_processo_modal(page_pae, item["pae"])
+
+        setor_anterior = str(item.get("setor_atual", "") or "")
+        atualizacoes.append({
+            "pae": res["pae"],
+            "setor_atual": res["setor_atual"],
+            "ultima_tramitacao": res["ultima_tramitacao"],
+            "situacao": res["status_consulta"],
+            "motivo": res["motivo"],
+        })
+
+        if res["status_consulta"] == "SUCESSO":
+            mudou = res["setor_atual"] != setor_anterior
+            print(f"  -> {'🔄 MUDOU DE SETOR' if mudou else '🔁 SEM ALTERAÇÃO'}: '{setor_anterior}' ➔ '{res['setor_atual']}'")
+            # Primeira leitura (sem setor anterior) não é "mudança": só passa a valer da próxima rodada.
+            if mudou and setor_anterior and item.get("relatorio"):
+                mudancas_totais.append({
+                    "linha": "",
+                    "ordem": "ACESSÓRIO",
+                    "pae": res["pae"],
+                    "setor_anterior": setor_anterior,
+                    "setor_atual": res["setor_atual"],
+                    "ultima_tramitacao": res["ultima_tramitacao"],
+                })
+        else:
+            print(f"  -> ⚠️ {res['status_consulta']}: {res['motivo']}")
+
+        erros_seguidos = erros_seguidos + 1 if res["status_consulta"] == "ERRO" else 0
+        if erros_seguidos >= 3:
+            print("⚠️ 3 falhas seguidas - tentando recuperar a tela do PAE...")
+            novo = await recuperar_consulta(context, page, page_pae)
+            erros_seguidos = 0
+            if novo is None:
+                print("❌ Não foi possível recuperar o PAE. Parando os PAEs acessórios.")
+                break
+            page_pae = novo
+        await asyncio.sleep(1.0)
+
+    try:
+        resp = chamar_webapp("POST", webapp_url, json={
+            "acao": "atualizar_paes_acessorios", "token": token, "atualizacoes": atualizacoes,
+        })
+        print(f"  -> Aba PAES_ACESSORIOS atualizada: {resp}")
+    except Exception as e:
+        print(f"  -> Aviso ao salvar os PAEs acessórios: {e}")
+    return page_pae
+
+
 # ----------------------------------------------------------------------
 # Inicialização com tentativas automáticas (portal -> PAE 4.0 -> Consulta Detalhada)
 # ----------------------------------------------------------------------
@@ -698,6 +766,8 @@ async def main():
     try:
         res = chamar_webapp("GET", WEBAPP_URL)
         processos_brutos = res.get("processos", [])
+        # PAEs acessórios cadastrados no sistema (Apps Script antigo não devolve a chave: lista vazia).
+        paes_acessorios = res.get("paes_acessorios", []) or []
     except Exception as e:
         print(f"❌ Erro ao conectar com o Google Sheets: {e}")
         return
@@ -823,6 +893,13 @@ async def main():
                         print(f"  -> Google Sheets atualizado: {resp_retry}")
                     except Exception as e:
                         print(f"  -> Aviso ao salvar: {e}")
+
+        # PAEs acessórios (solicitações a outros órgãos, faturas, pagamento...).
+        if not abortou and paes_acessorios:
+            page_pae = await rastrear_paes_acessorios(
+                context, page, page_pae, WEBAPP_URL, config.get("token_robo", ""),
+                paes_acessorios, mudancas_totais,
+            )
 
         await context.close()
 

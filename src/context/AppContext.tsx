@@ -104,6 +104,7 @@ import {
   Apostilamento,
   ItemCatalogoOrcamentario,
   ClassificacaoOrcamentaria,
+  PaeAcessorio,
   PagamentoContrato,
   Notificacao,
   PushSubscriptionRegistro,
@@ -122,6 +123,7 @@ import {
 } from '../lib/notificacoesPagamento';
 import { getAccessToken } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
+import { montarItensRastreio, type EscopoPae } from '../lib/paesAcessorios';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
 import { processoParaDadosPlanilha } from '../lib/planilhaProcessos';
 import { execucoesArquivadas, valorASerAbatido, valorJaAbatido } from '../lib/financeiro';
@@ -212,6 +214,8 @@ interface AppContextData {
   deleteUsuario: (id: string) => Promise<void>;
   addContrato: (dados: Omit<Contrato, 'id'>) => Promise<string>;
   updateContrato: (id: string, dados: Partial<Contrato>) => Promise<void>;
+  /** Grava os PAEs acessórios de um processo/contrato e publica a lista na planilha para o robô rastrear (`publicado` = false se a planilha não respondeu; o PAE fica salvo mesmo assim). */
+  salvarPaesAcessorios: (escopo: EscopoPae, id: string, lista: PaeAcessorio[]) => Promise<{ publicado: boolean }>;
   deleteContrato: (id: string) => Promise<void>;
   addExecucao: (
     dados: Omit<ExecucaoContrato, 'id'>,
@@ -2148,6 +2152,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [usuarioAtual, catalogoOrcamentario, processos, contratos, apostilamentos, pagamentos, dotacoes, registrarAuditoria],
   );
 
+  const salvarPaesAcessorios = useCallback(
+    async (escopo: EscopoPae, id: string, lista: PaeAcessorio[]) => {
+      if (escopo === 'processo') await updateProcesso(id, { paes_acessorios: lista });
+      else await updateContrato(id, { paes_acessorios: lista });
+
+      // A planilha recebe a lista inteira (a aba é reescrita pelo Apps Script, que preserva o que o robô já achou).
+      try {
+        const itens = montarItensRastreio(
+          processos.map((p) => (escopo === 'processo' && p.id === id ? { ...p, paes_acessorios: lista } : p)),
+          contratos.map((c) => (escopo === 'contrato' && c.id === id ? { ...c, paes_acessorios: lista } : c)),
+        );
+        const idToken = await getFirebaseAuth()?.currentUser?.getIdToken();
+        const resposta = await fetch('/api/planilha/paes-acessorios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken ?? ''}` },
+          body: JSON.stringify({ itens }),
+        });
+        if (!resposta.ok) console.warn('Não foi possível publicar os PAEs acessórios na planilha:', await resposta.text());
+        return { publicado: resposta.ok };
+      } catch (erro) {
+        console.warn('Não foi possível publicar os PAEs acessórios na planilha:', erro);
+        return { publicado: false };
+      }
+    },
+    [updateProcesso, updateContrato, processos, contratos],
+  );
+
   const addEmpenho = useCallback(
     async (dados: Omit<Empenho, 'id' | 'criado_em' | 'atualizado_em'>) => {
       const id = await criarEm('empenhos', dados);
@@ -2306,6 +2337,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       deleteUsuario,
       addContrato,
       updateContrato,
+      salvarPaesAcessorios,
       deleteContrato,
       addExecucao,
       deleteExecucao,
@@ -2392,6 +2424,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       deleteUsuario,
       addContrato,
       updateContrato,
+      salvarPaesAcessorios,
       deleteContrato,
       addExecucao,
       deleteExecucao,

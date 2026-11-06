@@ -1,6 +1,7 @@
 import { competenciaDoPagamento, descreverAndamento, statusDoPagamento, totalPagoDoContrato, valorDoPagamento } from '../../lib/financeiro';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import PaesAcessoriosCard from '../../components/PaesAcessoriosCard';
 import { ArrowLeft, FileText, PlusCircle, Save, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Contrato, ItemContrato } from '../../types';
@@ -1245,6 +1246,16 @@ export default function ContratoForm() {
           </div>
         </form>
       </div>
+
+      {emEdicao && contrato && (
+        <PaesAcessoriosCard
+          escopo="contrato"
+          donoId={contrato.id}
+          paes={contrato.paes_acessorios}
+          jaExistentes={[contrato.pae]}
+          podeEditar
+        />
+      )}
 
       {emEdicao && contrato && (
         <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
