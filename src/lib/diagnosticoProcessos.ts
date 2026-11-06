@@ -132,11 +132,16 @@ export interface VinculosParaLimpeza {
   paesVinculados: string[];
 }
 
+export interface DocParaRevisar extends DocDiagnostico {
+  /** Por que o registro não entra na exclusão automática. */
+  motivosRevisao: string[];
+}
+
 export interface PlanoDeLimpeza {
   /** Sem linha na planilha, sem dados próprios e sem vínculo: podem ser excluídos (com confirmação). */
   excluiveis: DocDiagnostico[];
-  /** Sem linha na planilha, mas com dados ou vínculo: ficam para revisão manual. */
-  revisar: DocDiagnostico[];
+  /** Sem linha na planilha, mas com dados, vínculo ou status de contratado: o master decide um a um. */
+  revisar: DocParaRevisar[];
 }
 
 /** Separa os registros sem linha na planilha entre os que podem ser excluídos com segurança e os que pedem revisão. */
@@ -147,11 +152,14 @@ export function planoDeLimpeza(
 ): PlanoDeLimpeza {
   const chavesVinculadas = new Set(vinculos.paesVinculados.flatMap((t) => chavesPae(t)));
   const excluiveis: DocDiagnostico[] = [];
-  const revisar: DocDiagnostico[] = [];
+  const revisar: DocParaRevisar[] = [];
   orfaos.forEach((d) => {
-    const vinculado = chavesPae(d.numero_processo).some((c) => chavesVinculadas.has(c));
-    const contratado = statusPorId.get(d.id) === 'contratado_aditivado';
-    (d.pontos === 0 && !vinculado && !contratado ? excluiveis : revisar).push(d);
+    const motivosRevisao: string[] = [];
+    if (d.pontos > 0) motivosRevisao.push(`tem dados próprios (${d.motivos.join(', ')})`);
+    if (chavesPae(d.numero_processo).some((c) => chavesVinculadas.has(c))) motivosRevisao.push('ligado a um contrato ou ata');
+    if (statusPorId.get(d.id) === 'contratado_aditivado') motivosRevisao.push('status Contratado/Aditivado');
+    if (motivosRevisao.length === 0) excluiveis.push(d);
+    else revisar.push({ ...d, motivosRevisao });
   });
   return { excluiveis, revisar };
 }
