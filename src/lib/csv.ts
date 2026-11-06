@@ -169,7 +169,8 @@ export function mapSheetRowToProcesso(linha: LinhaPlanilha): ProcessoDaPlanilha 
   const subfase = celula(linha, 'SUBFASE DO PROCESSO');
   // A coluna A (Nº de ordem) tem cabeçalho irrelevante na planilha — é sempre a primeira.
   const primeiraColuna = Object.keys(linha)[0];
-  const ordemTexto = primeiraColuna ? (linha[primeiraColuna] ?? '').toString().trim() : '';
+  // `!== undefined`, não truthy: com o cabeçalho da coluna A em branco a chave é '' (falsy) e o número era ignorado.
+  const ordemTexto = primeiraColuna !== undefined ? (linha[primeiraColuna] ?? '').toString().trim() : '';
   const ordem = /^\d+$/.test(ordemTexto) ? Number(ordemTexto) : undefined;
 
   return {
