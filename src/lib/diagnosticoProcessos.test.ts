@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diagnosticarProcessos } from './diagnosticoProcessos';
+import { diagnosticarProcessos, planoDeLimpeza } from './diagnosticoProcessos';
 
 const proc = (id: string, numero: string, extra: Record<string, unknown> = {}) => ({
   id,
@@ -56,5 +56,18 @@ describe('diagnosticarProcessos', () => {
   it('número sem PAE no formato usa o texto para comparar', () => {
     const d = diagnosticarProcessos([proc('a', 'SEM-PAE')], [{ numero_processo: 'sem-pae' }]);
     expect(d.orfaos).toHaveLength(0);
+  });
+});
+
+describe('planoDeLimpeza', () => {
+  const doc = (id: string, numero: string, pontos = 0) => ({ id, numero_processo: numero, objeto: '', criado_em: '', pontos, motivos: [] });
+  it('só libera para exclusão o que não tem dados, vínculo nem status de contratado', () => {
+    const plano = planoDeLimpeza(
+      [doc('a', '2026/1'), doc('b', '2026/2', 3), doc('c', '2026/3'), doc('d', '2026/4')],
+      new Map([['d', 'contratado_aditivado']]),
+      { paesVinculados: ['E-2026/3'] },
+    );
+    expect(plano.excluiveis.map((d) => d.id)).toEqual(['a']);
+    expect(plano.revisar.map((d) => d.id)).toEqual(['b', 'c', 'd']);
   });
 });
