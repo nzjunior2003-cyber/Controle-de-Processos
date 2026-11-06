@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { criarBuscaVinculada } from '../lib/buscaVinculada';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, ListChecks, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
@@ -8,7 +8,9 @@ import { formatarMoeda } from '../lib/contratos';
 import IntegracaoPCA from './IntegracaoPCA';
 import StatusRobo from '../components/StatusRobo';
 import { limparClassificacoes, descricaoDoCodigo } from '../lib/orcamento';
-import type { ClassificacaoOrcamentaria } from '../types';
+import type { ClassificacaoOrcamentaria, PaeAcessorio } from '../types';
+import { chavePae, diasNoSetorPae, type SituacaoPae } from '../lib/paesAcessorios';
+import { useSituacaoPaesAcessorios } from '../hooks/useSituacaoPaesAcessorios';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS, type StatusProcesso } from '../types';
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
 import { calcularProgressoChecklist, ordenarPorProgresso } from '../lib/fluxoProcesso';
@@ -25,6 +27,50 @@ const CAMPOS_EM_LINHA = [
   { chave: 'naturezaDespesa', rotulo: 'Natureza de despesa' },
   { chave: 'planoInterno', rotulo: 'Plano interno' },
 ] as const;
+
+/** PAEs acessórios do processo para consulta rápida: finalidade, setor atual e dias no setor (dados do robô). */
+function PaesAcessoriosEmLinha({
+  paes,
+  situacoes,
+  hoje,
+}: {
+  paes?: PaeAcessorio[];
+  situacoes: Map<string, SituacaoPae>;
+  hoje: Date;
+}) {
+  if (!paes || paes.length === 0) return null;
+  return (
+    <div className="space-y-1.5" aria-label="PAEs acessórios">
+      <p className="text-xs font-medium text-gray-500 uppercase">PAEs acessórios</p>
+      {paes.map((pae) => {
+        const situacao = situacoes.get(chavePae(pae.numero));
+        const dias = diasNoSetorPae(situacao, hoje);
+        return (
+          <div key={pae.id} className="flex flex-wrap items-baseline gap-x-6 gap-y-0.5 text-sm text-gray-600">
+            <span>
+              PAE: <strong className="text-gray-900">{pae.numero}</strong>
+            </span>
+            <span>
+              Finalidade: <strong className="text-gray-900">{pae.finalidade}</strong>
+            </span>
+            {situacao?.situacao === 'SUCESSO' ? (
+              <>
+                <span>
+                  Setor atual: <strong className="text-gray-900">{situacao.setorAtual || '—'}</strong>
+                </span>
+                <span>
+                  No setor há: <strong className="text-gray-900">{dias === null ? '—' : `${dias}d`}</strong>
+                </span>
+              </>
+            ) : (
+              <span className="text-gray-400">{situacao?.situacao ? `Última consulta: ${situacao.situacao.toLowerCase()}` : 'Aguardando a próxima rodada do robô'}</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function DotacaoEmLinha({ dotacoes }: { dotacoes?: ClassificacaoOrcamentaria[] }) {
   const { catalogoOrcamentario } = useApp();
@@ -54,8 +100,8 @@ export default function Aquisicoes() {
     () => criarBuscaVinculada({ processos, contratos, procedimentos }),
     [processos, contratos, procedimentos],
   );
-  const navigate = useNavigate();
   const etapasPorRito = useEtapasPorRito();
+  const situacoesPaes = useSituacaoPaesAcessorios();
   const [sincronizando, setSincronizando] = useState(false);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   // Linha com os detalhes abertos (uma por vez, como na lista de Gestão de Contratos).
@@ -524,7 +570,7 @@ export default function Aquisicoes() {
                       return (
                         <React.Fragment key={proc.id}>
                         <tr
-                          onClick={() => navigate(`/sistema/processos/${proc.id}`)}
+                          onClick={() => setExpandido(aberto ? null : proc.id)}
                           className={`hover:bg-gray-50 cursor-pointer ${aberto ? 'bg-red-50/30' : ''}`}
                         >
                           <td className="px-4 py-4 text-sm text-gray-500">{proc.ordem ?? '-'}</td>
@@ -646,6 +692,7 @@ export default function Aquisicoes() {
                                   </div>
                                   <DotacaoEmLinha dotacoes={proc.dotacoes_orcamentarias} />
                                 </div>
+                                <PaesAcessoriosEmLinha paes={proc.paes_acessorios} situacoes={situacoesPaes} hoje={hoje} />
                               </div>
                             </td>
                           </tr>

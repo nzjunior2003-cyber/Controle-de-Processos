@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   adicionarPaeAcessorio,
   chavePae,
+  diasNoSetorPae,
   ehSolicitacaoOutroOrgao,
   montarItensRastreio,
   normalizarPae,
@@ -67,5 +68,18 @@ describe('parseAbaPaesAcessorios', () => {
   it('ignora aba com outro cabeçalho', () => {
     expect(parseAbaPaesAcessorios([['ordem', 'pae'], ['1', '2026/1']]).size).toBe(0);
     expect(parseAbaPaesAcessorios([]).size).toBe(0);
+  });
+});
+
+describe('diasNoSetorPae', () => {
+  const base = { setorAtual: 'PGE', ultimaTramitacao: '03/11/2026', situacao: 'SUCESSO', consultadoEm: '' };
+  it('conta os dias desde a última tramitação', () => {
+    expect(diasNoSetorPae(base, new Date('2026-11-06T15:00:00Z'))).toBe(3);
+    expect(diasNoSetorPae({ ...base, ultimaTramitacao: '06/11/2026' }, new Date('2026-11-06T15:00:00Z'))).toBe(0);
+  });
+  it('devolve null sem consulta bem-sucedida ou sem data', () => {
+    expect(diasNoSetorPae(undefined)).toBeNull();
+    expect(diasNoSetorPae({ ...base, situacao: 'ERRO' })).toBeNull();
+    expect(diasNoSetorPae({ ...base, ultimaTramitacao: '' })).toBeNull();
   });
 });
