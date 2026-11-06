@@ -149,6 +149,11 @@ describe('mapSheetRowToProcesso', () => {
     expect(mapSheetRowToProcesso({ 'cabeçalho qualquer': 'x', ...linhaBase })?.ordem).toBeUndefined();
   });
 
+  it('lê o nº de ordem mesmo com o cabeçalho da coluna A em branco', () => {
+    expect(mapSheetRowToProcesso({ '': '168', ...linhaBase })?.ordem).toBe(168);
+    expect(mapSheetRowToProcesso({ '': '', ...linhaBase })?.ordem).toBeUndefined();
+  });
+
   it('mapeia as colunas e remove o prefixo "E-" do número do processo', () => {
     const processo = mapSheetRowToProcesso(linhaBase);
     expect(processo).toEqual({
