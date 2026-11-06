@@ -6,6 +6,7 @@
  * lá o setor atual, que o sistema lê de volta.
  */
 import type { Contrato, PaeAcessorio, Processo } from '../types';
+import { parseDataHoraRobo } from './statusRobo';
 
 export const ABA_PAES_ACESSORIOS = 'PAES_ACESSORIOS';
 
@@ -131,4 +132,12 @@ export function parseAbaPaesAcessorios(linhas: string[][]): Map<string, Situacao
     });
   });
   return resultado;
+}
+
+/** Dias desde a última tramitação do PAE (= tempo no setor atual); null quando o robô ainda não trouxe a data. */
+export function diasNoSetorPae(situacao: SituacaoPae | undefined, agora: Date = new Date()): number | null {
+  if (!situacao || situacao.situacao !== 'SUCESSO') return null;
+  const data = parseDataHoraRobo(situacao.ultimaTramitacao);
+  if (!data) return null;
+  return Math.max(0, Math.floor((agora.getTime() - data.getTime()) / 86_400_000));
 }
