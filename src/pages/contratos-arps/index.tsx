@@ -312,7 +312,7 @@ export default function ContratosArps() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {MENU_ABAS.map((item) => {
           const Icone = item.icone;
           const isAtivo = abaAtiva === item.id;
@@ -321,23 +321,23 @@ export default function ContratosArps() {
             <div
               key={item.id}
               onClick={() => setAbaAtiva(item.id)}
-              className={`bg-white p-4 rounded-lg border shadow-sm border-l-4 ${item.borderLClass} cursor-pointer transition-colors relative ${
+              className={`bg-white px-3 py-2 rounded-lg border shadow-sm border-l-[3px] ${item.borderLClass} cursor-pointer transition-colors relative ${
                 isAtivo
                   ? `ring-1 ${item.ringClass} ${item.bgClass} ${item.borderClass}`
                   : 'border-gray-200 hover:bg-gray-50'
               }`}
             >
               <div className="flex flex-col justify-between h-full">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-0.5">
                   <span
-                    className={`text-xs font-semibold uppercase tracking-wider line-clamp-2 ${isAtivo ? item.textThemeClass : 'text-gray-500'}`}
+                    className={`text-[10px] font-semibold uppercase tracking-wide leading-tight line-clamp-2 ${isAtivo ? item.textThemeClass : 'text-gray-500'}`}
                     title={item.nome}
                   >
                     {item.nome}
                   </span>
-                  <Icone className={`h-5 w-5 flex-shrink-0 ${isAtivo ? item.textClass : 'text-gray-400'}`} />
+                  <Icone className={`h-4 w-4 flex-shrink-0 ${isAtivo ? item.textClass : 'text-gray-400'}`} />
                 </div>
-                <span className={`text-2xl font-bold ${isAtivo ? item.textNumClass : 'text-gray-900'}`}>
+                <span className={`text-lg font-bold leading-tight ${isAtivo ? item.textNumClass : 'text-gray-900'}`}>
                   {contadores[item.id]}
                 </span>
               </div>

@@ -218,18 +218,18 @@ export default function DashboardDga() {
       </div>
 
       {/* Bloco 1 e 2: Planejado x Contratado */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Planejado no PCA</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{formatarMoeda(totalPlanejado)}</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Planejado no PCA</p>
+          <p className="text-lg font-bold text-gray-900 leading-tight">{formatarMoeda(totalPlanejado)}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Já Contratado</p>
-          <p className="text-2xl font-bold text-emerald-700 mt-1">{formatarMoeda(totalContratadoDoPlanejado)}</p>
+        <div className="bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Já Contratado</p>
+          <p className="text-lg font-bold text-emerald-700 leading-tight">{formatarMoeda(totalContratadoDoPlanejado)}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">% do Plano Executado</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{percentualExecutado.toFixed(1)}%</p>
+        <div className="bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">% do Plano Executado</p>
+          <p className="text-lg font-bold text-gray-900 leading-tight">{percentualExecutado.toFixed(1)}%</p>
         </div>
       </div>
 
@@ -282,22 +282,22 @@ export default function DashboardDga() {
       </div>
 
       {/* Bloco 4: Saldos de contratos (financeiro e quantitativo) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Saldo Financeiro em Aberto (Contratos Ativos)</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{formatarMoeda(saldoTotalFinanceiro)}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Saldo Financeiro em Aberto (Contratos Ativos)</p>
+          <p className="text-lg font-bold text-gray-900 leading-tight">{formatarMoeda(saldoTotalFinanceiro)}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-amber-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Contratos com Saldo Financeiro ≤ 20%</p>
-          <p className="text-2xl font-bold text-amber-700 mt-1">{contratosComSaldoBaixo.length}</p>
+        <div className="bg-white px-3 py-2 rounded-lg border border-amber-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Contratos com Saldo Financeiro ≤ 20%</p>
+          <p className="text-lg font-bold text-amber-700 leading-tight">{contratosComSaldoBaixo.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Contratos com Controle Quantitativo</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{saldosQuantitativos.length}</p>
+        <div className="bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Contratos com Controle Quantitativo</p>
+          <p className="text-lg font-bold text-gray-900 leading-tight">{saldosQuantitativos.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-amber-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Com Saldo Quantitativo ≤ 20%</p>
-          <p className="text-2xl font-bold text-amber-700 mt-1">{quantitativoBaixo}</p>
+        <div className="bg-white px-3 py-2 rounded-lg border border-amber-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Com Saldo Quantitativo ≤ 20%</p>
+          <p className="text-lg font-bold text-amber-700 leading-tight">{quantitativoBaixo}</p>
         </div>
       </div>
 
@@ -437,18 +437,18 @@ export default function DashboardDga() {
       </div>
 
       {/* Bloco 7: Previsão de execução no prazo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-emerald-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Dentro do Prazo Previsto</p>
-          <p className="text-2xl font-bold text-emerald-700 mt-1">{previsaoExecucao.dentroDoPrazo}</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-white px-3 py-2 rounded-lg border border-emerald-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Dentro do Prazo Previsto</p>
+          <p className="text-lg font-bold text-emerald-700 leading-tight">{previsaoExecucao.dentroDoPrazo}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-red-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Fora do Prazo Previsto</p>
-          <p className="text-2xl font-bold text-red-700 mt-1">{previsaoExecucao.foraDoPrazo}</p>
+        <div className="bg-white px-3 py-2 rounded-lg border border-red-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Fora do Prazo Previsto</p>
+          <p className="text-lg font-bold text-red-700 leading-tight">{previsaoExecucao.foraDoPrazo}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Sem Meta Definida pro Rito</p>
-          <p className="text-2xl font-bold text-gray-700 mt-1">{previsaoExecucao.semMeta}</p>
+        <div className="bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Sem Meta Definida pro Rito</p>
+          <p className="text-lg font-bold text-gray-700 leading-tight">{previsaoExecucao.semMeta}</p>
         </div>
       </div>
     </div>

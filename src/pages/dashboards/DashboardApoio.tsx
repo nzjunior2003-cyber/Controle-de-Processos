@@ -64,22 +64,22 @@ export default function DashboardApoio() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-500">Total de Processos</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{total}</p>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="bg-white rounded-lg border border-gray-200 px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Total de Processos</p>
+          <p className="text-lg font-bold leading-tight text-gray-900">{total}</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-500">Em Andamento</p>
-          <p className="mt-2 text-3xl font-bold text-blue-600">{emAndamento}</p>
+        <div className="bg-white rounded-lg border border-gray-200 px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Em Andamento</p>
+          <p className="text-lg font-bold leading-tight text-blue-600">{emAndamento}</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-500">Concluídos</p>
-          <p className="mt-2 text-3xl font-bold text-emerald-600">{concluidos}</p>
+        <div className="bg-white rounded-lg border border-gray-200 px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Concluídos</p>
+          <p className="text-lg font-bold leading-tight text-emerald-600">{concluidos}</p>
         </div>
-        <div className="bg-white rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm">
-          <p className="text-sm font-medium text-red-600">Com Alerta / Atraso</p>
-          <p className="mt-2 text-3xl font-bold text-red-700">{comAlerta}</p>
+        <div className="bg-white rounded-lg border border-red-200 bg-red-50 px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-medium text-red-600 uppercase tracking-wide leading-tight">Com Alerta / Atraso</p>
+          <p className="text-lg font-bold leading-tight text-red-700">{comAlerta}</p>
         </div>
       </div>
 

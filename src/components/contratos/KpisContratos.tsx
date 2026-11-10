@@ -24,7 +24,7 @@ export default function KpisContratos({ contratos, filtro, onFiltrar }: Props) {
     .reduce((acumulado, atual) => acumulado + (atual.valorGlobal || 0), 0);
 
   const clicavel = !!onFiltrar;
-  const classeBase = 'bg-white p-5 rounded-lg border shadow-sm border-l-4 transition-colors';
+  const classeBase = 'bg-white px-3 py-2 rounded-lg border shadow-sm border-l-[3px] transition-colors';
 
   const classeCard = (chave: Exclude<FiltroKpi, null> | 'total', borda: string, ativo: string) =>
     `${classeBase} ${borda} ${clicavel ? 'cursor-pointer' : ''} ${
@@ -34,17 +34,17 @@ export default function KpisContratos({ contratos, filtro, onFiltrar }: Props) {
     }`;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
       <div
         onClick={() => onFiltrar?.(filtro === 'vigentes' ? null : 'vigentes')}
         className={classeCard('vigentes', 'border-l-emerald-500', 'ring-2 ring-emerald-500 bg-emerald-50')}
       >
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contratos Vigentes</p>
-            <h3 className="text-2xl font-bold text-gray-900 mt-1">{vigentes}</h3>
+            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Contratos Vigentes</p>
+            <h3 className="text-lg font-bold text-gray-900 leading-tight">{vigentes}</h3>
           </div>
-          <CheckCircle className="w-5 h-5 text-emerald-500" />
+          <CheckCircle className="w-4 h-4 text-emerald-500" />
         </div>
       </div>
 
@@ -54,10 +54,10 @@ export default function KpisContratos({ contratos, filtro, onFiltrar }: Props) {
       >
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Vencendo (Até 90 dias)</p>
-            <h3 className="text-2xl font-bold text-gray-900 mt-1">{atencao}</h3>
+            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Vencendo (Até 90 dias)</p>
+            <h3 className="text-lg font-bold text-gray-900 leading-tight">{atencao}</h3>
           </div>
-          <Clock className="w-5 h-5 text-amber-500" />
+          <Clock className="w-4 h-4 text-amber-500" />
         </div>
       </div>
 
@@ -67,10 +67,10 @@ export default function KpisContratos({ contratos, filtro, onFiltrar }: Props) {
       >
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contratos Vencidos</p>
-            <h3 className="text-2xl font-bold text-gray-900 mt-1">{vencidos}</h3>
+            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Contratos Vencidos</p>
+            <h3 className="text-lg font-bold text-gray-900 leading-tight">{vencidos}</h3>
           </div>
-          <AlertTriangle className="w-5 h-5 text-red-600" />
+          <AlertTriangle className="w-4 h-4 text-red-600" />
         </div>
       </div>
 
@@ -80,10 +80,10 @@ export default function KpisContratos({ contratos, filtro, onFiltrar }: Props) {
       >
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Concluídos / Encerrados</p>
-            <h3 className="text-2xl font-bold text-gray-900 mt-1">{concluidos}</h3>
+            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Concluídos / Encerrados</p>
+            <h3 className="text-lg font-bold text-gray-900 leading-tight">{concluidos}</h3>
           </div>
-          <Archive className="w-5 h-5 text-slate-500" />
+          <Archive className="w-4 h-4 text-slate-500" />
         </div>
       </div>
 
@@ -93,12 +93,12 @@ export default function KpisContratos({ contratos, filtro, onFiltrar }: Props) {
       >
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Global Ativo</p>
+            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Valor Global Ativo</p>
             <h3 className="text-xl font-bold text-gray-900 mt-1">
               {valorTotalVigente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </h3>
           </div>
-          <FileSignature className="w-5 h-5 text-blue-600" />
+          <FileSignature className="w-4 h-4 text-blue-600" />
         </div>
       </div>
     </div>
