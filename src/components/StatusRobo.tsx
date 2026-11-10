@@ -6,7 +6,7 @@ import { useStatusRobo } from '../hooks/useStatusRobo';
 import { resumirStatusRobo, type NivelRobo } from '../lib/statusRobo';
 
 const CORES: Record<NivelRobo, string> = {
-  ok: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  ok: 'bg-gray-50 text-gray-600 border-gray-200',
   atencao: 'bg-amber-50 text-amber-800 border-amber-200',
   erro: 'bg-red-50 text-red-800 border-red-200',
   desconhecido: 'bg-gray-50 text-gray-600 border-gray-200',
@@ -51,14 +51,14 @@ export default function StatusRobo() {
   if (!carregado) return null;
 
   return (
-    <div className={`rounded-lg border px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${CORES[resumo.nivel]}`}>
-      <div className="flex items-start gap-2">
-        <Bot className="h-5 w-5 mt-0.5 flex-shrink-0" />
-        <div>
-          <p className="text-sm font-medium">{resumo.texto}</p>
-          <p className="text-xs opacity-80">{resumo.detalhe}</p>
-          {aviso && <p className="text-xs mt-1 font-medium">{aviso}</p>}
-        </div>
+    <div className={`rounded-md border px-3 py-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs ${CORES[resumo.nivel]}`}>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <Bot className="h-3.5 w-3.5 flex-shrink-0" />
+        <p className="min-w-0 truncate" title={`${resumo.texto} — ${resumo.detalhe}`}>
+          <span className="font-medium">{resumo.texto}</span>
+          <span className="opacity-70"> · {resumo.detalhe}</span>
+        </p>
+        {aviso && <span className="font-medium">· {aviso}</span>}
       </div>
       {podePedir && (
         <button
@@ -66,9 +66,9 @@ export default function StatusRobo() {
           onClick={pedirExecucao}
           disabled={pedindo || !resumo.vigiaLigado}
           title={resumo.vigiaLigado ? 'Pede ao robô para atualizar agora' : 'O vigia do robô não está ligado em nenhum computador'}
-          className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md border border-current bg-white/60 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded border border-current bg-white/60 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
         >
-          <RefreshCw className={`h-4 w-4 mr-1.5 ${pedindo ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-3 w-3 mr-1 ${pedindo ? 'animate-spin' : ''}`} />
           Atualizar agora
         </button>
       )}

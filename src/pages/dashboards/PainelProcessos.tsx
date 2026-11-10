@@ -103,16 +103,16 @@ function Indicadores({
         const conteudo = (
           <>
             <div className="flex items-start justify-between gap-2">
-              <p className="text-xs font-medium text-gray-500">{c.rotulo}</p>
-              <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg ${c.cor}`}>
-                <c.icone className="h-4 w-4" aria-hidden />
+              <p className="text-[11px] font-medium text-gray-500">{c.rotulo}</p>
+              <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md ${c.cor}`}>
+                <c.icone className="h-3.5 w-3.5" aria-hidden />
               </span>
             </div>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{c.valor}</p>
-            {c.dica && <p className="text-xs text-gray-500">{c.dica}</p>}
+            <p className="text-lg font-semibold leading-tight tabular-nums text-gray-900">{c.valor}</p>
+            {c.dica && <p className="text-[10px] leading-tight text-gray-500">{c.dica}</p>}
           </>
         );
-        const base = 'bg-white rounded-lg border p-4 shadow-sm text-left';
+        const base = 'bg-white rounded-lg border px-3 py-2 shadow-sm text-left';
         return c.clicavel ? (
           <button
             key={c.chave}

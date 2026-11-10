@@ -37,14 +37,14 @@ export default function ControleOrcamentario({ periodo }: { periodo: FiltroPerio
         </select>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-xs text-gray-500 uppercase">Pago {filtroPeriodoAtivo(periodo) ? 'no período' : 'no total'}</p>
-          <p className="text-xl font-bold text-emerald-700">{formatarMoeda(totalPago)}</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Pago {filtroPeriodoAtivo(periodo) ? 'no período' : 'no total'}</p>
+          <p className="text-lg font-bold text-emerald-700 leading-tight">{formatarMoeda(totalPago)}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-xs text-gray-500 uppercase">Em tramitação</p>
-          <p className="text-xl font-bold text-amber-700">{formatarMoeda(totalTramitacao)}</p>
+        <div className="bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Em tramitação</p>
+          <p className="text-lg font-bold text-amber-700 leading-tight">{formatarMoeda(totalTramitacao)}</p>
         </div>
       </div>
 

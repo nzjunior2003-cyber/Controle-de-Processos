@@ -42,18 +42,18 @@ export default function DashboardContratosArps() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-500">Procedimentos Licitatórios</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{procedimentos.length}</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-white rounded-lg border border-gray-200 px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Procedimentos Licitatórios</p>
+          <p className="text-lg font-bold leading-tight text-gray-900">{procedimentos.length}</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-500">Portarias de Fiscalização</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{portarias.length}</p>
+        <div className="bg-white rounded-lg border border-gray-200 px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Portarias de Fiscalização</p>
+          <p className="text-lg font-bold leading-tight text-gray-900">{portarias.length}</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-500">Processos Sancionatórios</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{sancionatorios.length}</p>
+        <div className="bg-white rounded-lg border border-gray-200 px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Processos Sancionatórios</p>
+          <p className="text-lg font-bold leading-tight text-gray-900">{sancionatorios.length}</p>
         </div>
       </div>
 

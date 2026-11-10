@@ -84,22 +84,22 @@ export default function Planejamento() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Total de IRPs</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{contadores.total}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Total de IRPs</p>
+          <p className="text-lg font-bold text-gray-900 leading-tight">{contadores.total}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-blue-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Abertas / Em análise</p>
-          <p className="text-2xl font-bold text-blue-700 mt-1">{contadores.abertas}</p>
+        <div className="bg-white px-3 py-2 rounded-lg border border-blue-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Abertas / Em análise</p>
+          <p className="text-lg font-bold text-blue-700 leading-tight">{contadores.abertas}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-amber-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Prazo em até 5 dias</p>
-          <p className="text-2xl font-bold text-amber-700 mt-1">{contadores.prazoProximo}</p>
+        <div className="bg-white px-3 py-2 rounded-lg border border-amber-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Prazo em até 5 dias</p>
+          <p className="text-lg font-bold text-amber-700 leading-tight">{contadores.prazoProximo}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-purple-200 shadow-sm">
-          <p className="text-xs font-medium text-gray-500 uppercase">Aderidas</p>
-          <p className="text-2xl font-bold text-purple-700 mt-1">{contadores.aderidas}</p>
+        <div className="bg-white px-3 py-2 rounded-lg border border-purple-200 shadow-sm">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Aderidas</p>
+          <p className="text-lg font-bold text-purple-700 leading-tight">{contadores.aderidas}</p>
         </div>
       </div>
 

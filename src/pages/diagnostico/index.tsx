@@ -89,9 +89,9 @@ export default function DiagnosticoProcessos() {
   };
 
   const cartao = (rotulo: string, valor: number | string, destaque = false) => (
-    <div className={`rounded-lg border p-4 ${destaque ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'}`}>
-      <p className="text-xs font-medium text-gray-500 uppercase">{rotulo}</p>
-      <p className="mt-1 text-2xl font-bold text-gray-900">{valor}</p>
+    <div className={`rounded-lg border px-3 py-2 ${destaque ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'}`}>
+      <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">{rotulo}</p>
+      <p className="text-lg font-bold text-gray-900 leading-tight">{valor}</p>
     </div>
   );
 
