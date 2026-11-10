@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { criarBuscaVinculada } from '../lib/buscaVinculada';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigationType, useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Search, Filter, AlertCircle, FileCheck2, FilePlus, Clock, Database, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, ListChecks, Stethoscope, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
@@ -93,6 +93,30 @@ function DotacaoEmLinha({ dotacoes }: { dotacoes?: ClassificacaoOrcamentaria[] }
   );
 }
 
+const CHAVE_POSICAO_LISTA = 'aquisicoes:posicao-lista';
+
+interface PosicaoLista {
+  rolagem: number;
+  expandido: string | null;
+}
+
+function lerPosicaoLista(): PosicaoLista | null {
+  try {
+    const texto = sessionStorage.getItem(CHAVE_POSICAO_LISTA);
+    return texto ? (JSON.parse(texto) as PosicaoLista) : null;
+  } catch {
+    return null;
+  }
+}
+
+function guardarPosicaoLista(posicao: PosicaoLista) {
+  try {
+    sessionStorage.setItem(CHAVE_POSICAO_LISTA, JSON.stringify(posicao));
+  } catch {
+    /* sessionStorage indisponível (janela privada/bloqueado): a lista só volta ao topo, como antes. */
+  }
+}
+
 export default function Aquisicoes() {
   const { processos, setores, usuarioAtual, syncProcessosDaPlanilha, processosSemLinha, contratos, procedimentos } = useApp();
   // Busca que também olha o contrato e a ata ligados ao processo (pelo PAE): fornecedor, nº do contrato, fiscal...
@@ -104,8 +128,17 @@ export default function Aquisicoes() {
   const situacoesPaes = useSituacaoPaesAcessorios();
   const [sincronizando, setSincronizando] = useState(false);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  // Ao VOLTAR de um processo (botão voltar da tela ou do navegador), a lista reabre onde estava: mesma
+  // rolagem e mesmo processo expandido. Entrando pelo menu (navegação nova) ela começa no topo.
+  const tipoNavegacao = useNavigationType();
+  const posicaoSalva = useMemo(() => lerPosicaoLista(), []);
+  const deveRestaurar = tipoNavegacao === 'POP' && posicaoSalva !== null;
+  const raizRef = useRef<HTMLDivElement>(null);
+  const restauradoRef = useRef(false);
+  const areaDeRolagem = () => raizRef.current?.closest('main') ?? null;
+
   // Linha com os detalhes abertos (uma por vez, como na lista de Gestão de Contratos).
-  const [expandido, setExpandido] = useState<string | null>(null);
+  const [expandido, setExpandido] = useState<string | null>(() => (deveRestaurar ? posicaoSalva?.expandido ?? null : null));
 
   // Filtros na URL (query params), não em useState local — assim, ao entrar
   // no detalhe de um processo e voltar, a lista mantém exatamente os
@@ -246,8 +279,39 @@ export default function Aquisicoes() {
     }
   };
 
+  // Restaura a rolagem quando os processos já chegaram (antes disso a lista está vazia e a posição seria perdida).
+  useLayoutEffect(() => {
+    if (restauradoRef.current) return;
+    if (!deveRestaurar || activeTab !== 'processos') {
+      restauradoRef.current = true;
+      return;
+    }
+    const area = areaDeRolagem();
+    if (!area || processos.length === 0) return;
+    area.scrollTop = posicaoSalva?.rolagem ?? 0;
+    restauradoRef.current = true;
+  });
+
+  // Guarda a posição enquanto a pessoa rola e quando expande/recolhe um processo (só depois da restauração).
+  useEffect(() => {
+    const area = areaDeRolagem();
+    if (!area || activeTab !== 'processos') return;
+    let quadro = 0;
+    const salvar = () => {
+      if (!restauradoRef.current) return;
+      cancelAnimationFrame(quadro);
+      quadro = requestAnimationFrame(() => guardarPosicaoLista({ rolagem: area.scrollTop, expandido }));
+    };
+    area.addEventListener('scroll', salvar, { passive: true });
+    salvar();
+    return () => {
+      area.removeEventListener('scroll', salvar);
+      cancelAnimationFrame(quadro);
+    };
+  }, [activeTab, expandido]);
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div ref={raizRef} className="max-w-7xl mx-auto space-y-6">
       {usuarioAtual?.perfil === 'master' && processosSemLinha !== null && processosSemLinha > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
           <strong>{processosSemLinha}</strong> processo(s) do sistema não têm mais linha na planilha (linha removida, movida de aba ou PAE trocado).{' '}
@@ -335,65 +399,65 @@ export default function Aquisicoes() {
 
       {activeTab === 'processos' ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
              <div
                onClick={() => setFiltroTempo('todos')}
-               className={`bg-white p-5 rounded-lg border shadow-sm border-l-4 border-l-gray-400 cursor-pointer transition-colors ${filtroTempo === 'todos' ? 'ring-2 ring-gray-400 bg-gray-50 border-gray-300' : 'border-gray-200 hover:bg-gray-50'}`}
+               className={`bg-white px-3 py-2 rounded-lg border shadow-sm border-l-[3px] border-l-gray-400 cursor-pointer transition-colors ${filtroTempo === 'todos' ? 'ring-2 ring-gray-400 bg-gray-50 border-gray-300' : 'border-gray-200 hover:bg-gray-50'}`}
              >
                <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total de Processos</p>
-                    <h3 className="text-2xl font-bold text-gray-900 mt-1">{processos.length}</h3>
+                    <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Total de Processos</p>
+                    <h3 className="text-lg font-bold text-gray-900 leading-tight">{processos.length}</h3>
                   </div>
-                  <List className="w-5 h-5 text-gray-400" />
+                  <List className="w-4 h-4 text-gray-400" />
                </div>
              </div>
              <div
                onClick={() => setFiltroTempo(filtroTempo === 'verde' ? 'todos' : 'verde')}
-               className={`bg-white p-5 rounded-lg border shadow-sm border-l-4 border-l-emerald-500 cursor-pointer transition-colors ${filtroTempo === 'verde' ? 'ring-2 ring-emerald-500 bg-emerald-50 border-emerald-200' : 'border-gray-200 hover:bg-gray-50'}`}
+               className={`bg-white px-3 py-2 rounded-lg border shadow-sm border-l-[3px] border-l-emerald-500 cursor-pointer transition-colors ${filtroTempo === 'verde' ? 'ring-2 ring-emerald-500 bg-emerald-50 border-emerald-200' : 'border-gray-200 hover:bg-gray-50'}`}
              >
                <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Menos de 10 dias no setor</p>
-                    <h3 className="text-2xl font-bold text-gray-900 mt-1">{contagemTempo.verde}</h3>
+                    <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Menos de 10 dias no setor</p>
+                    <h3 className="text-lg font-bold text-gray-900 leading-tight">{contagemTempo.verde}</h3>
                   </div>
-                  <Clock className="w-5 h-5 text-emerald-500" />
+                  <Clock className="w-4 h-4 text-emerald-500" />
                </div>
              </div>
              <div 
                onClick={() => setFiltroTempo(filtroTempo === 'amarelo' ? 'todos' : 'amarelo')}
-               className={`bg-white p-5 rounded-lg border shadow-sm border-l-4 border-l-amber-500 cursor-pointer transition-colors ${filtroTempo === 'amarelo' ? 'ring-2 ring-amber-500 bg-amber-50 border-amber-200' : 'border-gray-200 hover:bg-gray-50'}`}
+               className={`bg-white px-3 py-2 rounded-lg border shadow-sm border-l-[3px] border-l-amber-500 cursor-pointer transition-colors ${filtroTempo === 'amarelo' ? 'ring-2 ring-amber-500 bg-amber-50 border-amber-200' : 'border-gray-200 hover:bg-gray-50'}`}
              >
                <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">10 a 20 dias no setor</p>
-                    <h3 className="text-2xl font-bold text-gray-900 mt-1">{contagemTempo.amarelo}</h3>
+                    <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">10 a 20 dias no setor</p>
+                    <h3 className="text-lg font-bold text-gray-900 leading-tight">{contagemTempo.amarelo}</h3>
                   </div>
-                  <Clock className="w-5 h-5 text-amber-500" />
+                  <Clock className="w-4 h-4 text-amber-500" />
                </div>
              </div>
              <div 
                onClick={() => setFiltroTempo(filtroTempo === 'vermelho' ? 'todos' : 'vermelho')}
-               className={`bg-white p-5 rounded-lg border shadow-sm border-l-4 border-l-red-600 cursor-pointer transition-colors ${filtroTempo === 'vermelho' ? 'ring-2 ring-red-500 bg-red-50 border-red-200' : 'border-gray-200 hover:bg-gray-50'}`}
+               className={`bg-white px-3 py-2 rounded-lg border shadow-sm border-l-[3px] border-l-red-600 cursor-pointer transition-colors ${filtroTempo === 'vermelho' ? 'ring-2 ring-red-500 bg-red-50 border-red-200' : 'border-gray-200 hover:bg-gray-50'}`}
              >
                <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Mais de 20 dias no setor</p>
-                    <h3 className="text-2xl font-bold text-gray-900 mt-1">{contagemTempo.vermelho}</h3>
+                    <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Mais de 20 dias no setor</p>
+                    <h3 className="text-lg font-bold text-gray-900 leading-tight">{contagemTempo.vermelho}</h3>
                   </div>
-                  <AlertCircle className="w-5 h-5 text-red-600" />
+                  <AlertCircle className="w-4 h-4 text-red-600" />
                </div>
              </div>
              <div
                onClick={() => setFiltroTempo(filtroTempo === 'contratado' ? 'todos' : 'contratado')}
-               className={`bg-white p-5 rounded-lg border shadow-sm border-l-4 border-l-purple-500 cursor-pointer transition-colors ${filtroTempo === 'contratado' ? 'ring-2 ring-purple-500 bg-purple-50 border-purple-200' : 'border-gray-200 hover:bg-gray-50'}`}
+               className={`bg-white px-3 py-2 rounded-lg border shadow-sm border-l-[3px] border-l-purple-500 cursor-pointer transition-colors ${filtroTempo === 'contratado' ? 'ring-2 ring-purple-500 bg-purple-50 border-purple-200' : 'border-gray-200 hover:bg-gray-50'}`}
              >
                <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Contratado/Aditivado</p>
-                    <h3 className="text-2xl font-bold text-gray-900 mt-1">{contagemContratadoAditivado}</h3>
+                    <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide leading-tight">Contratado/Aditivado</p>
+                    <h3 className="text-lg font-bold text-gray-900 leading-tight">{contagemContratadoAditivado}</h3>
                   </div>
-                  <FileCheck2 className="w-5 h-5 text-purple-500" />
+                  <FileCheck2 className="w-4 h-4 text-purple-500" />
                </div>
              </div>
           </div>
@@ -568,7 +632,7 @@ export default function Aquisicoes() {
                       </td>
                     </tr>
                   ) : (
-                    filtrados.map((proc) => {
+                    filtrados.map((proc, indice) => {
                       const diasNoSetor = proc.ultima_tramitacao
                         ? Math.max(0, differenceInDays(hoje, new Date(proc.ultima_tramitacao)))
                         : null;
@@ -590,9 +654,11 @@ export default function Aquisicoes() {
                         <React.Fragment key={proc.id}>
                         <tr
                           onClick={() => setExpandido(aberto ? null : proc.id)}
-                          className={`hover:bg-gray-50 cursor-pointer ${aberto ? 'bg-red-50/30' : ''}`}
+                          className={`cursor-pointer transition-colors ${
+                            aberto ? 'bg-red-50' : `${indice % 2 === 1 ? 'bg-gray-100' : 'bg-white'} hover:bg-gray-200/70`
+                          }`}
                         >
-                          <td className="px-4 py-4 text-sm text-gray-500">{proc.ordem ?? '-'}</td>
+                          <td className={`px-4 py-4 text-sm text-gray-500 border-l-4 ${aberto ? 'border-l-red-500' : 'border-l-transparent'}`}>{proc.ordem ?? '-'}</td>
                           <td className="px-4 py-4">
                             <div className="flex items-center">
                               {proc.possui_alerta && (
@@ -667,8 +733,8 @@ export default function Aquisicoes() {
                           </td>
                         </tr>
                         {aberto && (
-                          <tr className="bg-red-50/10">
-                            <td colSpan={7} className="px-4 py-4 border-b border-red-100">
+                          <tr className="bg-red-50">
+                            <td colSpan={7} className="px-4 py-4 border-b border-red-100 border-l-4 border-l-red-500">
                               <div className="bg-white p-4 rounded-lg border border-red-100 shadow-sm space-y-4">
                                 <div>
                                   <span className="block text-[11px] font-medium text-gray-500 uppercase">Objeto</span>
