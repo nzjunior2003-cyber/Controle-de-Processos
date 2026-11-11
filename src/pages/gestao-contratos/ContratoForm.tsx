@@ -5,7 +5,8 @@ import PaesAcessoriosCard from '../../components/PaesAcessoriosCard';
 import { ArrowLeft, FileText, PlusCircle, Save, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Contrato, ItemContrato } from '../../types';
-import { ehProcedimentoArp, saldoDaArp } from '../../lib/arp';
+import { ehProcedimentoArp, saldoDaArp, valorUtilizadoNaArp } from '../../lib/arp';
+import { chavesPae } from '../../lib/ordemProcesso';
 import { STATUS_PAGAMENTO_LABELS } from '../../types';
 import DotacaoOrcamentariaEditor from '../../components/processo/DotacaoOrcamentariaEditor';
 import { limparClassificacoes } from '../../lib/orcamento';
@@ -268,6 +269,12 @@ export default function ContratoForm() {
     0,
   );
 
+  // Processo (Apoio e Suprimento) de origem do contrato, pelo PAE — se ele indicou uma ata do Órgão, o contrato precisa conferir com isso.
+  const processoDoContrato =
+    processos.find((p) => p.numero_processo === form.pae.trim()) ??
+    (chavesPae(form.pae)[0] ? processos.find((p) => chavesPae(p.numero_processo)[0] === chavesPae(form.pae)[0]) : undefined);
+  const usoDaAta = processoDoContrato?.arpUtilizada ?? null;
+
   // Ata (ARP / adesão / partícipe) deste contrato: escolhida à mão ou achada pelo PAE informado.
   const ataDoPae = useMemo(
     () => (form.pae.trim() ? procedimentos.filter(ehProcedimentoArp).find((proc) => proc.pae.trim() === form.pae.trim()) : undefined),
@@ -276,9 +283,14 @@ export default function ContratoForm() {
   const ataEscolhida = procedimentos.find((proc) => proc.id === form.arpId);
   const saldoAta = useMemo(() => {
     if (!ataEscolhida) return null;
-    const saldo = saldoDaArp(ataEscolhida, contratos.filter((c) => c.id !== contrato?.id));
+    // O processo de origem sai da conta: o contrato dele substitui o que o processo tinha declarado.
+    const saldo = saldoDaArp(
+      ataEscolhida,
+      contratos.filter((c) => c.id !== contrato?.id),
+      processos.filter((p) => p.id !== processoDoContrato?.id),
+    );
     return { ...saldo, restante: saldo.registrado - saldo.utilizado - (parseValorMonetario(form.valorGlobal) || 0) };
-  }, [ataEscolhida, contratos, contrato?.id, form.valorGlobal]);
+  }, [ataEscolhida, contratos, processos, processoDoContrato?.id, contrato?.id, form.valorGlobal]);
 
   const preencherDaAta = (ata: (typeof procedimentos)[number]) =>
     setForm((anterior) => ({
@@ -302,8 +314,35 @@ export default function ContratoForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ataDoPae?.id]);
 
+  // Contrato novo de um processo que usa uma ata do Órgão: liga a ata, traz o valor e os itens declarados no processo.
+  useEffect(() => {
+    if (!usoDaAta || contrato) return;
+    const ata = procedimentos.find((proc) => proc.id === usoDaAta.arpId);
+    if (ata) preencherDaAta(ata);
+    const itensUsados = usoDaAta.itens ?? [];
+    setForm((anterior) => ({
+      ...anterior,
+      arpId: anterior.arpId || usoDaAta.arpId,
+      valorGlobal: anterior.valorGlobal || String(valorUtilizadoNaArp(usoDaAta) || ''),
+      controlaQuantidade: anterior.controlaQuantidade || itensUsados.length > 0,
+    }));
+    if (itensUsados.length > 0) {
+      setItensForm((anterior) =>
+        anterior.length > 0
+          ? anterior
+          : itensUsados.map((item) => ({
+              id: crypto.randomUUID(),
+              descricao: item.descricao,
+              unidade: '',
+              quantidadeInicial: String(item.quantidade),
+              valorUnitario: String(item.valorUnitario),
+            })),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processoDoContrato?.id]);
+
   // Dotação orçamentária que já veio do Apoio e Suprimento (checklist do processo) ou do próprio contrato.
-  const processoDoContrato = processos.find((p) => p.numero_processo === form.pae.trim());
   const dotacoesDoContrato = contrato?.dotacoes_orcamentarias?.length
     ? limparClassificacoes(contrato.dotacoes_orcamentarias)
     : limparClassificacoes(processoDoContrato?.dotacoes_orcamentarias ?? []);
@@ -682,6 +721,33 @@ export default function ContratoForm() {
                 {ataDoPae && form.arpId === ataDoPae.id && (
                   <p className="mt-1 text-xs text-teal-700">Vinculada automaticamente pelo número do PAE.</p>
                 )}
+                {usoDaAta && (() => {
+                  const valorProcesso = valorUtilizadoNaArp(usoDaAta);
+                  const normalizar = (t: string) => t.trim().toLowerCase();
+                  const itensDiferentes = (usoDaAta.itens ?? []).filter((uso) => {
+                    const doContrato = itensValidos.find((i) => normalizar(i.descricao) === normalizar(uso.descricao));
+                    return !doContrato || Number(doContrato.quantidadeInicial) !== uso.quantidade;
+                  });
+                  const valorDiferente = valorProcesso > 0 && Math.abs(valorGlobalNumero - valorProcesso) > 0.01;
+                  const ataDiferente = form.arpId !== usoDaAta.arpId;
+                  const ok = !valorDiferente && itensDiferentes.length === 0 && !ataDiferente;
+                  return (
+                    <div className={`mt-3 rounded-md border p-3 text-xs ${ok ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-300 bg-amber-50 text-amber-900'}`} role={ok ? undefined : 'alert'}>
+                      <p>
+                        O processo {processoDoContrato?.numero_processo} indicou usar <strong>{formatarMoeda(valorProcesso)}</strong> desta ata
+                        {(usoDaAta.itens?.length ?? 0) > 0 ? ` (${usoDaAta.itens?.map((i) => `${i.quantidade}× ${i.descricao}`).join(', ')})` : ''}.
+                      </p>
+                      {ataDiferente && <p className="mt-1">Este contrato não está ligado à ata indicada pelo processo.</p>}
+                      {valorDiferente && (
+                        <p className="mt-1">O valor global do contrato ({formatarMoeda(valorGlobalNumero)}) é diferente do valor indicado no processo.</p>
+                      )}
+                      {itensDiferentes.map((uso) => (
+                        <p key={uso.idx} className="mt-1">Item &quot;{uso.descricao}&quot;: o processo indicou {uso.quantidade} e o contrato não confere.</p>
+                      ))}
+                      {ok && <p className="mt-1">Valor e itens do contrato conferem com o processo.</p>}
+                    </div>
+                  );
+                })()}
                 {ataEscolhida ? (
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs text-gray-700">
                     <p><span className="block text-gray-500">Tipo</span><strong>{ataEscolhida.modalidade}</strong></p>

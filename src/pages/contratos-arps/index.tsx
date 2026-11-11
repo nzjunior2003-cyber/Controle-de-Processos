@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Download, Filter, PlusCircle, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useMilitares } from '../../hooks/useMilitares';
@@ -117,7 +117,6 @@ export default function ContratosArps() {
           if (procedimentos.some((proc) => proc.pae === p.numero_processo)) return false;
           return (
             p.rito_processual === RITO_ADESAO_ARP ||
-            p.rito_processual === RITO_GERENCIADOR_ARP ||
             p.rito_processual === RITO_PARTICIPE_ARP ||
             !!p.rito_processual?.includes('Pregão') ||
             !!p.rito_processual?.includes('Dispensa') ||
@@ -127,7 +126,6 @@ export default function ContratosArps() {
         .map((p) => {
           let modalidade = '';
           if (p.rito_processual === RITO_ADESAO_ARP) modalidade = 'Adesão';
-          else if (p.rito_processual === RITO_GERENCIADOR_ARP) modalidade = 'Gerenciador da ARP';
           else if (p.rito_processual === RITO_PARTICIPE_ARP) modalidade = 'Partícipe';
           else if (p.rito_processual?.includes('Pregão')) modalidade = 'Pregão Eletrônico';
           else if (p.rito_processual?.includes('Dispensa')) modalidade = 'Dispensa';
@@ -184,6 +182,8 @@ export default function ContratosArps() {
   const dispensasFiltradas = filtrarProcedimentos('Dispensa');
   const adesoesFiltradas = filtrarProcedimentos('Adesão');
   const gerenciadorFiltradas = filtrarProcedimentos('Gerenciador');
+  // Processos de rito Gerenciador da ARP que ainda não indicaram a ata do Órgão que utilizam.
+  const processosSemAta = processos.filter((p) => p.rito_processual === RITO_GERENCIADOR_ARP && !p.arpUtilizada?.arpId);
   const participesFiltradas = filtrarProcedimentos('Partícipe');
 
   const sancionatoriosFiltrados = sancionatorios.filter((s) => {
@@ -411,6 +411,25 @@ export default function ContratosArps() {
             />
           )}
 
+          {abaAtiva === 'gerenciador' && processosSemAta.length > 0 && (
+            <details className="mx-4 mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <summary className="cursor-pointer font-medium">
+                {processosSemAta.length} processo(s) de rito Gerenciador da ARP ainda sem ata vinculada
+              </summary>
+              <p className="mt-2 text-xs">Escolha a ata do Órgão na edição de cada processo, para o consumo entrar no saldo da ata.</p>
+              <ul className="mt-2 space-y-1 text-xs">
+                {processosSemAta.map((p) => (
+                  <li key={p.id}>
+                    <Link to={`/sistema/processos/${p.id}/editar`} className="font-medium text-red-700 hover:underline">
+                      PAE {p.numero_processo}
+                    </Link>{' '}
+                    — {p.objeto}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
           {isAbaProcedimento(abaAtiva) && (
             <TabelaProcedimentos
               dados={filtrarProcedimentos(filtroModalidade(abaAtiva))}
@@ -418,6 +437,7 @@ export default function ContratosArps() {
               podeEditar={isMasterOrContratos}
               onEditar={abrirEdicao}
               contratos={contratos}
+              processos={processos}
               onAditivos={(proc) => setProcedimentoAditivosId(proc.id)}
             />
           )}
