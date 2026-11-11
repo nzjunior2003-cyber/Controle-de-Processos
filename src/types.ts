@@ -612,6 +612,13 @@ export interface ProcedimentoLicitatorio {
   linkPncp?: string;
   linkComprasGov?: string;
   fornecedor?: string;
+  /** Razão social do fornecedor da ata (o CNPJ fica em `fornecedor`). */
+  fornecedorNome?: string;
+  fornecedorEmail?: string;
+  fornecedorTelefone?: string;
+  /** Documento da ARP anexado (link no Drive institucional) e o nome do arquivo. */
+  linkArp?: string;
+  arquivoArpNome?: string;
   valorHomologado?: string;
   numeroContrato?: string;
   doeContrato?: string;

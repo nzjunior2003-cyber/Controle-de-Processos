@@ -1,9 +1,10 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import type { PCA, PortariaFiscal, Processo } from '../../types';
+import type { AditivoArp, Contrato, PCA, PortariaFiscal, Processo } from '../../types';
 import type { Militar } from '../../hooks/useMilitares';
 import { isAbaProcedimento, type AbaContratos, type RegistroFormData } from './abas';
 import FormProcedimento from './FormProcedimento';
+import FormAtaGerenciador from './FormAtaGerenciador';
 import FormSancionatorio from './FormSancionatorio';
 import FormPortaria from './FormPortaria';
 
@@ -15,6 +16,10 @@ interface Props {
   pcas: PCA[];
   portarias: PortariaFiscal[];
   militares: Militar[];
+  contratos: Contrato[];
+  aditivosArp: AditivoArp[];
+  /** Abre o cadastro de aditivos de uma ata já salva. */
+  onAbrirAditivos: (procedimentoId: string) => void;
   salvando: boolean;
   onFechar: () => void;
   onSalvar: () => void;
@@ -28,6 +33,9 @@ export default function RegistroModal({
   pcas,
   portarias,
   militares,
+  contratos,
+  aditivosArp,
+  onAbrirAditivos,
   salvando,
   onFechar,
   onSalvar,
@@ -51,7 +59,8 @@ export default function RegistroModal({
           <h3 className="text-lg font-medium leading-6 text-gray-900">
             {abaAtiva === 'sancionatorios' && 'Novo Processo Sancionatório'}
             {abaAtiva === 'portarias' && 'Nova Portaria de Fiscal'}
-            {isAbaProcedimento(abaAtiva) && 'Novo Procedimento'}
+            {abaAtiva === 'gerenciador' && (formData.id && !String(formData.id).startsWith('auto-') ? 'Ata (Gerenciador da ARP)' : 'Nova Ata (Gerenciador da ARP)')}
+            {isAbaProcedimento(abaAtiva) && abaAtiva !== 'gerenciador' && 'Novo Procedimento'}
           </h3>
           <button type="button" onClick={onFechar} className="text-gray-400 hover:text-gray-500">
             <X className="w-5 h-5" />
@@ -59,7 +68,19 @@ export default function RegistroModal({
         </div>
 
         <div className="space-y-6 overflow-y-auto flex-1 pr-2 pb-2">
-          {isAbaProcedimento(abaAtiva) && (
+          {abaAtiva === 'gerenciador' && (
+            <FormAtaGerenciador
+              formData={formData}
+              setFormData={setFormData}
+              onInputChange={handleInputChange}
+              processos={processos}
+              contratos={contratos}
+              aditivos={aditivosArp.filter((a) => a.procedimentoId === formData.id)}
+              onAditivo={onAbrirAditivos}
+            />
+          )}
+
+          {isAbaProcedimento(abaAtiva) && abaAtiva !== 'gerenciador' && (
             <FormProcedimento
               abaAtiva={abaAtiva}
               formData={formData}
