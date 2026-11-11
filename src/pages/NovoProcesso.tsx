@@ -6,7 +6,9 @@ import { differenceInDays } from 'date-fns';
 import { PcaAutocomplete } from '../components/PcaAutocomplete';
 import { useEtapasPorRito } from '../hooks/useEtapasPorRito';
 import { ID_PLANILHA_PROCESSOS } from '../lib/csv';
-import { normalizarRito, RITO_ADESAO_ARP } from '../lib/ritosProcessuais';
+import { normalizarRito, RITO_ADESAO_ARP, RITO_GERENCIADOR_ARP } from '../lib/ritosProcessuais';
+import UsoDeAtaGerenciador from '../components/processo/UsoDeAtaGerenciador';
+import type { ArpUtilizada } from '../types';
 import { encontrarObjetosSemelhantes, type CandidatoObjeto } from '../lib/correspondenciaTexto';
 import { getAccessToken, googleSignIn, initAuth } from '../lib/googleAuth';
 import { sincronizarProcessoNaPlanilha } from '../lib/sheetsService';
@@ -28,7 +30,7 @@ const MODALIDADES_ARP = ['Adesão', 'Partícipe'];
 
 export default function NovoProcesso() {
   const { id } = useParams<{ id: string }>();
-  const { addProcesso, updateProcesso, processos, pcas, irps, procedimentos, usuarioAtual } = useApp();
+  const { addProcesso, updateProcesso, processos, pcas, irps, procedimentos, contratos, usuarioAtual } = useApp();
   const navigate = useNavigate();
   const etapasPorRito = useEtapasPorRito();
 
@@ -67,6 +69,12 @@ export default function NovoProcesso() {
   );
   const [orgaoGerenciadorArp, setOrgaoGerenciadorArp] = useState(processo?.orgaoGerenciadorArp ?? '');
   const [fornecedorArp, setFornecedorArp] = useState(processo?.fornecedorArp ?? '');
+  // Atas do Órgão (CBMPA gerenciador) que o processo de rito Gerenciador pode utilizar.
+  const atasDoOrgao = useMemo(
+    () => procedimentos.filter((p) => !p.isAuto && (p.modalidade ?? '').toLowerCase().includes('gerenciador')),
+    [procedimentos],
+  );
+  const [arpUtilizada, setArpUtilizada] = useState<ArpUtilizada | null>(processo?.arpUtilizada ?? null);
   const [naturezaDespesa, setNaturezaDespesa] = useState(processo?.natureza_despesa ?? '');
   const [fonte, setFonte] = useState(processo?.fonte ?? '');
   const [prd, setPrd] = useState(processo?.prd ?? '');
@@ -232,6 +240,7 @@ export default function NovoProcesso() {
         ...(ritoProcessual === RITO_ADESAO_ARP
           ? { orgaoGerenciadorArp, fornecedorArp }
           : { orgaoGerenciadorArp: '', fornecedorArp: '' }),
+        arpUtilizada: ritoProcessual === RITO_GERENCIADOR_ARP && arpUtilizada?.arpId ? arpUtilizada : null,
       };
 
       // Pede a autorização do Google ANTES de gravar no Firestore: feita
@@ -490,6 +499,18 @@ export default function NovoProcesso() {
                   </div>
                   <AdicionarEtapa rito={ritoProcessual} />
                 </div>
+              )}
+
+              {ritoProcessual === RITO_GERENCIADOR_ARP && (
+                <UsoDeAtaGerenciador
+                  atas={atasDoOrgao}
+                  contratos={contratos}
+                  processos={processos}
+                  processoId={processo?.id}
+                  valorEstimado={valorEstimado}
+                  valor={arpUtilizada}
+                  onChange={setArpUtilizada}
+                />
               )}
 
               {ritoProcessual === RITO_ADESAO_ARP && (

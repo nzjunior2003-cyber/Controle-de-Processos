@@ -18,6 +18,7 @@ import { processoParaDadosPlanilha, SUBFASE_CONTRATADO } from '../lib/planilhaPr
 import { calcularEconomicidade, encontrarVinculosPorPae, formatarMoeda } from '../lib/contratos';
 import { calcularDataPrevista, prazoAlvoDoRito } from '../lib/prazosProcesso';
 import { ehItemDotacaoOrcamentaria, limparClassificacoes } from '../lib/orcamento';
+import { valorUtilizadoNaArp } from '../lib/arp';
 import PaesAcessoriosCard from '../components/PaesAcessoriosCard';
 import DotacaoOrcamentariaEditor from '../components/processo/DotacaoOrcamentariaEditor';
 import { AdicionarEtapa, BotaoExcluirEtapa } from '../components/processo/ControlesChecklistMaster';
@@ -170,6 +171,7 @@ export default function DetalheProcesso() {
     processo.numero_processo,
     { contratos, procedimentos },
   );
+  const ataUtilizada = processo.arpUtilizada ? procedimentos.find((p) => p.id === processo.arpUtilizada?.arpId) : undefined;
   const economicidade = contratoVinculado
     ? calcularEconomicidade(processo.valor_estimado, contratoVinculado.valorGlobal)
     : null;
@@ -391,10 +393,22 @@ export default function DetalheProcesso() {
             </div>
           </div>
 
-          {(contratoVinculado || procedimentoVinculado) && (
+          {(contratoVinculado || procedimentoVinculado || ataUtilizada) && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4">Vínculo com Contratos/ARP&apos;s</h2>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                {ataUtilizada && processo.arpUtilizada && (
+                  <div className="sm:col-span-2">
+                    <dt className="text-sm font-medium text-gray-500">Ata do Órgão utilizada</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {ataUtilizada.numero} — {ataUtilizada.objeto}:{' '}
+                      <strong>{formatarMoeda(valorUtilizadoNaArp(processo.arpUtilizada))}</strong>
+                      {(processo.arpUtilizada.itens?.length ?? 0) > 0 && (
+                        <span className="text-gray-500"> ({processo.arpUtilizada.itens?.map((i) => `${i.quantidade}× ${i.descricao}`).join(', ')})</span>
+                      )}
+                    </dd>
+                  </div>
+                )}
                 {contratoVinculado && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Contrato Vinculado</dt>

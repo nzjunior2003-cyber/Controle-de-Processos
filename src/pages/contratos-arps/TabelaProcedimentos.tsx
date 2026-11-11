@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Contrato, ProcedimentoLicitatorio } from '../../types';
+import { Link } from 'react-router-dom';
+import type { Contrato, ProcedimentoLicitatorio, Processo } from '../../types';
 import { formatarMoeda } from '../../lib/contratos';
 import { ehProcedimentoArp, saldoDaArp } from '../../lib/arp';
 
@@ -19,6 +20,8 @@ interface Props {
   onEditar: (item: ProcedimentoLicitatorio) => void;
   /** Contratos, pra calcular quanto da ata já foi usado pelos contratos vinculados a ela. */
   contratos?: Contrato[];
+  /** Processos, pra listar os que utilizaram a ata (rito Gerenciador) e abater o que cada um consumiu do saldo. */
+  processos?: Processo[];
   /** Abre os aditivos (prorrogação) da ata — só para registros já gravados, não os automáticos. */
   onAditivos?: (item: ProcedimentoLicitatorio) => void;
 }
@@ -29,6 +32,7 @@ export default function TabelaProcedimentos({
   podeEditar,
   onEditar,
   contratos = [],
+  processos = [],
   onAditivos,
 }: Props) {
   const [expandido, setExpandido] = useState<string | null>(null);
@@ -138,27 +142,85 @@ export default function TabelaProcedimentos({
                         </div>
                       </div>
                       {ehProcedimentoArp(item) && !item.isAuto && (() => {
-                        const saldo = saldoDaArp(item, contratos);
+                        const saldo = saldoDaArp(item, contratos, processos);
                         return (
                           <div className="mt-3 bg-white p-4 rounded-lg border border-red-100 shadow-sm text-sm">
                             <span className="font-semibold text-gray-900 block mb-2">Saldo da ata para compras futuras</span>
                             <div className="grid grid-cols-3 gap-4 mb-3">
                               <div><span className="block text-xs text-gray-500 uppercase">Registrado</span>{saldo.registrado > 0 ? formatarMoeda(saldo.registrado) : 'não informado'}</div>
-                              <div><span className="block text-xs text-gray-500 uppercase">Já contratado</span>{formatarMoeda(saldo.utilizado)}</div>
+                              <div><span className="block text-xs text-gray-500 uppercase">Utilizado (contratos e processos)</span>{formatarMoeda(saldo.utilizado)}</div>
                               <div>
                                 <span className="block text-xs text-gray-500 uppercase">Saldo</span>
                                 <strong className={saldo.saldo < 0 ? 'text-red-700' : 'text-emerald-700'}>{saldo.registrado > 0 ? formatarMoeda(saldo.saldo) : '-'}</strong>
                               </div>
                             </div>
-                            {saldo.contratos.length > 0 ? (
-                              <ul className="text-xs text-gray-600 space-y-0.5">
-                                {saldo.contratos.map((c) => (
-                                  <li key={c.id}>Contrato {c.numero} — {c.empresa}: {formatarMoeda(c.valorGlobal || 0)}</li>
+                            {saldo.itens.length > 0 && (
+                              <div className="mb-3 overflow-x-auto">
+                                <span className="font-semibold text-gray-900 block mb-1">Saldo por item (quantidade)</span>
+                                <table className="min-w-full text-xs">
+                                  <thead>
+                                    <tr className="text-left text-gray-500 uppercase">
+                                      <th className="py-1 pr-3 font-medium">Item</th>
+                                      <th className="py-1 pr-3 font-medium">Registrada</th>
+                                      <th className="py-1 pr-3 font-medium">Utilizada</th>
+                                      <th className="py-1 font-medium">Saldo</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100">
+                                    {saldo.itens.map((it) => (
+                                      <tr key={it.idx}>
+                                        <td className="py-1 pr-3 text-gray-900">{it.descricao}</td>
+                                        <td className="py-1 pr-3">{it.registrada}</td>
+                                        <td className="py-1 pr-3">{it.utilizada}</td>
+                                        <td className={`py-1 font-semibold ${it.saldo < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{it.saldo}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            <span className="font-semibold text-gray-900 block mb-1">Processos que utilizaram esta ata</span>
+                            {saldo.processos.length > 0 ? (
+                              <ul className="text-xs text-gray-700 space-y-1.5 mb-3">
+                                {saldo.processos.map((c) => (
+                                  <li key={c.processoId} className="rounded border border-gray-100 bg-gray-50 px-2 py-1.5">
+                                    <Link to={`/sistema/processos/${c.processoId}`} className="font-medium text-red-700 hover:underline">PAE {c.pae}</Link>
+                                    {' — '}{c.objeto}: <strong>{formatarMoeda(c.valor)}</strong>
+                                    {c.itens.length > 0 && <span className="text-gray-500"> ({c.itens.map((i) => `${i.quantidade}× ${i.descricao}`).join(', ')})</span>}
+                                    <div className="mt-0.5">
+                                      {c.contrato ? (
+                                        <>
+                                          Contrato {c.contrato.numero} — {c.contrato.empresa}: {formatarMoeda(c.contrato.valorGlobal)}
+                                          {!c.contrato.vinculadoAAta && <span className="ml-1 text-amber-700">(contrato ainda não ligado a esta ata)</span>}
+                                          {c.divergencia !== undefined && (
+                                            <span className="ml-1 font-medium text-amber-700">
+                                              — valor diferente do processo ({c.divergencia > 0 ? '+' : '-'}{formatarMoeda(Math.abs(c.divergencia))})
+                                            </span>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <span className="text-gray-500">Contrato ainda não cadastrado.</span>
+                                      )}
+                                    </div>
+                                  </li>
                                 ))}
                               </ul>
                             ) : (
-                              <p className="text-xs text-gray-500">Nenhum contrato vinculado a esta ata ainda (vincule no cadastro do contrato).</p>
+                              <p className="text-xs text-gray-500 mb-3">Nenhum processo utilizou esta ata ainda (escolha a ata no cadastro do processo de rito Gerenciador).</p>
                             )}
+                            {(() => {
+                              const contratosDosProcessos = new Set(saldo.processos.map((c) => c.contrato?.id));
+                              const outros = saldo.contratos.filter((c) => !contratosDosProcessos.has(c.id));
+                              return outros.length > 0 ? (
+                                <ul className="text-xs text-gray-600 space-y-0.5">
+                                  {outros.map((c) => (
+                                    <li key={c.id}>Contrato {c.numero} — {c.empresa}: {formatarMoeda(c.valorGlobal || 0)}</li>
+                                  ))}
+                                </ul>
+                              ) : saldo.processos.length === 0 ? (
+                                <p className="text-xs text-gray-500">Nenhum contrato vinculado a esta ata ainda (vincule no cadastro do contrato).</p>
+                              ) : null;
+                            })()}
                             {saldo.registrado === 0 && (
                               <p className="text-xs text-amber-700 mt-2">Informe o valor homologado no procedimento para calcular o saldo.</p>
                             )}

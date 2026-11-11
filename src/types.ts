@@ -281,6 +281,25 @@ export const CHECKLISTS_RITOS: Record<string, string[]> = {
   ]
 };
 
+/** Item da ata consumido por um processo de rito "Gerenciador da ARP". */
+export interface ItemUtilizadoArp {
+  /** Posição do item na lista de itens da ata (com `descricao`, localiza o item mesmo se a lista mudar). */
+  idx: number;
+  descricao: string;
+  quantidade: number;
+  valorUnitario: number;
+}
+
+/**
+ * Ata do Órgão (CBMPA gerenciador) que um processo de rito "Gerenciador da ARP" utiliza: ata com itens
+ * consome quantidade (`itens`); ata de serviço, só valor total (`valor`).
+ */
+export interface ArpUtilizada {
+  arpId: string;
+  valor?: number;
+  itens?: ItemUtilizadoArp[];
+}
+
 /**
  * PAE aberto à parte, ligado a um processo (solicitação de análise a outro
  * órgão) ou a um contrato (fatura, recebimento de objeto, pagamento). O robô
@@ -324,6 +343,8 @@ export interface Processo {
   checklist_rito?: string[];
   /** PAEs acessórios do processo (solicitações de análise a outros órgãos do Estado). */
   paes_acessorios?: PaeAcessorio[];
+  /** Ata do Órgão que este processo utiliza (só no rito "Gerenciador da ARP"); abate o saldo da ata. */
+  arpUtilizada?: ArpUtilizada | null;
   /** Dotações orçamentárias do processo (item "Dotação Orçamentária" do checklist) — uma ou mais linhas com os campos da ficha da Finanças. */
   dotacoes_orcamentarias?: ClassificacaoOrcamentaria[];
   /** Só usados quando o rito é a Adesão à ata de registro de preços (RITO_ADESAO_ARP). */
