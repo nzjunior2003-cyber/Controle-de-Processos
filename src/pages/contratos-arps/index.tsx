@@ -268,7 +268,7 @@ export default function ContratosArps() {
         const procedimento = {
           ...dados,
           pae: dados.pae ?? '',
-          numero: dados.numero ?? dados.numeroContrato ?? 'Aguardando',
+          numero: dados.numero || dados.numeroContrato || 'Aguardando',
           modalidade: dados.modalidade || modalidadePadrao(abaAtiva),
           objeto: dados.objeto || processoVinculado?.objeto || 'Objeto não informado',
           fase: dados.fase ?? 'Pendente',
@@ -469,6 +469,9 @@ export default function ContratosArps() {
           pcas={pcas}
           portarias={portarias}
           militares={militares}
+          contratos={contratos}
+          aditivosArp={aditivosArp}
+          onAbrirAditivos={(id) => setProcedimentoAditivosId(id)}
           salvando={salvando}
           onFechar={() => setModalOpen(false)}
           onSalvar={handleSalvarRegistro}
