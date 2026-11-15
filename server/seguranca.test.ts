@@ -35,3 +35,49 @@ describe("seguranca do servidor", () => {
     expect(nomeSeguro("a'b\"c.pdf")).toBe("a_b_c.pdf");
   });
 });
+
+import { afterEach, beforeEach, vi } from "vitest";
+import { destinatariosNaoAutorizados, limparCacheEmailsAtivos, normalizarEmail } from "./seguranca";
+
+describe("destinatários de e-mail", () => {
+  const ativos = ["Maria@Gmail.com ", "joao@hotmail.com"];
+  beforeEach(() => {
+    limparCacheEmailsAtivos();
+    process.env.VITE_FIREBASE_PROJECT_ID = "proj";
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      json: async () => ativos.map((e) => ({ document: { fields: { email: { stringValue: e } } } })),
+    })));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env.EMAIL_DOMINIOS_PERMITIDOS;
+  });
+
+  it("normaliza caixa e espaços", () => {
+    expect(normalizarEmail("  Maria@GMAIL.com ")).toBe("maria@gmail.com");
+  });
+  it("aceita usuário ativo ignorando maiúsculas e espaços (nos dois lados)", async () => {
+    expect(await destinatariosNaoAutorizados(["maria@gmail.com", " JOAO@Hotmail.COM "], "t")).toEqual([]);
+  });
+  it("variável vazia: recusa quem não é usuário ativo (nunca 'qualquer um')", async () => {
+    process.env.EMAIL_DOMINIOS_PERMITIDOS = "";
+    expect(await destinatariosNaoAutorizados(["estranho@gmail.com", "x@bombeiros.pa.gov.br"], "t"))
+      .toEqual(["estranho@gmail.com", "x@bombeiros.pa.gov.br"]);
+  });
+  it("variável ausente: mesmo comportamento", async () => {
+    expect(await destinatariosNaoAutorizados(["estranho@gmail.com"], "t")).toEqual(["estranho@gmail.com"]);
+  });
+  it("domínio listado é aceito; outros continuam recusados", async () => {
+    process.env.EMAIL_DOMINIOS_PERMITIDOS = "@Exemplo.gov.br, outro.com";
+    expect(await destinatariosNaoAutorizados(["a@exemplo.gov.br", "b@gmail.com"], "t")).toEqual(["b@gmail.com"]);
+  });
+  it("e-mail malformado ou lista dupla é recusado", async () => {
+    expect(await destinatariosNaoAutorizados(["maria@gmail.com, joao@hotmail.com", "sem-arroba"], "t"))
+      .toEqual(["maria@gmail.com, joao@hotmail.com", "sem-arroba"]);
+  });
+  it("falha na consulta ao Firestore nega tudo", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, json: async () => [] })));
+    expect(await destinatariosNaoAutorizados(["maria@gmail.com"], "t")).toEqual(["maria@gmail.com"]);
+  });
+});

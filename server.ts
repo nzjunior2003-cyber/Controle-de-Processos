@@ -14,7 +14,7 @@ import {
   PERFIS_CONTRATOS,
   PERFIS_OPERACIONAIS,
   arquivoUploadPermitido,
-  destinatarioPermitido,
+  destinatariosNaoAutorizados,
   emailsDosMasters,
   endpointPushPermitido,
   escaparHtml,
@@ -320,9 +320,14 @@ async function startServer() {
       const destinos = (Array.isArray(parsed.data.to) ? parsed.data.to : parsed.data.to.split(/[;,]/))
         .map((d) => d.trim()).filter(Boolean);
       if (destinos.length === 0 || destinos.length > 10) return res.status(400).json({ error: "Destinatários inválidos." });
-      const liberados = await Promise.all(destinos.map((d) => destinatarioPermitido(d, req.usuario!.idToken)));
-      if (liberados.some((ok) => !ok)) {
-        return res.status(403).json({ error: "Destinatário não autorizado." });
+      const recusados = await destinatariosNaoAutorizados(destinos, req.usuario!.idToken);
+      if (recusados.length > 0) {
+        return res.status(403).json({
+          error:
+            `Destinatário sem cadastro ativo no sistema: ${recusados.map(escaparHtml).join(", ")}. ` +
+            "A pessoa precisa solicitar acesso e ser aprovada em Usuários para receber e-mails do sistema.",
+          naoAutorizados: recusados,
+        });
       }
       const htmlSeguro = html ? sanitizarHtmlEmail(html) : undefined;
 

@@ -682,14 +682,16 @@ export default function GestaoContratos() {
               <div className="mb-4 flex items-center gap-2">
                 <UserX className="w-5 h-5 text-red-600" />
                 <h3 className="text-lg font-medium text-gray-900">
-                  Contratos com Fiscal sem Usuário Correspondente
+                  Fiscais sem cadastro ativo no sistema
                 </h3>
               </div>
             <p className="text-sm text-gray-500 mb-4">
               Estes contratos têm Fiscal Titular/Suplente cadastrado, mas o e-mail não bate com
               nenhum usuário Fiscal já aprovado no sistema — a pessoa não vai ver este contrato em
               "Fiscal do Contrato" até o e-mail ser corrigido (ou até ela solicitar/ter o acesso
-              aprovado).
+              aprovado). <b>Enquanto não tiver cadastro ativo, o sistema também não envia e-mails
+              (designação, alertas) para essa pessoa</b> — peça que se cadastre em "Solicitar acesso",
+              com o mesmo e-mail do contrato, e aprove em Usuários.
             </p>
             <div className="space-y-3">
               {contratosComFiscalSemUsuario.map(({ contrato, titularSemUsuario, suplenteSemUsuario }) => (

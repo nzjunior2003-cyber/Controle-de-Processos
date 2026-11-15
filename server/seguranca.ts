@@ -170,12 +170,24 @@ export function emailValido(email: string): boolean {
   return email.length <= 254 && /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/.test(email);
 }
 
-/** Destinatário aceito: domínio autorizado OU usuário ativo cadastrado (consulta com o token de quem chamou). */
-export async function destinatarioPermitido(email: string, idToken: string): Promise<boolean> {
-  const alvo = email.trim().toLowerCase();
-  if (!emailValido(alvo)) return false;
-  const dominio = alvo.split("@")[1];
-  if (dominiosPermitidos().includes(dominio)) return true;
+/** Normaliza e-mail para comparação: sem espaços nas pontas e sem diferença de maiúsculas. */
+export function normalizarEmail(email: unknown): string {
+  return String(email ?? "").trim().toLowerCase();
+}
+
+let cacheAtivos: { expira: number; emails: Set<string> } | null = null;
+export function limparCacheEmailsAtivos(): void {
+  cacheAtivos = null;
+}
+
+/**
+ * E-mails (normalizados) de todos os usuários ATIVOS cadastrados. A consulta usa
+ * o token de quem chamou (as Rules valem) e compara em código, para ignorar
+ * maiúsculas/espaços do que foi digitado no cadastro. Falha => conjunto vazio
+ * (nega por padrão).
+ */
+export async function emailsDeUsuariosAtivos(idToken: string): Promise<Set<string>> {
+  if (cacheAtivos && cacheAtivos.expira > Date.now()) return cacheAtivos.emails;
   try {
     const resposta = await fetch(urlFirestore(":runQuery"), {
       method: "POST",
@@ -183,25 +195,39 @@ export async function destinatarioPermitido(email: string, idToken: string): Pro
       body: JSON.stringify({
         structuredQuery: {
           from: [{ collectionId: "usuarios" }],
-          where: {
-            compositeFilter: {
-              op: "AND",
-              filters: [
-                { fieldFilter: { field: { fieldPath: "email" }, op: "EQUAL", value: { stringValue: alvo } } },
-                { fieldFilter: { field: { fieldPath: "ativo" }, op: "EQUAL", value: { booleanValue: true } } },
-              ],
-            },
-          },
-          limit: 1,
+          where: { fieldFilter: { field: { fieldPath: "ativo" }, op: "EQUAL", value: { booleanValue: true } } },
+          select: { fields: [{ fieldPath: "email" }] },
+          limit: 5000,
         },
       }),
     });
-    if (!resposta.ok) return false;
-    const linhas = (await resposta.json()) as { document?: unknown }[];
-    return linhas.some((l) => !!l.document);
+    if (!resposta.ok) return new Set();
+    const linhas = (await resposta.json()) as { document?: { fields?: { email?: { stringValue?: string } } } }[];
+    const emails = new Set(
+      linhas.map((l) => normalizarEmail(l.document?.fields?.email?.stringValue)).filter(Boolean),
+    );
+    cacheAtivos = { expira: Date.now() + 30_000, emails };
+    return emails;
   } catch {
-    return false;
+    return new Set();
   }
+}
+
+/**
+ * Devolve os destinatários NÃO autorizados. Autorizado = usuário ativo
+ * cadastrado (com o mesmo e-mail, ignorando caixa/espaços) OU domínio listado
+ * em EMAIL_DOMINIOS_PERMITIDOS. Variável vazia = só usuários ativos; nunca
+ * "qualquer destinatário".
+ */
+export async function destinatariosNaoAutorizados(destinos: string[], idToken: string): Promise<string[]> {
+  const dominios = dominiosPermitidos();
+  const ativos = await emailsDeUsuariosAtivos(idToken);
+  return destinos.filter((d) => {
+    const alvo = normalizarEmail(d);
+    if (!emailValido(alvo)) return true;
+    if (ativos.has(alvo)) return false;
+    return !dominios.includes(alvo.split("@")[1]);
+  });
 }
 
 /** Endpoints de push aceitos: só os serviços oficiais dos navegadores (evita SSRF). */

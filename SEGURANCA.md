@@ -60,7 +60,7 @@ Casos especiais (testados): fiscal do contrato altera só campos de saldo e cria
 
 ## 4. Variáveis novas (`.env` do servidor)
 
-- `EMAIL_DOMINIOS_PERMITIDOS` — domínios extras que podem receber e-mail (ex.: o domínio dos fiscais). **Sem isso, e-mail a um fiscal que não seja usuário ativo cadastrado será recusado.**
+- `EMAIL_DOMINIOS_PERMITIDOS` — **deixar VAZIO** (decisão: a equipe usa Gmail/Hotmail etc.). Vazio = só recebem e-mail do sistema **usuários ATIVOS cadastrados** (a comparação ignora maiúsculas/minúsculas e espaços); nunca significa "qualquer destinatário" (coberto por teste). Fiscal sem cadastro ativo **não recebe** e-mail: a tela mostra "Destinatário sem cadastro ativo no sistema: <e-mail>…", e a aba "Fiscais e Suplentes" de Gestão de Contratos lista os contratos cujo fiscal não tem cadastro ativo.
 - `ACESSO_NOTIFICAR_EMAILS` — quem recebe o aviso de novo pedido de acesso (vazio = masters ativos).
 
 ## 5. Dependência das planilhas públicas
