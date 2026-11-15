@@ -233,6 +233,7 @@ export function arquivoUploadPermitido(nome: string, mimetype: string): boolean 
 }
 /** Nome de arquivo/pasta seguro: sem separadores, controle ou aspas; tamanho limitado. */
 export function nomeSeguro(nome: string, max = 120): string {
+  // eslint-disable-next-line no-control-regex
   return nome.replace(/[\\/\u0000-\u001f"'<>|?*:]/g, "_").replace(/^\.+/, "").trim().slice(0, max) || "arquivo";
 }
 
