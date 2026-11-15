@@ -317,6 +317,10 @@ export interface PaeAcessorio {
 
 export interface Processo {
   id: string;
+  /** Exclusão lógica: processo "excluído" some do sistema mas continua no banco (recuperável). */
+  excluido?: boolean;
+  excluido_em?: string;
+  excluido_por?: string;
   numero_processo: string;
   objeto: string;
   descricao?: string;

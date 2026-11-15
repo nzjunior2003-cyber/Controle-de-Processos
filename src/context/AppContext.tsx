@@ -447,7 +447,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // canônico na próxima edição/sincronização.
   const processos = useMemo(
     () =>
-      processosBrutos.map((p) =>
+      processosBrutos.filter((p) => !p.excluido).map((p) =>
         p.rito_processual ? { ...p, rito_processual: normalizarRito(p.rito_processual) } : p,
       ),
     [processosBrutos],
@@ -1325,20 +1325,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 
   /**
-   * Remove um processo (ex.: cadastro feito por engano). Não apaga o
-   * histórico de movimentações/estadas associado — fica órfão, mas
-   * inofensivo (nada mais referencia um processo que não existe mais).
+   * Exclui um processo (ex.: cadastro feito por engano) de forma LÓGICA: o
+   * documento fica no banco marcado como `excluido` (recuperável) e some do
+   * sistema. Só perfis administrativos (master, contratos, apoio) — as Rules
+   * também exigem isso. Não mexe no histórico de movimentações/estadas.
    */
   const deleteProcesso = useCallback(
     async (id: string) => {
+      if (!usuarioAtual || !['master', 'contratos', 'apoio'].includes(usuarioAtual.perfil)) {
+        throw new Error('Seu perfil não pode excluir processos.');
+      }
       const db = requireDb();
       const anterior = processos.find((p) => p.id === id);
-      await deleteDoc(doc(db, 'processos', id));
-      await registrarAuditoria('processos', id, 'DELETE', {}, anterior);
+      await updateDoc(doc(db, 'processos', id), {
+        excluido: true,
+        excluido_em: new Date().toISOString(),
+        excluido_por: usuarioAtual.id,
+      });
+      await registrarAuditoria('processos', id, 'DELETE', { excluido: true }, anterior);
     },
-    [processos, registrarAuditoria],
+    [usuarioAtual, processos, registrarAuditoria],
   );
 
+  /** Exclusão lógica em lote (limpeza do diagnóstico). Só o master; reversível. */
   const excluirProcessosEmLote = useCallback(
     async (ids: string[]) => {
       if (usuarioAtual?.perfil !== 'master') throw new Error('Apenas o master pode excluir processos em lote.');
@@ -1346,14 +1355,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const existentes = processos.filter((p) => alvo.has(p.id));
       if (existentes.length === 0) return 0;
       const db = requireDb();
-      const refs = [
-        ...existentes.map((p) => doc(db, 'processos', p.id)),
-        ...estadasProcesso.filter((e) => alvo.has(e.processo_id)).map((e) => doc(db, 'estadas_processo', e.id)),
-        ...movimentacoes.filter((m) => alvo.has(m.processo_id)).map((m) => doc(db, 'movimentacoes', m.id)),
-      ];
-      for (let i = 0; i < refs.length; i += 400) {
+      const agora = new Date().toISOString();
+      for (let i = 0; i < existentes.length; i += 400) {
         const lote = writeBatch(db);
-        refs.slice(i, i + 400).forEach((ref) => lote.delete(ref));
+        existentes.slice(i, i + 400).forEach((p) =>
+          lote.update(doc(db, 'processos', p.id), { excluido: true, excluido_em: agora, excluido_por: usuarioAtual.id }),
+        );
         await lote.commit();
       }
       await registrarAuditoria('processos', `lote-${Date.now()}`, 'DELETE', {
@@ -1362,7 +1369,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       });
       return existentes.length;
     },
-    [usuarioAtual, processos, estadasProcesso, movimentacoes, registrarAuditoria],
+    [usuarioAtual, processos, registrarAuditoria],
   );
 
   const updateProcesso = useCallback(

@@ -73,7 +73,7 @@ export default function DiagnosticoProcessos() {
     link.click();
     URL.revokeObjectURL(link.href);
     // 2) Confirmação explícita.
-    if (!window.confirm(`O backup (${backup.length} processos) foi baixado.\n\nExcluir agora esses ${backup.length} processos sem linha na planilha e sem dados próprios? Esta ação não pode ser desfeita pelo sistema.`)) return;
+    if (!window.confirm(`O backup (${backup.length} processos) foi baixado.\n\nExcluir agora esses ${backup.length} processos sem linha na planilha e sem dados próprios? Eles somem do sistema, mas ficam guardados no banco (exclusão lógica) e podem ser recuperados.`)) return;
     setExcluindo(true);
     setAviso('');
     try {
