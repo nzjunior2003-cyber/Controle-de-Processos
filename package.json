@@ -12,7 +12,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-rules \"vitest run --config vitest.rules.config.ts\"",
+    "rules:matriz": "tsx -e \"import('./firestore-tests/matriz.ts').then(m=>console.log(m.tabelaMarkdown()))\""
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
