@@ -10,3 +10,4 @@ coverage/
 
 # Configuração do Firebase nunca é versionada (use .env / VITE_FIREBASE_*)
 firebase-applet-config.json
+firestore-debug.log
