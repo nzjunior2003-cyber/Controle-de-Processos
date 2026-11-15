@@ -13,7 +13,7 @@ import { limparClassificacoes } from '../../lib/orcamento';
 import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { getAccessToken, googleSignIn, initAuth } from '../../lib/googleAuth';
 import { uploadArquivoContrato } from '../../lib/driveUploadService';
-import { enviarEmail } from '../../lib/emailService';
+import { enviarEmail, escaparHtml } from '../../lib/emailService';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
 import { sincronizarContratoInstitucional } from '../../lib/sheetsInstitucionalService';
 import { contratoParaDadosPlanilha } from '../../lib/planilhaContratos';
@@ -27,6 +27,7 @@ import {
   OPCOES_FONTE_RECURSO_CONTRATO,
   OPCOES_NATUREZA_DESPESA_CONTRATO,
 } from '../../lib/contratos';
+import { abrirLink } from '../../lib/linksSeguros';
 
 /** Unidades de medida mais comuns, oferecidas como sugestão no campo de item. */
 const OPCOES_UNIDADE_ITEM = ['UND', 'PCT', 'JG', 'CONJ', 'CX', 'KG', 'L', 'M', 'M²', 'M³'];
@@ -558,10 +559,10 @@ export default function ContratoForm() {
             to: dados.fiscalEmail,
             subject: `Você foi designado Fiscal do Contrato ${form.numero}`,
             html: `
-              <h2>Designação de Fiscal — Contrato ${form.numero}</h2>
-              <p>Prezado(a) ${form.fiscalTitular || 'Fiscal'},</p>
-              <p>Você foi designado(a) <b>Fiscal Titular</b> do contrato <b>${form.numero}</b>
-              (${form.empresa}), com vigência até ${vigenciaFormatada}.</p>
+              <h2>Designação de Fiscal — Contrato ${escaparHtml(form.numero)}</h2>
+              <p>Prezado(a) ${escaparHtml(form.fiscalTitular || 'Fiscal')},</p>
+              <p>Você foi designado(a) <b>Fiscal Titular</b> do contrato <b>${escaparHtml(form.numero)}</b>
+              (${escaparHtml(form.empresa)}), com vigência até ${vigenciaFormatada}.</p>
               <p>Acesse o sistema, módulo Fiscal do Contrato, para mais detalhes.</p>
             `,
           });
@@ -574,10 +575,10 @@ export default function ContratoForm() {
             to: dados.fiscalSuplenteEmail,
             subject: `Você foi designado Fiscal Suplente do Contrato ${form.numero}`,
             html: `
-              <h2>Designação de Fiscal Suplente — Contrato ${form.numero}</h2>
-              <p>Prezado(a) ${form.fiscalSuplente || 'Fiscal Suplente'},</p>
-              <p>Você foi designado(a) <b>Fiscal Suplente</b> do contrato <b>${form.numero}</b>
-              (${form.empresa}), com vigência até ${vigenciaFormatada}.</p>
+              <h2>Designação de Fiscal Suplente — Contrato ${escaparHtml(form.numero)}</h2>
+              <p>Prezado(a) ${escaparHtml(form.fiscalSuplente || 'Fiscal Suplente')},</p>
+              <p>Você foi designado(a) <b>Fiscal Suplente</b> do contrato <b>${escaparHtml(form.numero)}</b>
+              (${escaparHtml(form.empresa)}), com vigência até ${vigenciaFormatada}.</p>
               <p>Acesse o sistema, módulo Fiscal do Contrato, para mais detalhes.</p>
             `,
           });
@@ -862,9 +863,8 @@ export default function ContratoForm() {
                 />
                 {contrato?.contratoPdfLink && !arquivoContrato && (
                   <a
-                    href={contrato.contratoPdfLink}
-                    target="_blank"
-                    rel="noreferrer"
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); void abrirLink(contrato.contratoPdfLink); }}
                     className="mt-1 inline-flex items-center text-xs text-red-600 hover:text-red-800 font-medium"
                   >
                     <FileText className="w-3 h-3 mr-1" />
@@ -1280,9 +1280,8 @@ export default function ContratoForm() {
                 />
                 {contrato?.empenhoPdfLink && !arquivoEmpenho && (
                   <a
-                    href={contrato.empenhoPdfLink}
-                    target="_blank"
-                    rel="noreferrer"
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); void abrirLink(contrato.empenhoPdfLink); }}
                     className="mt-1 inline-flex items-center text-xs text-red-600 hover:text-red-800 font-medium"
                   >
                     <FileText className="w-3 h-3 mr-1" />

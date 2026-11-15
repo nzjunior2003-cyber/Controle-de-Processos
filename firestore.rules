@@ -43,26 +43,30 @@ service cloud.firestore {
     match /usuarios/{usuarioId} {
       // Qualquer usuário autenticado lê a lista (nomes/fiscais aparecem nas telas);
       // o próprio usuário sempre consegue ler seu documento para saber se foi aprovado.
+      // [a confirmar] Restringir a leitura (ver SEGURANCA.md) fica para depois, com aviso.
       allow read: if autenticado();
 
-      // Autocadastro ("Solicitar acesso"): só o próprio UID, sempre inativo e
-      // sem se autopromover a master.
+      // Autocadastro ("Solicitar acesso"): só o próprio UID, sempre INATIVO,
+      // sempre perfil `fiscal` (o master muda o perfil ao aprovar), com o
+      // e-mail da própria conta e só os campos do formulário.
       allow create: if autenticado()
         && request.auth.uid == usuarioId
         && request.resource.data.ativo == false
-        && request.resource.data.perfil != 'master'
-        && !('senha' in request.resource.data);
+        && request.resource.data.perfil == 'fiscal'
+        && request.resource.data.email.lower() == request.auth.token.email.lower()
+        && request.resource.data.keys().hasOnly(['nome', 'email', 'cargo', 'perfil', 'setor_id', 'ativo', 'mf', 'nomeGuerra', 'ubm'])
+        && request.resource.data.nome is string && request.resource.data.nome.size() <= 200;
 
       // Master cria (cadastro manual), aprova, muda perfil e remove.
       allow create, update: if master() && !('senha' in request.resource.data);
       allow delete: if master();
 
-      // O próprio usuário pode ajustar dados de contato, nunca perfil/ativo.
+      // O próprio usuário ajusta só dados de contato — nunca perfil, ativo,
+      // e-mail, MF nem unidade demandante (isso é papel do master).
       allow update: if autenticado()
         && request.auth.uid == usuarioId
-        && request.resource.data.perfil == resource.data.perfil
-        && request.resource.data.ativo == resource.data.ativo
-        && !('senha' in request.resource.data);
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['nome', 'cargo', 'nomeGuerra', 'ubm']);
     }
 
     // Índice público mínimo MF -> e-mail, pra permitir login por matrícula
@@ -71,7 +75,10 @@ service cloud.firestore {
     // admin conseguem sobrescrever uma matrícula já vinculada a outra
     // conta; só quem está autenticado com aquele e-mail pode reivindicá-la.
     match /matriculas/{matricula} {
-      allow read: if true;
+      // Só consulta pontual (get) — o login por matrícula precisa dela antes
+      // de autenticar; listar todas as matrículas/e-mails fica proibido.
+      allow get: if true;
+      allow list: if false;
       allow create: if autenticado()
         && request.auth.token.email == request.resource.data.email
         && request.resource.data.keys().hasOnly(['email']);
@@ -81,9 +88,18 @@ service cloud.firestore {
     // Demais coleções operacionais: leitura para usuários ativos; escrita para
     // todos os ativos exceto os perfis de Diretoria (DGA, DAL, DF, DCA, BM4),
     // que são só consulta (o BM4 edita apenas IRPs e PCA, mais abaixo).
+    // Processos: exclusão LÓGICA (campos `excluido*`), só pelos perfis
+    // administrativos; apagar de vez (delete) só o master.
     match /processos/{documento} {
       allow read: if ativo();
-      allow write: if ativo() && !(perfilDoc().perfil in ['dga', 'dal', 'df', 'dca', 'bm4']);
+      allow create: if ativo() && !(perfilDoc().perfil in ['dga', 'dal', 'df', 'dca', 'bm4']);
+      allow update: if ativo()
+        && !(perfilDoc().perfil in ['dga', 'dal', 'df', 'dca', 'bm4'])
+        && (
+          request.resource.data.get('excluido', false) == resource.data.get('excluido', false)
+          || perfilDoc().perfil in ['master', 'contratos', 'apoio']
+        );
+      allow delete: if master();
     }
     match /movimentacoes/{documento} {
       allow read: if ativo();
@@ -198,7 +214,9 @@ service cloud.firestore {
       // o evento grava um doc por destinatário — ver
       // `dispararNotificacoesProcesso`, AppContext.tsx).
       allow read: if ativo() && resource.data.destinatarioId == request.auth.uid;
-      allow create: if ativo();
+      allow create: if ativo()
+        && request.resource.data.destinatarioId is string
+        && request.resource.data.destinatarioId.size() <= 128;
       // Só marca como lida (nenhum outro campo pode mudar).
       allow update: if ativo()
         && resource.data.destinatarioId == request.auth.uid
@@ -212,7 +230,9 @@ service cloud.firestore {
       // /api/send-push — não são dados sensíveis (só endpoint/keys de
       // push), só o dono pode criar/alterar/remover a própria inscrição.
       allow read: if ativo();
-      allow create, update: if ativo() && request.resource.data.usuarioId == request.auth.uid;
+      allow create, update: if ativo() && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.endpoint is string
+        && request.resource.data.endpoint.matches('^https://.*');
       allow delete: if ativo() && resource.data.usuarioId == request.auth.uid;
     }
     match /pagamentos/{documento} {
@@ -270,6 +290,8 @@ service cloud.firestore {
     match /logs_acesso/{documento} {
       allow read: if master();
       allow create: if request.resource.data.email is string
+        && request.resource.data.email.size() <= 254
+        && (!('userAgent' in request.resource.data) || (request.resource.data.userAgent is string && request.resource.data.userAgent.size() <= 400))
         && request.resource.data.sucesso is bool
         && request.resource.data.keys().hasOnly(['userId', 'email', 'sucesso', 'dataHora', 'userAgent']);
       allow update, delete: if false;
@@ -281,7 +303,10 @@ service cloud.firestore {
     // leitura só para master; sem edição/exclusão (trilha imutável).
     match /logs_auditoria/{documento} {
       allow read: if master();
-      allow create: if autenticado();
+      // Só usuário ATIVO e só em nome de si mesmo (não dá pra forjar autoria).
+      allow create: if ativo()
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.keys().hasAll(['colecao', 'acao', 'usuarioId']);
       allow update, delete: if false;
     }
 

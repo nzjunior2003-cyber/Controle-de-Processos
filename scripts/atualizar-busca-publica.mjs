@@ -69,7 +69,7 @@ async function main() {
   const esperados = new Map();
   processosSnap.docs.forEach((doc) => {
     const p = doc.data();
-    if (!p.numero_processo) return;
+    if (!p.numero_processo || p.excluido) return;
     const estadaAtual = estadaEmCursoPorProcesso.get(doc.id);
     const diasNoSetorAtual = estadaAtual
       ? Math.max(0, differenceInDays(agora, new Date(estadaAtual.data_inicio)))

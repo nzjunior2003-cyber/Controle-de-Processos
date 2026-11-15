@@ -7,6 +7,7 @@ import {
   type ExecucaoContrato,
   type Ocorrencia,
 } from '../../lib/contratos';
+import { abrirLink } from '../../lib/linksSeguros';
 
 const formatarData = (valor?: string) => {
   if (!valor) return '-';
@@ -124,7 +125,7 @@ export default function TabelaContratosVigencia({
                             <button
                               onClick={() => {
                                 const link = item.contratoPdfLink || item.linkContrato;
-                                if (link) window.open(link, '_blank');
+                                if (link) void abrirLink(link);
                               }}
                               disabled={!item.contratoPdfLink && !item.linkContrato}
                               className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none disabled:bg-gray-300 disabled:cursor-not-allowed mb-2"

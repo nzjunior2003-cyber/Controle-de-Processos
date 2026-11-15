@@ -9,7 +9,7 @@ import { useApp } from '../../context/AppContext';
 import { URL_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { initAuth } from '../../lib/googleAuth';
 import { pushSaldoNaPlanilha } from '../../lib/saldoPlanilha';
-import { enviarEmail } from '../../lib/emailService';
+import { enviarEmail, escaparHtml } from '../../lib/emailService';
 import { AlertasModal } from '../../components/AlertasModal';
 import KpisContratos, { type FiltroKpi } from '../../components/contratos/KpisContratos';
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
@@ -224,10 +224,10 @@ export default function GestaoContratos() {
         to: destinatario,
         subject: `[ALERTA] Contrato ${contrato.numero} - Ações Necessárias`,
         html: `
-          <h2>Alerta de Contrato - ${contrato.numero}</h2>
+          <h2>Alerta de Contrato - ${escaparHtml(contrato.numero)}</h2>
           <p>Prezado Fiscal,</p>
-          <p>Este é um lembrete sobre o contrato <b>${contrato.numero}</b> (${contrato.empresa}):</p>
-          <p>Fim da Vigência: ${contrato.fimVigencia}<br/>
+          <p>Este é um lembrete sobre o contrato <b>${escaparHtml(contrato.numero)}</b> (${escaparHtml(contrato.empresa)}):</p>
+          <p>Fim da Vigência: ${escaparHtml(contrato.fimVigencia)}<br/>
           ${contrato.diasRestantes < 0
             ? `Vencido há ${Math.abs(contrato.diasRestantes)} dias.`
             : `Faltam ${contrato.diasRestantes} dias para o fim da vigência.`}</p>
@@ -682,14 +682,16 @@ export default function GestaoContratos() {
               <div className="mb-4 flex items-center gap-2">
                 <UserX className="w-5 h-5 text-red-600" />
                 <h3 className="text-lg font-medium text-gray-900">
-                  Contratos com Fiscal sem Usuário Correspondente
+                  Fiscais sem cadastro ativo no sistema
                 </h3>
               </div>
             <p className="text-sm text-gray-500 mb-4">
               Estes contratos têm Fiscal Titular/Suplente cadastrado, mas o e-mail não bate com
               nenhum usuário Fiscal já aprovado no sistema — a pessoa não vai ver este contrato em
               "Fiscal do Contrato" até o e-mail ser corrigido (ou até ela solicitar/ter o acesso
-              aprovado).
+              aprovado). <b>Enquanto não tiver cadastro ativo, o sistema também não envia e-mails
+              (designação, alertas) para essa pessoa</b> — peça que se cadastre em "Solicitar acesso",
+              com o mesmo e-mail do contrato, e aprove em Usuários.
             </p>
             <div className="space-y-3">
               {contratosComFiscalSemUsuario.map(({ contrato, titularSemUsuario, suplenteSemUsuario }) => (

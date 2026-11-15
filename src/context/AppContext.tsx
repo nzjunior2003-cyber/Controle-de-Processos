@@ -50,7 +50,7 @@ import {
   type ProcessoDaPlanilha,
 } from '../lib/csv';
 import { localizacaoEfetiva, type EstadaProcesso } from '../lib/fluxoProcesso';
-import { enviarEmail } from '../lib/emailService';
+import { avisarPedidoDeAcesso } from '../lib/emailService';
 import {
   ABA_GESTAO_CONTRATOS,
   linhaTemOrdemValida,
@@ -447,7 +447,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // canônico na próxima edição/sincronização.
   const processos = useMemo(
     () =>
-      processosBrutos.map((p) =>
+      processosBrutos.filter((p) => !p.excluido).map((p) =>
         p.rito_processual ? { ...p, rito_processual: normalizarRito(p.rito_processual) } : p,
       ),
     [processosBrutos],
@@ -610,34 +610,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           }
         }
 
-        // Avisa todo master por e-mail — sem isso, uma solicitação podia
-        // ficar esquecida em Usuários por dias até alguém notar. Best
-        // effort: usa a sessão recém-criada (ainda autenticada, mesmo
-        // inativa) só pra essa consulta/envio, e nunca bloqueia o
-        // cadastro em si se o e-mail falhar.
+        // Avisa os masters por e-mail. O servidor monta a mensagem a partir do
+        // cadastro recém-criado (nada de HTML vindo daqui) e aceita a conta
+        // ainda inativa só para esta rota. Best effort: nunca bloqueia o cadastro.
         try {
-          const mastersSnap = await getDocs(query(collection(db, 'usuarios'), where('perfil', '==', 'master')));
-          const emailsMasters = mastersSnap.docs
-            .map((d) => (d.data() as Usuario).email)
-            .filter((destinatario): destinatario is string => !!destinatario);
-          await Promise.all(
-            emailsMasters.map((destinatario) =>
-              enviarEmail({
-                to: destinatario,
-                subject: `Nova solicitação de acesso — ${nome}`,
-                html: `
-                  <h2>Nova Solicitação de Acesso</h2>
-                  <p><b>${nome}</b>${cargo ? ` (${cargo})` : ''} solicitou acesso ao Sistema de
-                  Controle de Processos com o e-mail <b>${email}</b>.</p>
-                  <p>Acesse o módulo <b>Usuários</b> para revisar e ativar o acesso.</p>
-                `,
-              }).catch((erroEnvio) =>
-                console.error('Erro ao notificar master sobre solicitação de acesso:', erroEnvio),
-              ),
-            ),
-          );
+          await avisarPedidoDeAcesso();
         } catch (erroNotificacao) {
-          console.error('Erro ao buscar masters para notificar solicitação de acesso:', erroNotificacao);
+          console.error('Erro ao notificar masters sobre solicitação de acesso:', erroNotificacao);
         }
 
         await signOut(auth);
@@ -1346,20 +1325,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 
   /**
-   * Remove um processo (ex.: cadastro feito por engano). Não apaga o
-   * histórico de movimentações/estadas associado — fica órfão, mas
-   * inofensivo (nada mais referencia um processo que não existe mais).
+   * Exclui um processo (ex.: cadastro feito por engano) de forma LÓGICA: o
+   * documento fica no banco marcado como `excluido` (recuperável) e some do
+   * sistema. Só perfis administrativos (master, contratos, apoio) — as Rules
+   * também exigem isso. Não mexe no histórico de movimentações/estadas.
    */
   const deleteProcesso = useCallback(
     async (id: string) => {
+      if (!usuarioAtual || !['master', 'contratos', 'apoio'].includes(usuarioAtual.perfil)) {
+        throw new Error('Seu perfil não pode excluir processos.');
+      }
       const db = requireDb();
       const anterior = processos.find((p) => p.id === id);
-      await deleteDoc(doc(db, 'processos', id));
-      await registrarAuditoria('processos', id, 'DELETE', {}, anterior);
+      await updateDoc(doc(db, 'processos', id), {
+        excluido: true,
+        excluido_em: new Date().toISOString(),
+        excluido_por: usuarioAtual.id,
+      });
+      await registrarAuditoria('processos', id, 'DELETE', { excluido: true }, anterior);
     },
-    [processos, registrarAuditoria],
+    [usuarioAtual, processos, registrarAuditoria],
   );
 
+  /** Exclusão lógica em lote (limpeza do diagnóstico). Só o master; reversível. */
   const excluirProcessosEmLote = useCallback(
     async (ids: string[]) => {
       if (usuarioAtual?.perfil !== 'master') throw new Error('Apenas o master pode excluir processos em lote.');
@@ -1367,14 +1355,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const existentes = processos.filter((p) => alvo.has(p.id));
       if (existentes.length === 0) return 0;
       const db = requireDb();
-      const refs = [
-        ...existentes.map((p) => doc(db, 'processos', p.id)),
-        ...estadasProcesso.filter((e) => alvo.has(e.processo_id)).map((e) => doc(db, 'estadas_processo', e.id)),
-        ...movimentacoes.filter((m) => alvo.has(m.processo_id)).map((m) => doc(db, 'movimentacoes', m.id)),
-      ];
-      for (let i = 0; i < refs.length; i += 400) {
+      const agora = new Date().toISOString();
+      for (let i = 0; i < existentes.length; i += 400) {
         const lote = writeBatch(db);
-        refs.slice(i, i + 400).forEach((ref) => lote.delete(ref));
+        existentes.slice(i, i + 400).forEach((p) =>
+          lote.update(doc(db, 'processos', p.id), { excluido: true, excluido_em: agora, excluido_por: usuarioAtual.id }),
+        );
         await lote.commit();
       }
       await registrarAuditoria('processos', `lote-${Date.now()}`, 'DELETE', {
@@ -1383,7 +1369,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       });
       return existentes.length;
     },
-    [usuarioAtual, processos, estadasProcesso, movimentacoes, registrarAuditoria],
+    [usuarioAtual, processos, registrarAuditoria],
   );
 
   const updateProcesso = useCallback(

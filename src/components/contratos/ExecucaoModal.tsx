@@ -18,6 +18,7 @@ import {
   type TipoAditivo,
   type TipoOcorrencia,
 } from '../../lib/contratos';
+import { abrirLink } from '../../lib/linksSeguros';
 
 interface LinhaItemConsumido {
   itemId: string;
@@ -301,9 +302,8 @@ export default function ExecucaoModal({
           <div className="flex flex-wrap items-center gap-2">
             {contrato.contratoPdfLink && (
               <a
-                href={contrato.contratoPdfLink}
-                target="_blank"
-                rel="noreferrer"
+                href="#"
+                onClick={(e) => { e.preventDefault(); void abrirLink(contrato.contratoPdfLink); }}
                 className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border border-gray-300 flex items-center"
               >
                 <FileText className="w-4 h-4 mr-1" />
@@ -312,9 +312,8 @@ export default function ExecucaoModal({
             )}
             {contrato.empenhoPdfLink && (
               <a
-                href={contrato.empenhoPdfLink}
-                target="_blank"
-                rel="noreferrer"
+                href="#"
+                onClick={(e) => { e.preventDefault(); void abrirLink(contrato.empenhoPdfLink); }}
                 className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border border-gray-300 flex items-center"
               >
                 <FileText className="w-4 h-4 mr-1" />
@@ -323,7 +322,7 @@ export default function ExecucaoModal({
             )}
             <button
               type="button"
-              onClick={() => window.open(`/sistema/gestao-contratos/${contrato.id}/relatorio`, '_blank')}
+              onClick={() => void abrirLink(`/sistema/gestao-contratos/${contrato.id}/relatorio`)}
               className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border border-gray-300 flex items-center"
             >
               <FileText className="w-4 h-4 mr-1" />
@@ -698,9 +697,8 @@ export default function ExecucaoModal({
                           )}
                           {exec.arquivoLink && (
                             <a
-                              href={exec.arquivoLink}
-                              target="_blank"
-                              rel="noreferrer"
+                              href="#"
+                              onClick={(e) => { e.preventDefault(); void abrirLink(exec.arquivoLink); }}
                               className="text-xs text-red-600 hover:text-red-800 font-medium inline-flex items-center"
                             >
                               <FileText className="w-3 h-3 mr-1" />

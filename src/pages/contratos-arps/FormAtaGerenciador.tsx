@@ -7,6 +7,7 @@ import { parseCurrencyBR } from '../../lib/csv';
 import { formatarMoeda } from '../../lib/contratos';
 import { uploadArquivoContrato } from '../../lib/driveUploadService';
 import type { RegistroFormData } from './abas';
+import { abrirLink } from '../../lib/linksSeguros';
 
 const CLASSE_INPUT =
   'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm';
@@ -334,7 +335,7 @@ export default function FormAtaGerenciador({ formData, setFormData, onInputChang
           </button>
           {formData.linkArp && (
             <p className="mt-2 text-sm">
-              <a href={formData.linkArp} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-red-700 hover:underline">
+              <a href="#" onClick={(e) => { e.preventDefault(); void abrirLink(formData.linkArp); }} className="inline-flex items-center text-red-700 hover:underline">
                 <ExternalLink className="h-4 w-4 mr-1" />
                 {formData.arquivoArpNome || 'Abrir a ARP anexada'}
               </a>

@@ -29,3 +29,20 @@ export async function enviarEmail(dados: DadosEmail): Promise<void> {
     throw new Error(erro?.error || 'Não foi possível enviar o e-mail.');
   }
 }
+
+/** Pede ao servidor que avise os masters do pedido de acesso do usuário logado (ainda inativo). */
+export async function avisarPedidoDeAcesso(): Promise<void> {
+  const idToken = await getFirebaseAuth()?.currentUser?.getIdToken();
+  if (!idToken) return;
+  await fetch('/api/acesso/notificar', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+}
+
+/** Escapa texto para uso dentro de HTML de e-mail (nomes, objetos, etc. vindos de formulários). */
+export function escaparHtml(valor: unknown): string {
+  return String(valor ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
+  ));
+}

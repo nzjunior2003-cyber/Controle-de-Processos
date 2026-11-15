@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { useApp } from '../../context/AppContext';
 import BuscaMilitarInput from '../../components/contratos/BuscaMilitarInput';
 import { carregarMilitares, type Militar } from '../../lib/militares';
-import { enviarEmail } from '../../lib/emailService';
+import { enviarEmail, escaparHtml } from '../../lib/emailService';
 import { getAccessToken } from '../../lib/googleAuth';
 import { ID_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { sincronizarContratoNaPlanilha } from '../../lib/sheetsService';
@@ -125,14 +125,14 @@ export default function AlterarFiscaisModal({ contrato, onFechar }: { contrato: 
           await enviarEmail({
             to: novos.fiscalEmail,
             subject: `Você foi designado Fiscal do Contrato ${contrato.numero}`,
-            html: `<h2>Designação de Fiscal — Contrato ${contrato.numero}</h2><p>Prezado(a) ${novos.fiscalTitular || 'Fiscal'},</p><p>Você foi designado(a) <b>Fiscal Titular</b> do contrato <b>${contrato.numero}</b> (${contrato.empresa}), com vigência até ${vigencia}.</p><p>Acesse o sistema, módulo Fiscal do Contrato, para mais detalhes.</p>`,
+            html: `<h2>Designação de Fiscal — Contrato ${escaparHtml(contrato.numero)}</h2><p>Prezado(a) ${escaparHtml(novos.fiscalTitular || 'Fiscal')},</p><p>Você foi designado(a) <b>Fiscal Titular</b> do contrato <b>${escaparHtml(contrato.numero)}</b> (${escaparHtml(contrato.empresa)}), com vigência até ${escaparHtml(vigencia)}.</p><p>Acesse o sistema, módulo Fiscal do Contrato, para mais detalhes.</p>`,
           });
         }
         if (novos.fiscalSuplenteEmail && novos.fiscalSuplenteEmail !== (contrato.fiscalSuplenteEmail ?? '')) {
           await enviarEmail({
             to: novos.fiscalSuplenteEmail,
             subject: `Você foi designado Fiscal Suplente do Contrato ${contrato.numero}`,
-            html: `<h2>Designação de Fiscal Suplente — Contrato ${contrato.numero}</h2><p>Prezado(a) ${novos.fiscalSuplente || 'Fiscal Suplente'},</p><p>Você foi designado(a) <b>Fiscal Suplente</b> do contrato <b>${contrato.numero}</b> (${contrato.empresa}), com vigência até ${vigencia}.</p><p>Acesse o sistema, módulo Fiscal do Contrato, para mais detalhes.</p>`,
+            html: `<h2>Designação de Fiscal Suplente — Contrato ${escaparHtml(contrato.numero)}</h2><p>Prezado(a) ${escaparHtml(novos.fiscalSuplente || 'Fiscal Suplente')},</p><p>Você foi designado(a) <b>Fiscal Suplente</b> do contrato <b>${escaparHtml(contrato.numero)}</b> (${escaparHtml(contrato.empresa)}), com vigência até ${escaparHtml(vigencia)}.</p><p>Acesse o sistema, módulo Fiscal do Contrato, para mais detalhes.</p>`,
           });
         }
       } catch (e) {
