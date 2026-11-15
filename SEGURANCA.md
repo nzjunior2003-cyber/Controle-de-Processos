@@ -67,7 +67,17 @@ Casos especiais (testados): fiscal do contrato altera só campos de saldo e cria
 
 Se o compartilhamento das planilhas for restringido, **quebram** (leitura direta do navegador, via link público): sincronização de processos, status do robô, etapas dos ritos, busca de militares no cadastro/login, sincronização do PCA e o diagnóstico. **Não dependem** do link público: o robô (usa a URL do Apps Script), gravações dos usuários (OAuth do próprio usuário) e o servidor (OAuth institucional). Por isso: só restrinja o compartilhamento depois de a leitura passar pelo servidor (próximo passo).
 
+## 5.1 Pendências da Fase 2 — escopo de escrita em processos
+
+Perfis que escrevem em `processos`, `movimentacoes`, `estadas_processo`, `alertas` e `pareceres` (todos menos dga, dal, df, dca e bm4): **master, contratos, apoio, gestao, fiscal, financeiro e demandante** (7 de 12).
+
+- As Rules **não** limitam por unidade nem por perfil além dessa lista: um `fiscal` ou `demandante` ativo consegue, chamando o Firestore diretamente (fora da tela), **editar processos de outras unidades**. A tela só oferece edição a master/apoio, mas isso é só interface.
+- Todos os perfis ativos também **leem** todos os processos de todas as unidades.
+- Fase 2: restringir `fiscal`/`demandante`/`financeiro` a leitura (ou a campos específicos) e, para `demandante`, limitar por `unidade_demandante`; testar no emulador antes de publicar. `[a confirmar]` o desenho com o responsável (alguns fluxos, como notificações e dotação, escrevem nessas coleções hoje).
+
 ## 6. Apps Script do robô `[a confirmar]`
+
+O robô (código no repositório) agora envia o `TOKEN_ROBO` em **todas** as chamadas (antes faltava na leitura da lista, nas gravações de setor, no status e no e-mail do relatório). O trecho do Apps Script que exige o token em toda entrada, com falha fechada, está em `robo/apps_script_guarda_token.gs` — publicar junto com o robô novo. Resumo:
 
 O script não está no repositório. Em **toda** ação do `doPost`/`doGet`, exija o token e falhe fechado:
 

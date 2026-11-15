@@ -134,6 +134,10 @@ async def esperar_visivel(page, seletores, timeout_ms: int = 30000):
     return None
 
 
+# Senha do robô (mesma do TOKEN_ROBO do Apps Script); preenchida em main() a partir da configuração.
+_TOKEN_ROBO = ""
+
+
 def registrar_status(webapp_url: str, situacao: str, motivo: str = "", total: int = 0,
                      sucesso: int = 0, mudaram: int = 0, erros: int = 0, minutos: float = 0.0):
     """
@@ -143,6 +147,7 @@ def registrar_status(webapp_url: str, situacao: str, motivo: str = "", total: in
     try:
         chamar_webapp("POST", webapp_url, tentativas=2, json={
             "acao": "status_robo",
+            "token": _TOKEN_ROBO,
             "maquina": socket.gethostname(),
             "situacao": situacao,
             "motivo": motivo,
@@ -754,6 +759,8 @@ async def main():
         abrir_configuracao_inicial()
 
     config = load_config()
+    global _TOKEN_ROBO
+    _TOKEN_ROBO = config.get("token_robo", "")
     WEBAPP_URL = config.get("webapp_url", "")
     EMAIL_RELATORIO = config.get("email_relatorio", "sipcdal@gmail.com")
     USER_DATA_DIR = str(get_session_dir())
@@ -764,7 +771,7 @@ async def main():
 
     print("Conectando à planilha Google Sheets online...")
     try:
-        res = chamar_webapp("GET", WEBAPP_URL)
+        res = chamar_webapp("GET", WEBAPP_URL, params={"token": _TOKEN_ROBO})
         processos_brutos = res.get("processos", [])
         # PAEs acessórios cadastrados no sistema (Apps Script antigo não devolve a chave: lista vazia).
         paes_acessorios = res.get("paes_acessorios", []) or []
@@ -865,7 +872,7 @@ async def main():
             if atualizacoes_bloco:
                 print(f"Gravando {len(atualizacoes_bloco)} mudança(s) de setor diretamente na planilha Google Sheets online...")
                 try:
-                    resp_post = chamar_webapp("POST", WEBAPP_URL, json={"atualizacoes": atualizacoes_bloco})
+                    resp_post = chamar_webapp("POST", WEBAPP_URL, json={"token": _TOKEN_ROBO, "atualizacoes": atualizacoes_bloco})
                     print(f"  -> Google Sheets atualizado: {resp_post}")
                 except Exception as e:
                     print(f"  -> Aviso ao salvar: {e}")
@@ -889,7 +896,7 @@ async def main():
                 if atualizacoes_retry:
                     print(f"Gravando {len(atualizacoes_retry)} mudança(s) de setor da segunda tentativa...")
                     try:
-                        resp_retry = chamar_webapp("POST", WEBAPP_URL, json={"atualizacoes": atualizacoes_retry})
+                        resp_retry = chamar_webapp("POST", WEBAPP_URL, json={"token": _TOKEN_ROBO, "atualizacoes": atualizacoes_retry})
                         print(f"  -> Google Sheets atualizado: {resp_retry}")
                     except Exception as e:
                         print(f"  -> Aviso ao salvar: {e}")
@@ -909,6 +916,7 @@ async def main():
     try:
         payload_email = {
             "acao": "enviar_relatorio",
+            "token": _TOKEN_ROBO,
             "destinatario": EMAIL_RELATORIO,
             "mudancas": mudancas_totais,
         }

@@ -49,6 +49,8 @@ O computador precisa estar **ligado, com a sessão do Windows desbloqueada** (o 
 
 ### Configuração única (token + servidor)
 
+> **Token obrigatório:** a partir da versão de segurança, o Apps Script recusa qualquer chamada sem a senha (`robo/apps_script_guarda_token.gs`). O robô agora envia a senha em **todas** as chamadas; atualize `rastreador_pae.py` em todos os PCs/VPS (e gere o `.exe` de novo) **antes** de publicar o Apps Script novo.
+
 1. No Apps Script: Configurações do projeto > Propriedades do script > adicione `TOKEN_ROBO` = uma senha
    qualquer. Depois publique **nova versão** da implantação (Implantar > Gerenciar implantações).
 2. No robô: `RastreadorPAE.exe --reconfigurar` (ou `python rastreador_pae.py --reconfigurar`) e preencha o
