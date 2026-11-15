@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, FilePlus2, FileSignature, Pencil, UserCog } fro
 import { format } from 'date-fns';
 import type { Contrato, ProcedimentoLicitatorio } from '../../types';
 import { formatarMoeda } from '../../lib/contratos';
+import { abrirLink } from '../../lib/linksSeguros';
 
 const formatarData = (valor?: string) => {
   if (!valor) return '-';
@@ -77,7 +78,7 @@ export default function TabelaContratos({
                     <button
                       onClick={() => {
                         const link = item.contratoPdfLink || item.linkContrato;
-                        if (link) window.open(link, '_blank');
+                        if (link) void abrirLink(link);
                       }}
                       disabled={!item.contratoPdfLink && !item.linkContrato}
                       className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md shadow-sm text-xs font-medium transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"

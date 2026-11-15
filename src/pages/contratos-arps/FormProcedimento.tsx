@@ -2,6 +2,7 @@ import React from 'react';
 import { ExternalLink, X } from 'lucide-react';
 import type { PCA, PortariaFiscal, Processo } from '../../types';
 import type { AbaContratos, RegistroFormData } from './abas';
+import { abrirLink } from '../../lib/linksSeguros';
 
 const CLASSE_INPUT =
   'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm';
@@ -168,7 +169,7 @@ export default function FormProcedimento({
               <label className="block text-sm font-medium text-gray-700">Link PNCP</label>
               <div className="mt-1 flex rounded-md shadow-sm">
                 <input type="url" name="linkPncp" placeholder="https://" value={formData.linkPncp || ''} onChange={onInputChange} className="flex-1 block w-full border border-gray-300 rounded-none rounded-l-md py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" />
-                <button type="button" onClick={() => formData.linkPncp && window.open(formData.linkPncp, '_blank')} disabled={!formData.linkPncp} className="inline-flex items-center px-4 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-700 font-medium hover:bg-gray-100 focus:outline-none disabled:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                <button type="button" onClick={() => formData.linkPncp && void abrirLink(formData.linkPncp)} disabled={!formData.linkPncp} className="inline-flex items-center px-4 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-700 font-medium hover:bg-gray-100 focus:outline-none disabled:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Acessar
                 </button>
@@ -178,7 +179,7 @@ export default function FormProcedimento({
               <label className="block text-sm font-medium text-gray-700">Link Compras GOV</label>
               <div className="mt-1 flex rounded-md shadow-sm">
                 <input type="url" name="linkComprasGov" placeholder="https://" value={formData.linkComprasGov || ''} onChange={onInputChange} className="flex-1 block w-full border border-gray-300 rounded-none rounded-l-md py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" />
-                <button type="button" onClick={() => formData.linkComprasGov && window.open(formData.linkComprasGov, '_blank')} disabled={!formData.linkComprasGov} className="inline-flex items-center px-4 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-700 font-medium hover:bg-gray-100 focus:outline-none disabled:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                <button type="button" onClick={() => formData.linkComprasGov && void abrirLink(formData.linkComprasGov)} disabled={!formData.linkComprasGov} className="inline-flex items-center px-4 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-700 font-medium hover:bg-gray-100 focus:outline-none disabled:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Acessar
                 </button>
@@ -265,7 +266,7 @@ export default function FormProcedimento({
                     <label className="block text-xs font-medium text-gray-700">Link Acesso (Drive)</label>
                     <div className="mt-1 flex rounded-md shadow-sm">
                       <input type="url" placeholder="Cole o link do Google Drive aqui..." value={inst.link || ''} onChange={(e) => atualizarInstrumentos(idx, 'link', e.target.value)} className="flex-1 block w-full border border-gray-300 rounded-none rounded-l-md py-1.5 px-3 text-sm focus:outline-none focus:ring-red-500 focus:border-red-500" />
-                      <button type="button" onClick={() => inst.link && window.open(inst.link, '_blank')} disabled={!inst.link} className="inline-flex items-center px-3 py-1.5 rounded-r-md border border-l-0 border-gray-300 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 focus:outline-none disabled:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                      <button type="button" onClick={() => inst.link && void abrirLink(inst.link)} disabled={!inst.link} className="inline-flex items-center px-3 py-1.5 rounded-r-md border border-l-0 border-gray-300 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 focus:outline-none disabled:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
                         <ExternalLink className="h-4 w-4 mr-2" />
                         Acessar Documento
                       </button>
@@ -446,7 +447,7 @@ export default function FormProcedimento({
                       <label className="block text-xs font-medium text-gray-700">Link Acesso (Drive)</label>
                       <div className="mt-1 flex rounded-md shadow-sm">
                         <input type="url" placeholder="Cole o link do Google Drive aqui..." value={inst.link || ''} onChange={(e) => atualizarInstrumentos(idx, 'link', e.target.value)} className="flex-1 block w-full border border-gray-300 rounded-none rounded-l-md py-1.5 px-3 text-sm focus:outline-none focus:ring-red-500 focus:border-red-500" />
-                        <button type="button" onClick={() => inst.link && window.open(inst.link, '_blank')} disabled={!inst.link} className="inline-flex items-center px-3 py-1.5 rounded-r-md border border-l-0 border-gray-300 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 focus:outline-none disabled:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                        <button type="button" onClick={() => inst.link && void abrirLink(inst.link)} disabled={!inst.link} className="inline-flex items-center px-3 py-1.5 rounded-r-md border border-l-0 border-gray-300 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 focus:outline-none disabled:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
                           <ExternalLink className="h-4 w-4 mr-2" />
                           Acessar Documento
                         </button>
@@ -502,7 +503,7 @@ export default function FormProcedimento({
               <label className="block text-sm font-medium text-gray-700">Link de Acesso ao Contrato (Drive)</label>
               <div className="mt-1 flex rounded-md shadow-sm">
                 <input type="url" name="linkContrato" placeholder="Cole o link do Google Drive aqui..." value={formData.linkContrato || ''} onChange={onInputChange} className="flex-1 block w-full border border-gray-300 rounded-none rounded-l-md py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" />
-                <button type="button" onClick={() => formData.linkContrato && window.open(formData.linkContrato, '_blank')} disabled={!formData.linkContrato} className="inline-flex items-center px-4 py-2 rounded-r-md border border-l-0 border-gray-300 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 focus:outline-none disabled:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed sm:text-sm">
+                <button type="button" onClick={() => formData.linkContrato && void abrirLink(formData.linkContrato)} disabled={!formData.linkContrato} className="inline-flex items-center px-4 py-2 rounded-r-md border border-l-0 border-gray-300 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 focus:outline-none disabled:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed sm:text-sm">
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Acessar Documento
                 </button>

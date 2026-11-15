@@ -9,7 +9,7 @@ import { useApp } from '../../context/AppContext';
 import { URL_PLANILHA_CONTRATOS } from '../../lib/csv';
 import { initAuth } from '../../lib/googleAuth';
 import { pushSaldoNaPlanilha } from '../../lib/saldoPlanilha';
-import { enviarEmail } from '../../lib/emailService';
+import { enviarEmail, escaparHtml } from '../../lib/emailService';
 import { AlertasModal } from '../../components/AlertasModal';
 import KpisContratos, { type FiltroKpi } from '../../components/contratos/KpisContratos';
 import TabelaContratosVigencia from '../../components/contratos/TabelaContratosVigencia';
@@ -224,10 +224,10 @@ export default function GestaoContratos() {
         to: destinatario,
         subject: `[ALERTA] Contrato ${contrato.numero} - Ações Necessárias`,
         html: `
-          <h2>Alerta de Contrato - ${contrato.numero}</h2>
+          <h2>Alerta de Contrato - ${escaparHtml(contrato.numero)}</h2>
           <p>Prezado Fiscal,</p>
-          <p>Este é um lembrete sobre o contrato <b>${contrato.numero}</b> (${contrato.empresa}):</p>
-          <p>Fim da Vigência: ${contrato.fimVigencia}<br/>
+          <p>Este é um lembrete sobre o contrato <b>${escaparHtml(contrato.numero)}</b> (${escaparHtml(contrato.empresa)}):</p>
+          <p>Fim da Vigência: ${escaparHtml(contrato.fimVigencia)}<br/>
           ${contrato.diasRestantes < 0
             ? `Vencido há ${Math.abs(contrato.diasRestantes)} dias.`
             : `Faltam ${contrato.diasRestantes} dias para o fim da vigência.`}</p>

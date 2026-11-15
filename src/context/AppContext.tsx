@@ -50,7 +50,7 @@ import {
   type ProcessoDaPlanilha,
 } from '../lib/csv';
 import { localizacaoEfetiva, type EstadaProcesso } from '../lib/fluxoProcesso';
-import { enviarEmail } from '../lib/emailService';
+import { avisarPedidoDeAcesso } from '../lib/emailService';
 import {
   ABA_GESTAO_CONTRATOS,
   linhaTemOrdemValida,
@@ -610,34 +610,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           }
         }
 
-        // Avisa todo master por e-mail — sem isso, uma solicitação podia
-        // ficar esquecida em Usuários por dias até alguém notar. Best
-        // effort: usa a sessão recém-criada (ainda autenticada, mesmo
-        // inativa) só pra essa consulta/envio, e nunca bloqueia o
-        // cadastro em si se o e-mail falhar.
+        // Avisa os masters por e-mail. O servidor monta a mensagem a partir do
+        // cadastro recém-criado (nada de HTML vindo daqui) e aceita a conta
+        // ainda inativa só para esta rota. Best effort: nunca bloqueia o cadastro.
         try {
-          const mastersSnap = await getDocs(query(collection(db, 'usuarios'), where('perfil', '==', 'master')));
-          const emailsMasters = mastersSnap.docs
-            .map((d) => (d.data() as Usuario).email)
-            .filter((destinatario): destinatario is string => !!destinatario);
-          await Promise.all(
-            emailsMasters.map((destinatario) =>
-              enviarEmail({
-                to: destinatario,
-                subject: `Nova solicitação de acesso — ${nome}`,
-                html: `
-                  <h2>Nova Solicitação de Acesso</h2>
-                  <p><b>${nome}</b>${cargo ? ` (${cargo})` : ''} solicitou acesso ao Sistema de
-                  Controle de Processos com o e-mail <b>${email}</b>.</p>
-                  <p>Acesse o módulo <b>Usuários</b> para revisar e ativar o acesso.</p>
-                `,
-              }).catch((erroEnvio) =>
-                console.error('Erro ao notificar master sobre solicitação de acesso:', erroEnvio),
-              ),
-            ),
-          );
+          await avisarPedidoDeAcesso();
         } catch (erroNotificacao) {
-          console.error('Erro ao buscar masters para notificar solicitação de acesso:', erroNotificacao);
+          console.error('Erro ao notificar masters sobre solicitação de acesso:', erroNotificacao);
         }
 
         await signOut(auth);

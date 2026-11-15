@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X, Send, AlertTriangle, Clock, Activity, CheckCircle } from 'lucide-react';
 import type { Contrato } from '../types';
 import { marcoAlertaVencimento, type ExecucaoContrato } from '../lib/contratos';
-import { enviarEmail } from '../lib/emailService';
+import { enviarEmail, escaparHtml } from '../lib/emailService';
 
 interface AlertasModalProps {
   isOpen: boolean;
@@ -70,16 +70,16 @@ export function AlertasModal({ isOpen, onClose, contratos, execucoes = [] }: Ale
         if (alertasSaldo.includes(contrato)) motivoStr.push('saldo baixo (< 20%)');
 
         const corpo = `
-          <h2>Alerta de Contrato - ${contrato.numero}</h2>
+          <h2>Alerta de Contrato - ${escaparHtml(contrato.numero)}</h2>
           <p>Prezado Fiscal,</p>
-          <p>Este é um alerta automático do sistema informando as seguintes urgências para o contrato <b>${contrato.numero}</b> (${contrato.empresa}):</p>
+          <p>Este é um alerta automático do sistema informando as seguintes urgências para o contrato <b>${escaparHtml(contrato.numero)}</b> (${escaparHtml(contrato.empresa)}):</p>
           <ul>
             ${motivoStr.map(m => `<li><b>Atenção:</b> ${m}</li>`).join('')}
           </ul>
           <p>Lembre-se também de observar o prazo regular para o envio de e conferência de Notas Fiscais/Faturas e recibos para pagamento em tempo hábil.</p>
           <hr/>
           <p><b>Dados do Contrato:</b></p>
-          <p>Fim da Vigência: ${contrato.fimVigencia}<br/>Saldo Atual: R$ ${saldoDoContrato(contrato).toFixed(2)}</p>
+          <p>Fim da Vigência: ${escaparHtml(contrato.fimVigencia)}<br/>Saldo Atual: R$ ${saldoDoContrato(contrato).toFixed(2)}</p>
         `;
 
         const destinatario = contrato.fiscalEmail || contrato.contatoEmail;
