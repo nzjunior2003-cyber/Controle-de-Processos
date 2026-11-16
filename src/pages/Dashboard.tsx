@@ -1,43 +1,19 @@
 import { useState } from 'react';
-import { BarChart3, ClipboardList, FileCheck, FileText, Package, CheckSquare, LayoutDashboard } from 'lucide-react';
-import { useApp } from '../context/AppContext';
-import { ehPerfilDiretoria } from '../types';
-import DashboardApoio from './dashboards/DashboardApoio';
-import DashboardContratosArps from './dashboards/DashboardContratosArps';
-import DashboardGestaoContratos from './dashboards/DashboardGestaoContratos';
-import DashboardFiscalContrato from './dashboards/DashboardFiscalContrato';
-import DashboardDga from './dashboards/DashboardDga';
+import { BarChart3, ClipboardList } from 'lucide-react';
 import PainelProcessos from './dashboards/PainelProcessos';
 import PainelPca from './dashboards/PainelPca';
 
 /**
- * Dashboard Corporativo: um dashboard distinto por módulo, cada um com
- * as métricas próprias daquele módulo. Um usuário comum só vê o
- * dashboard do módulo ao qual está vinculado (perfil); o master vê
- * todos, em abas.
+ * Dashboard: apenas o Painel de Processos e o Painel do PCA, para todos os
+ * perfis (ambos já são de leitura liberada pelas regras do Firestore). Os
+ * dashboards por módulo (Apoio, Contratos, Gestão, Fiscal, Executivo) foram
+ * retirados daqui; os componentes continuam em ./dashboards, sem uso.
  */
 export default function Dashboard() {
-  const { usuarioAtual } = useApp();
-  const perfil = usuarioAtual?.perfil;
-  const isMaster = perfil === 'master';
-  const isDemandante = perfil === 'demandante';
-  const isDiretoria = ehPerfilDiretoria(perfil);
-  // Master, Diretoria (DGA, DAL, DF, DCA, BM4) e Demandante veem as abas de
-  // todos os módulos; o painel Executivo é só do master e da Diretoria.
-  const verTodosOsModulos = isMaster || isDiretoria || isDemandante;
-
   const abas = [
-    { id: 'apoio', nome: 'Apoio e Suprimento', icon: Package, show: verTodosOsModulos || perfil === 'apoio', Componente: DashboardApoio },
-    { id: 'painel-processos', nome: 'Painel de Processos', icon: BarChart3, show: verTodosOsModulos || perfil === 'apoio', Componente: PainelProcessos },
-    { id: 'painel-pca', nome: 'Painel do PCA', icon: ClipboardList, show: verTodosOsModulos || perfil === 'apoio', Componente: PainelPca },
-    { id: 'contratos-arps', nome: "Contratos e ARP's", icon: FileText, show: verTodosOsModulos || perfil === 'contratos', Componente: DashboardContratosArps },
-    { id: 'gestao-contratos', nome: 'Gestão de Contratos', icon: CheckSquare, show: verTodosOsModulos || perfil === 'gestao', Componente: DashboardGestaoContratos },
-    { id: 'fiscal-contrato', nome: 'Fiscal do Contrato', icon: FileCheck, show: verTodosOsModulos || perfil === 'fiscal', Componente: DashboardFiscalContrato },
-    { id: 'dga', nome: 'Executivo (DGA)', icon: LayoutDashboard, show: isMaster || isDiretoria, Componente: DashboardDga },
-  ]
-    .filter((aba) => aba.show)
-    // Pra Diretoria, o painel Executivo abre primeiro.
-    .sort((a, b) => (isDiretoria ? Number(b.id === 'dga') - Number(a.id === 'dga') : 0));
+    { id: 'painel-processos', nome: 'Painel de Processos', icon: BarChart3, Componente: PainelProcessos },
+    { id: 'painel-pca', nome: 'Painel do PCA', icon: ClipboardList, Componente: PainelPca },
+  ];
 
   const [abaAtiva, setAbaAtiva] = useState(abas[0]?.id);
   const abaSelecionada = abas.find((aba) => aba.id === abaAtiva) ?? abas[0];
