@@ -13,7 +13,9 @@ import { chavePae, diasNoSetorPae, type SituacaoPae } from '../lib/paesAcessorio
 import { useSituacaoPaesAcessorios } from '../hooks/useSituacaoPaesAcessorios';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS, type StatusProcesso } from '../types';
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
-import { calcularProgressoChecklist, ordenarPorProgresso } from '../lib/fluxoProcesso';
+import { agruparEstadasPorProcesso, calcularProgressoChecklist, ordenarPorProgresso } from '../lib/fluxoProcesso';
+import { calcularFluxo } from '../lib/fluxoCompras';
+import { resumoProximoPasso } from '../lib/confirmacaoFluxo';
 import { useEtapasPorRito } from '../hooks/useEtapasPorRito';
 
 type FiltroTempo = 'todos' | 'verde' | 'amarelo' | 'vermelho' | 'contratado';
@@ -118,7 +120,8 @@ function guardarPosicaoLista(posicao: PosicaoLista) {
 }
 
 export default function Aquisicoes() {
-  const { processos, setores, usuarioAtual, syncProcessosDaPlanilha, processosSemLinha, contratos, procedimentos } = useApp();
+  const { processos, setores, estadasProcesso, usuarioAtual, syncProcessosDaPlanilha, processosSemLinha, contratos, procedimentos } = useApp();
+  const estadasPorProcesso = useMemo(() => agruparEstadasPorProcesso(estadasProcesso), [estadasProcesso]);
   // Busca que também olha o contrato e a ata ligados ao processo (pelo PAE): fornecedor, nº do contrato, fiscal...
   const buscaVinculada = useMemo(
     () => criarBuscaVinculada({ processos, contratos, procedimentos }),
@@ -637,6 +640,7 @@ export default function Aquisicoes() {
                         ? Math.max(0, differenceInDays(hoje, new Date(proc.ultima_tramitacao)))
                         : null;
                       const progresso = calcularProgressoChecklist(proc, etapasPorRito);
+                      const proximoPasso = resumoProximoPasso(calcularFluxo(proc, estadasPorProcesso.get(proc.id) ?? []));
                       const aberto = expandido === proc.id;
                       const contratoDoProcesso = contratos.find((c) => c.pae === proc.numero_processo);
                       const procedimentoDoProcesso = procedimentos.find((p) => p.pae === proc.numero_processo);
@@ -685,6 +689,11 @@ export default function Aquisicoes() {
                             <div className="text-sm text-gray-900 line-clamp-2" title={proc.objeto}>
                               {proc.objeto}
                             </div>
+                            {proximoPasso && (
+                              <div className="mt-0.5 text-[11px] text-red-800 truncate" title={proximoPasso}>
+                                {proximoPasso}
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-4">
                             <div

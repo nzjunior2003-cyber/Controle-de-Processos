@@ -48,7 +48,7 @@ Fonte: `firestore-tests/matriz.ts` (os testes são gerados dela). Perfis: master
 | logs_acesso | master | — | — | — |
 | logs_auditoria | master | — | — | — |
 
-Casos especiais (testados): fiscal do contrato altera só campos de saldo e cria execução/ocorrência do **próprio** contrato; financeiro altera só saldo/dotação do contrato; demandante responde só IRP da própria unidade e só campos de resposta; `notificacoes` e `push_subscriptions` só do dono; processos: marcar como excluído só master/contratos/apoio.
+Casos especiais (testados): fiscal do contrato altera só campos de saldo e cria execução/ocorrência do **próprio** contrato; financeiro altera só saldo/dotação do contrato; demandante responde só IRP da própria unidade e só campos de resposta; `notificacoes` e `push_subscriptions` só do dono; processos: marcar como excluído só master/contratos/apoio. Campos do fluxo de compras em `processos` (etapa atual, rito do fluxo e as 5 decisões): só master/apoio/contratos; `etapaConfirmadaPor` = uid de quem grava; etapa E01–E35, origem auto/manual, rito e decisões validados.
 
 ## 3. Pendente / decisão do responsável
 

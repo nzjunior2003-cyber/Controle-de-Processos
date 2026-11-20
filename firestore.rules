@@ -88,17 +88,56 @@ service cloud.firestore {
     // Demais coleções operacionais: leitura para usuários ativos; escrita para
     // todos os ativos exceto os perfis de Diretoria (DGA, DAL, DF, DCA, BM4),
     // que são só consulta (o BM4 edita apenas IRPs e PCA, mais abaixo).
+    // Campos do fluxo oficial de compras (etapa atual, rito do fluxo e decisões).
+    // Só master, apoio e contratos alteram; a confirmação carrega o uid de quem
+    // confirmou (não dá para forjar) e os valores são validados.
+    function camposFluxo() {
+      return ['etapaAtualId', 'etapaOrigem', 'etapaConfirmadaEm', 'etapaConfirmadaPor', 'ritoProcessual',
+        'dispensaAteMetadeLimite', 'necessitaDotacao', 'cbmGerenciadorOuParticipeArp',
+        'parecerJuridicoAprovadoSemRecomendacoes', 'haveraFaseExterna'];
+    }
+    function perfilFluxo() {
+      return perfilDoc().perfil in ['master', 'apoio', 'contratos'];
+    }
+    function fluxoValido(d) {
+      return (!('etapaAtualId' in d) || (d.etapaAtualId is string && d.etapaAtualId.matches('^E(0[1-9]|[12][0-9]|3[0-5])$')))
+        && (!('etapaOrigem' in d) || d.etapaOrigem in ['auto', 'manual'])
+        && (!('ritoProcessual' in d) || d.ritoProcessual in ['pregao_srp', 'pregao', 'concorrencia', 'dispensa_eletronica', 'inexigibilidade', 'gerenciador_ata', 'participe_ata', 'adesao_ata'])
+        && (!('dispensaAteMetadeLimite' in d) || d.dispensaAteMetadeLimite is bool)
+        && (!('necessitaDotacao' in d) || d.necessitaDotacao is bool)
+        && (!('cbmGerenciadorOuParticipeArp' in d) || d.cbmGerenciadorOuParticipeArp is bool)
+        && (!('parecerJuridicoAprovadoSemRecomendacoes' in d) || d.parecerJuridicoAprovadoSemRecomendacoes is bool)
+        && (!('haveraFaseExterna' in d) || d.haveraFaseExterna is bool);
+    }
+    // Atualização: se mexe em algum campo do fluxo, perfil permitido + valores válidos
+    // + (ao mudar a etapa) confirmação em nome de quem está logado.
+    function atualizacaoFluxoOk() {
+      let mudou = request.resource.data.diff(resource.data).affectedKeys();
+      return !mudou.hasAny(camposFluxo())
+        || (perfilFluxo()
+          && fluxoValido(request.resource.data)
+          && (!mudou.hasAny(['etapaConfirmadaPor']) || request.resource.data.etapaConfirmadaPor == request.auth.uid)
+          && (!mudou.hasAny(['etapaAtualId'])
+            || (mudou.hasAny(['etapaConfirmadaEm']) && request.resource.data.get('etapaConfirmadaPor', '') == request.auth.uid)));
+    }
+    function criacaoFluxoOk() {
+      return !request.resource.data.keys().hasAny(camposFluxo())
+        || (perfilFluxo() && fluxoValido(request.resource.data));
+    }
+
     // Processos: exclusão LÓGICA (campos `excluido*`), só pelos perfis
     // administrativos; apagar de vez (delete) só o master.
     match /processos/{documento} {
       allow read: if ativo();
-      allow create: if ativo() && !(perfilDoc().perfil in ['dga', 'dal', 'df', 'dca', 'bm4']);
+      allow create: if ativo() && !(perfilDoc().perfil in ['dga', 'dal', 'df', 'dca', 'bm4'])
+        && criacaoFluxoOk();
       allow update: if ativo()
         && !(perfilDoc().perfil in ['dga', 'dal', 'df', 'dca', 'bm4'])
         && (
           request.resource.data.get('excluido', false) == resource.data.get('excluido', false)
           || perfilDoc().perfil in ['master', 'contratos', 'apoio']
-        );
+        )
+        && atualizacaoFluxoOk();
       allow delete: if master();
     }
     match /movimentacoes/{documento} {
