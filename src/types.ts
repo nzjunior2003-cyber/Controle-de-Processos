@@ -1,3 +1,4 @@
+import type { RitoCompras } from './config/fluxoCompras';
 export type Perfil =
   | 'master'
   | 'contratos'
@@ -336,11 +337,30 @@ export interface Processo {
   natureza_despesa?: string;
   valor_estimado?: number;
   rito_processual?: string;
+  /**
+   * Fluxo oficial de compras (src/config/fluxoCompras.ts). Todos opcionais:
+   * processo antigo, sem nenhum destes campos, continua funcionando.
+   * `ritoProcessual` é o rito do fluxo (vazio = deduzido de `rito_processual`).
+   */
+  ritoProcessual?: RitoCompras;
+  /** Só na dispensa eletrônica: valor estimado até 50% do limite da dispensa por valor. */
+  dispensaAteMetadeLimite?: boolean;
+  necessitaDotacao?: boolean;
+  /** O CBM é Gerenciador ou Partícipe de ARP (pula o jurídico e a licitação). */
+  cbmGerenciadorOuParticipeArp?: boolean;
+  parecerJuridicoAprovadoSemRecomendacoes?: boolean;
+  haveraFaseExterna?: boolean;
+  /** Etapa atual do fluxo (E01…E35), confirmada pelo usuário. */
+  etapaAtualId?: string;
+  /** 'auto' = o usuário aceitou a sugestão do sistema; 'manual' = escolheu outra. */
+  etapaOrigem?: 'auto' | 'manual';
+  etapaConfirmadaEm?: string;
+  etapaConfirmadaPor?: string;
   /** Nº de ordem do processo na planilha de processos (coluna A) — sequencial, o sistema continua a numeração ao criar. */
   ordem?: number;
   /** "SIM"/"NÃO" da coluna "Previsão no PCA" da planilha de processos (o painel de processos usa). */
   previsao_pca?: string;
-  /** PRD (Pedido de Reconhecimento de Despesa) do processo — só é digitado no módulo Apoio e Suprimento; os demais módulos apenas leem. */
+  /** PRD (Pedido de Realização de Despesa) do processo — só é digitado no módulo Apoio e Suprimento; os demais módulos apenas leem. */
   prd?: string;
   prd_validade?: string;
   valor_prd?: number;
@@ -513,7 +533,7 @@ export interface Contrato {
   /** Marcado manualmente pelo Gestor quando o contrato foi encerrado/totalmente executado antes do fim da vigência (ou mesmo depois, como registro). */
   concluido?: boolean;
   prd?: string;
-  /** Valor do PRD (Pedido de Reconhecimento de Despesa), distinto do valor global do contrato. */
+  /** Valor do PRD (Pedido de Realização de Despesa), distinto do valor global do contrato. */
   valorPRD?: number;
   empenho?: string;
   dotacao?: string;
