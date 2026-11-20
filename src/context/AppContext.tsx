@@ -114,6 +114,7 @@ import {
 import { idItemCatalogo, normalizarCodigoOrcamentario, trocarCodigoNaFicha, trocarCodigoNasClassificacoes } from '../lib/orcamento';
 import { resolverAndamento } from '../lib/andamentoProcesso';
 import { idAjusteRito, type AjusteRito } from '../lib/ajustesRito';
+import type { ConfigPrazos } from '../lib/prazosFluxo';
 import {
   destinatariosFinanceiro,
   destinatariosFiscais,
@@ -154,6 +155,8 @@ interface AppContextData {
   empenhos: Empenho[];
   catalogoOrcamentario: ItemCatalogoOrcamentario[];
   ajustesRito: AjusteRito[];
+  /** Prazos do fluxo de compras editados por DAL/Master (undefined = valem os padrões do código). */
+  configPrazos: ConfigPrazos | undefined;
   aditivosArp: AditivoArp[];
   /** Prorroga a vigência de uma ata (ARP/adesão/partícipe) e registra o aditivo. */
   addAditivoArp: (dados: Omit<AditivoArp, 'id' | 'criado_em' | 'vigenciaAnterior'>) => Promise<void>;
@@ -162,6 +165,7 @@ interface AppContextData {
   addApostilamento: (dados: Omit<Apostilamento, 'id' | 'criado_em' | 'fonteAnterior' | 'dotacoesAnteriores'>) => Promise<void>;
   /** Master: grava os itens incluídos/excluídos de um rito (sobre a lista oficial da planilha). */
   salvarAjusteRito: (rito: string, adicionar: string[], remover: string[]) => Promise<void>;
+  salvarConfigPrazos: (config: ConfigPrazos) => Promise<void>;
   /** Só as últimas 50 do usuário logado (ver `useNotificacoesDoUsuario`). */
   notificacoes: Notificacao[];
   pushSubscriptions: PushSubscriptionRegistro[];
@@ -470,6 +474,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const empenhos = useColecao<Empenho>('empenhos', isAuthenticated);
   const catalogoOrcamentario = useColecao<ItemCatalogoOrcamentario>('catalogo_orcamentario', isAuthenticated);
   const ajustesRito = useColecao<AjusteRito>('ajustes_rito', isAuthenticated);
+  const configFluxo = useColecao<ConfigPrazos & { id: string }>('config_fluxo', isAuthenticated);
+  const configPrazos = useMemo(() => configFluxo.find((c) => c.id === 'prazos'), [configFluxo]);
   const aditivosArp = useColecao<AditivoArp>('aditivos_arp', isAuthenticated);
   const apostilamentos = useColecao<Apostilamento>('apostilamentos', isAuthenticated);
   const notificacoes = useNotificacoesDoUsuario(usuarioAtual?.id, isAuthenticated);
@@ -2096,6 +2102,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     [ajustesRito, usuarioAtual, registrarAuditoria],
   );
 
+  /** DAL e Master definem os prazos do fluxo (as Rules também exigem isso). */
+  const salvarConfigPrazos = useCallback(
+    async (config: ConfigPrazos) => {
+      if (!usuarioAtual || !['master', 'dal'].includes(usuarioAtual.perfil)) {
+        throw new Error('Só o DAL e o Master podem alterar os prazos do fluxo.');
+      }
+      const db = requireDb();
+      const limpar = (n: unknown) => Math.min(365, Math.max(0, Math.round(Number(n))));
+      const diasPorEtapa = Object.fromEntries(
+        Object.entries(config.diasPorEtapa ?? {}).filter(([, v]) => Number.isFinite(Number(v))).map(([k, v]) => [k, limpar(v)]),
+      );
+      const prazoAteContratoPorRito = Object.fromEntries(
+        Object.entries(config.prazoAteContratoPorRito ?? {}).filter(([, v]) => Number.isFinite(Number(v))).map(([k, v]) => [k, limpar(v)]),
+      );
+      const anterior = configPrazos;
+      const dados = { diasPorEtapa, prazoAteContratoPorRito, atualizado_em: new Date().toISOString(), atualizado_por: usuarioAtual.id };
+      await setDoc(doc(db, 'config_fluxo', 'prazos'), dados);
+      await registrarAuditoria('config_fluxo', 'prazos', anterior ? 'UPDATE' : 'CREATE', dados, anterior);
+    },
+    [usuarioAtual, configPrazos, registrarAuditoria],
+  );
+
   const salvarItemCatalogo = useCallback(
     async (campo: CampoOrcamentario, codigo: string, descricao: string) => {
       const codigoLimpo = normalizarCodigoOrcamentario(codigo);
@@ -2351,7 +2379,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       renomearCodigoCatalogo,
       excluirCodigoCatalogo,
       ajustesRito,
+      configPrazos,
       salvarAjusteRito,
+      salvarConfigPrazos,
       aditivosArp,
       addAditivoArp,
       apostilamentos,
@@ -2441,7 +2471,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       renomearCodigoCatalogo,
       excluirCodigoCatalogo,
       ajustesRito,
+      configPrazos,
       salvarAjusteRito,
+      salvarConfigPrazos,
       aditivosArp,
       addAditivoArp,
       apostilamentos,

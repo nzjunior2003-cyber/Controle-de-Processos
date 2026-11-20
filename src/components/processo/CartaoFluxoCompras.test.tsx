@@ -95,4 +95,27 @@ describe('CartaoFluxoCompras', () => {
     });
     expect(screen.getByText(/Atualizar para E14/)).toBeTruthy();
   });
+
+  it('mostra etapas restantes, porcentagem, previsão, prazo e situação por marco', () => {
+    montar({
+      ritoProcessual: 'pregao', data_entrada: '2026-01-01T00:00:00Z', etapaAtualId: 'E07', etapaOrigem: 'manual',
+      etapaConfirmadaEm: '2020-01-01T00:00:00Z', necessitaDotacao: false, cbmGerenciadorOuParticipeArp: false,
+      parecerJuridicoAprovadoSemRecomendacoes: true, haveraFaseExterna: false,
+    });
+    expect(screen.getByText('Contrato')).toBeTruthy();
+    expect(screen.getByText(/faltam 9 de 15 etapas · 40%/)).toBeTruthy();
+    expect(screen.getByText('Pagamento')).toBeTruthy();
+    expect(screen.getAllByText(/Atrasado há/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/prazo até a contratação: 120 dias/)).toBeTruthy();
+  });
+
+  it('decisão em aberto mostra a contagem como estimativa (faixa)', () => {
+    montar({ ritoProcessual: 'pregao', data_entrada: '2026-01-01T00:00:00Z', etapaAtualId: 'E07', etapaOrigem: 'manual' });
+    expect(screen.getAllByText(/\(estimativa\)/).length).toBeGreaterThan(0);
+  });
+
+  it('sem rito não mostra a seção de prazos', () => {
+    montar({});
+    expect(screen.queryByText('Contrato')).toBeNull();
+  });
 });
