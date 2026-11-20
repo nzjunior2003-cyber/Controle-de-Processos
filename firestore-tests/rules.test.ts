@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { deleteDoc, doc, getDoc, getDocs, collection, setDoc, updateDoc, setLogLevel } from 'firebase/firestore';
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import { MATRIZ, PERFIS } from './matriz';
 
 let env: RulesTestEnvironment;
@@ -194,5 +194,53 @@ describe('casos especiais por regra de negócio', () => {
   it('coleção desconhecida é negada para todos (deny by default)', async () => {
     await assertFails(getDoc(doc(como('master'), 'qualquer_coisa', 'x')));
     await assertFails(setDoc(doc(como('master'), 'qualquer_coisa', 'x'), { a: 1 }));
+  });
+});
+
+describe('processos: campos do fluxo de compras', () => {
+  // Cada teste parte do mesmo documento limpo (sem campos do fluxo).
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'processos', 'existente'), { teste: true, excluido: false });
+    });
+  });
+  const confirmar = (p: string, extra: Record<string, unknown> = {}) =>
+    updateDoc(doc(como(p), 'processos', 'existente'), {
+      etapaAtualId: 'E07', etapaOrigem: 'auto', etapaConfirmadaEm: new Date().toISOString(), etapaConfirmadaPor: uid(p), ...extra,
+    });
+
+  for (const p of PERFIS) {
+    const pode = ['master', 'apoio', 'contratos'].includes(p);
+    it(`${p} ${pode ? 'PODE' : 'NÃO pode'} confirmar etapa do fluxo`, async () => {
+      await (pode ? assertSucceeds(confirmar(p)) : assertFails(confirmar(p)));
+    });
+    it(`${p} ${pode ? 'PODE' : 'NÃO pode'} responder pergunta do fluxo`, async () => {
+      const r = updateDoc(doc(como(p), 'processos', 'existente'), { necessitaDotacao: true });
+      await (pode ? assertSucceeds(r) : assertFails(r));
+    });
+  }
+
+  it('não dá para forjar quem confirmou', async () => {
+    await assertFails(confirmar('apoio', { etapaConfirmadaPor: uid('master') }));
+  });
+  it('mudar a etapa sem registrar a confirmação em nome próprio é negado', async () => {
+    await assertFails(updateDoc(doc(como('apoio'), 'processos', 'existente'), { etapaAtualId: 'E10' }));
+  });
+  it('valores inválidos são negados (etapa, origem, rito, decisão)', async () => {
+    await assertFails(confirmar('apoio', { etapaAtualId: 'E36' }));
+    await assertFails(confirmar('apoio', { etapaAtualId: 'X01' }));
+    await assertFails(confirmar('apoio', { etapaOrigem: 'robo' }));
+    await assertFails(updateDoc(doc(como('apoio'), 'processos', 'existente'), { ritoProcessual: 'qualquer' }));
+    await assertFails(updateDoc(doc(como('apoio'), 'processos', 'existente'), { haveraFaseExterna: 'sim' }));
+    await assertSucceeds(updateDoc(doc(como('apoio'), 'processos', 'existente'), { ritoProcessual: 'concorrencia' }));
+  });
+  it('perfis sem permissão continuam editando os demais campos do processo', async () => {
+    await assertSucceeds(updateDoc(doc(como('fiscal'), 'processos', 'existente'), { observacao: `x${Math.random()}` }));
+  });
+  it('criar processo já com campos do fluxo: só os perfis permitidos', async () => {
+    await assertSucceeds(setDoc(doc(como('apoio'), 'processos', 'novo_fluxo_ok'), { ritoProcessual: 'pregao' }));
+    await assertFails(setDoc(doc(como('fiscal'), 'processos', 'novo_fluxo_fiscal'), { ritoProcessual: 'pregao' }));
+    await assertFails(setDoc(doc(como('apoio'), 'processos', 'novo_fluxo_ruim'), { ritoProcessual: 'xxx' }));
+    await assertSucceeds(setDoc(doc(como('fiscal'), 'processos', 'novo_sem_fluxo'), { numero_processo: 'x' }));
   });
 });
