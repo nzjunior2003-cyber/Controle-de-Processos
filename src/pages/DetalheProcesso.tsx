@@ -20,6 +20,8 @@ import { calcularDataPrevista, prazoAlvoDoRito } from '../lib/prazosProcesso';
 import { ehItemDotacaoOrcamentaria, limparClassificacoes } from '../lib/orcamento';
 import { valorUtilizadoNaArp } from '../lib/arp';
 import PaesAcessoriosCard from '../components/PaesAcessoriosCard';
+import CartaoFluxoCompras from '../components/processo/CartaoFluxoCompras';
+import { podeConfirmarFluxo } from '../lib/confirmacaoFluxo';
 import DotacaoOrcamentariaEditor from '../components/processo/DotacaoOrcamentariaEditor';
 import { AdicionarEtapa, BotaoExcluirEtapa } from '../components/processo/ControlesChecklistMaster';
 import type { ClassificacaoOrcamentaria } from '../types';
@@ -32,7 +34,7 @@ const CORES_GANTT = [
 export default function DetalheProcesso() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { processos, setores, estadasProcesso, pcas, contratos, procedimentos, usuarioAtual, updateProcesso, deleteProcesso } = useApp();
+  const { processos, setores, estadasProcesso, pcas, contratos, procedimentos, usuarioAtual, usuarios, updateProcesso, deleteProcesso } = useApp();
   const etapasPorRito = useEtapasPorRito();
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
@@ -288,6 +290,17 @@ export default function DetalheProcesso() {
           )}
         </div>
       </div>
+
+      {usuarioAtual && (
+        <CartaoFluxoCompras
+          processo={processo}
+          tramitacoes={estadasProcesso.filter((e) => e.processo_id === processo.id)}
+          podeEditar={podeConfirmarFluxo(usuarioAtual.perfil)}
+          usuarioId={usuarioAtual.id}
+          nomeConfirmador={usuarios.find((u) => u.id === processo.etapaConfirmadaPor)?.nome}
+          onSalvar={(campos) => updateProcesso(processo.id, campos)}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Details & Actions */}

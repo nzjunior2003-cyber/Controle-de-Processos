@@ -254,3 +254,22 @@ export const PISTAS_ANDAMENTO: Array<{ padrao: RegExp; etapaId: string }> = [
   { padrao: /autoriza/, etapaId: 'E13' },
   { padrao: /minuta/, etapaId: 'E11' },
 ];
+
+/**
+ * Ao definir o rito pela tela do fluxo, se o campo antigo `rito_processual`
+ * estiver vazio ele é preenchido com este nome (para o checklist atual do
+ * sistema aparecer). Concorrência não tem equivalente antigo: fica de fora.
+ * Nomes iguais aos de RITOS_CANONICOS (src/lib/ritosProcessuais.ts).
+ */
+export const RITO_ANTIGO_EQUIVALENTE: Partial<Record<RitoCompras, string>> = {
+  pregao: 'Pregão Eletrônico',
+  pregao_srp: 'Pregão Eletrônico p/ Registro de preços',
+  dispensa_eletronica: 'Dispensa por valor (Decreto 2.787, Art. 3º, II. Lei 14.133, Art. 75, II.)',
+  inexigibilidade: 'Inexigibilidade',
+  gerenciador_ata: 'Gerenciador da Ata de Registro de Preços',
+  participe_ata: 'Partícipe de uma ata de registro de preços',
+  adesao_ata: 'Adesão à ata de registro de preços',
+};
+
+/** Perfis que podem confirmar etapa, corrigir e responder as perguntas do fluxo (as Rules repetem esta lista). */
+export const PERFIS_QUE_CONFIRMAM_FLUXO = ['master', 'apoio', 'contratos'];
