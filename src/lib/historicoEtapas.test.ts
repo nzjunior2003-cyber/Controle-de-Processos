@@ -81,7 +81,6 @@ describe('datas de chegada', () => {
     expect(() => validarChegada(d('2026-11-05'), h, 'corrigir', agora)).toThrow();
   });
 });
-});
 
 describe('histórico efetivo e linha do tempo', () => {
   it('processo confirmado antes da Fase D vira uma passagem em andamento, sem gravar', () => {
