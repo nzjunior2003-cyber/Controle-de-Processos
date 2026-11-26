@@ -387,27 +387,28 @@ export default function Aquisicoes() {
       <StatusRobo />
 
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
+        <nav className="-mb-px flex w-full sm:w-auto space-x-2 sm:space-x-8" aria-label="Tabs">
           <button
             onClick={() => setActiveTab('processos')}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
+            className={`flex-1 sm:flex-none justify-center sm:justify-start whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
               activeTab === 'processos'
                 ? 'border-red-500 text-red-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            <List className="w-5 h-5 mr-2" />
-            Acompanhamento de Processos
+            <List className="w-5 h-5 mr-1.5 sm:mr-2 flex-shrink-0" />
+            <span className="sm:hidden">Processos</span>
+            <span className="hidden sm:inline">Acompanhamento de Processos</span>
           </button>
           <button
             onClick={() => setActiveTab('pca')}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
+            className={`flex-1 sm:flex-none justify-center sm:justify-start whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
               activeTab === 'pca'
                 ? 'border-red-500 text-red-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            <Database className="w-5 h-5 mr-2" />
+            <Database className="w-5 h-5 mr-1.5 sm:mr-2 flex-shrink-0" />
             Integração PCA
           </button>
         </nav>
@@ -604,7 +605,7 @@ export default function Aquisicoes() {
               {filtrados.length === 0 ? (
                 <p className="px-4 py-10 text-center text-gray-500">Nenhum processo encontrado.</p>
               ) : (
-                filtrados.map((proc) => {
+                filtrados.map((proc, indice) => {
                   const diasNoSetor = proc.ultima_tramitacao
                     ? Math.max(0, differenceInDays(hoje, new Date(proc.ultima_tramitacao)))
                     : null;
@@ -616,7 +617,7 @@ export default function Aquisicoes() {
                     <Link
                       key={proc.id}
                       to={`/sistema/processos/${proc.id}`}
-                      className="block px-4 py-3 bg-white active:bg-gray-100"
+                      className={`block px-4 py-3 active:bg-gray-200 ${indice % 2 === 1 ? 'bg-gray-100' : 'bg-white'}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
