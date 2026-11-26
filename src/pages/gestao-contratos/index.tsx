@@ -340,7 +340,7 @@ export default function GestaoContratos() {
       <KpisContratos contratos={contratosComStatus} filtro={filtroKpi} onFiltrar={setFiltroKpi} />
 
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex flex-wrap gap-x-6 sm:gap-x-8" aria-label="Tabs">
           <button
             onClick={() => setAbaAtiva('geral')}
             className={`whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm flex items-center ${
@@ -397,7 +397,7 @@ export default function GestaoContratos() {
             placeholder="Buscar por PAE, Contrato, Empresa ou Objeto..."
           />
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setDirecaoOrdenacao((d) => (d === 'asc' ? 'desc' : 'asc'))}

@@ -181,7 +181,7 @@ export default function Financeiro() {
         )}
       </div>
 
-      <div className="border-b border-gray-200 flex gap-6 overflow-x-auto">
+      <div className="border-b border-gray-200 flex flex-wrap gap-x-6">
         {abas.map((item) => (
           <button
             key={item.id}

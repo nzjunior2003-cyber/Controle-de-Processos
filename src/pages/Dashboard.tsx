@@ -36,7 +36,7 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
+        <nav className="-mb-px flex flex-wrap gap-x-6 sm:gap-x-8" aria-label="Tabs">
           {abas.map((aba) => (
             <button
               key={aba.id}
