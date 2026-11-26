@@ -10,10 +10,13 @@ import {
 } from '../../config/fluxoCompras';
 import { calcularFluxo, type ProcessoFluxo, type TramitacaoFluxo } from '../../lib/fluxoCompras';
 import { camposConfirmacao, camposRito, camposResposta } from '../../lib/confirmacaoFluxo';
+import { calcularPrazos, ROTULO_SITUACAO, textoFaixa, type ConfigPrazos, type SituacaoPrazo } from '../../lib/prazosFluxo';
 import type { Processo } from '../../types';
 
 interface Props {
-  processo: ProcessoFluxo & Pick<Processo, 'id'>;
+  processo: ProcessoFluxo & Pick<Processo, 'id'> & Partial<Pick<Processo, 'data_entrada' | 'data_abertura'>>;
+  /** Prazos editados por DAL/Master (sem isso valem os padrões). */
+  configPrazos?: ConfigPrazos;
   tramitacoes: TramitacaoFluxo[];
   /** master, apoio ou contratos; os demais só veem. */
   podeEditar: boolean;
@@ -26,8 +29,19 @@ interface Props {
 const GRUPOS = Array.from(new Set(ETAPAS.map((e) => e.grupo)));
 
 /** Cartão "Fluxo de compras": onde o processo está, o próximo passo e as perguntas em aberto. */
-export default function CartaoFluxoCompras({ processo, tramitacoes, podeEditar, usuarioId, nomeConfirmador, onSalvar }: Props) {
+const COR_SITUACAO: Record<SituacaoPrazo, string> = {
+  concluido: 'bg-emerald-50 text-emerald-800',
+  no_prazo: 'bg-emerald-50 text-emerald-800',
+  atencao: 'bg-amber-100 text-amber-900',
+  atrasado: 'bg-red-100 text-red-800',
+  sem_data: 'bg-gray-100 text-gray-600',
+};
+
+const dataBR = (d: Date | null) => (d ? format(d, 'dd/MM/yyyy') : '—');
+
+export default function CartaoFluxoCompras({ processo, tramitacoes, podeEditar, usuarioId, nomeConfirmador, configPrazos, onSalvar }: Props) {
   const fluxo = useMemo(() => calcularFluxo(processo, tramitacoes), [processo, tramitacoes]);
+  const prazos = useMemo(() => calcularPrazos(processo, tramitacoes, configPrazos), [processo, tramitacoes, configPrazos]);
   const [salvando, setSalvando] = useState(false);
   const [corrigindo, setCorrigindo] = useState(false);
   const [escolhida, setEscolhida] = useState('');
@@ -163,6 +177,43 @@ export default function CartaoFluxoCompras({ processo, tramitacoes, podeEditar, 
             {fluxo.e07.faltando.map((item) => <li key={item.id}>{item.rotulo}</li>)}
           </ul>
           {fluxo.e07.provisorio && <p className="text-xs text-gray-500 mt-1">Lista provisória: responda a pergunta sobre o valor da dispensa.</p>}
+        </div>
+      )}
+
+      {fluxo.rito && (
+        <div className="text-sm" aria-label="Prazos do fluxo">
+          <p className="text-xs font-medium text-gray-500 uppercase">Etapas e prazos até cada marco</p>
+          {prazos.etapaAtual && (
+            <p className="mt-1 text-xs text-gray-600">
+              Nesta etapa há {prazos.etapaAtual.diasNaEtapa} dia(s) · meta {prazos.etapaAtual.metaDias} dia(s){' '}
+              <span className={`ml-1 px-1.5 py-0.5 rounded-full font-medium ${COR_SITUACAO[prazos.etapaAtual.situacao]}`}>{ROTULO_SITUACAO[prazos.etapaAtual.situacao]}</span>
+            </p>
+          )}
+          <ul className="mt-2 space-y-1">
+            {prazos.marcos.map((m) => (
+              <li key={m.marco.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-800">
+                <strong>{m.marco.nome}</strong>
+                <span className="text-xs text-gray-500">({m.marco.etapaId})</span>
+                {m.situacao === 'concluido' ? (
+                  <span className="text-xs text-emerald-700">já atingido</span>
+                ) : (
+                  <>
+                    <span>
+                      faltam {textoFaixa(m.contagem.restantes)} de {textoFaixa(m.contagem.total)} etapas · {textoFaixa(m.contagem.percentual)}%
+                      {m.contagem.incerto && <span title="Responda as perguntas em aberto para fechar a conta"> (estimativa)</span>}
+                    </span>
+                    {m.situacao !== 'sem_data' && <span className="text-xs text-gray-600">previsão {dataBR(m.previsao)} · prazo {dataBR(m.prazo)}</span>}
+                    <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${COR_SITUACAO[m.situacao]}`}>
+                      {m.situacao === 'atrasado' ? `Atrasado há ${m.diasAtraso} dia(s)` : ROTULO_SITUACAO[m.situacao]}
+                    </span>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[11px] text-gray-400">
+            Dias corridos, contados da abertura do processo{prazos.prazoTotalRito ? ` (prazo até a contratação: ${prazos.prazoTotalRito} dias)` : ''}. A data de início da etapa atual é a da confirmação. Prazos provisórios, definidos pelo DAL/Master.
+          </p>
         </div>
       )}
 

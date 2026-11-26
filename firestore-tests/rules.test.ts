@@ -244,3 +244,40 @@ describe('processos: campos do fluxo de compras', () => {
     await assertSucceeds(setDoc(doc(como('fiscal'), 'processos', 'novo_sem_fluxo'), { numero_processo: 'x' }));
   });
 });
+
+describe('config_fluxo (prazos do fluxo de compras)', () => {
+  const prazos = (p: string, dados: Record<string, unknown>) => setDoc(doc(como(p), 'config_fluxo', 'prazos'), dados);
+  const valido = (p: string) => ({ diasPorEtapa: { E07: 20, E19: 7 }, prazoAteContratoPorRito: { pregao: 120 }, atualizado_em: 'x', atualizado_por: uid(p) });
+
+  for (const p of PERFIS) {
+    const pode = ['master', 'dal'].includes(p);
+    it(`${p} ${pode ? 'PODE' : 'NÃO pode'} gravar os prazos`, async () => {
+      await (pode ? assertSucceeds(prazos(p, valido(p))) : assertFails(prazos(p, valido(p))));
+    });
+    it(`${p} PODE ler os prazos`, async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), 'config_fluxo', 'prazos'), { diasPorEtapa: {} }); });
+      await assertSucceeds(getDoc(doc(como(p), 'config_fluxo', 'prazos')));
+    });
+  }
+  it('anônimo e inativo não leem', async () => {
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'config_fluxo', 'prazos')));
+    await assertFails(getDoc(doc(env.authenticatedContext('u_inativo', { email: 'inativo@teste.com' }).firestore(), 'config_fluxo', 'prazos')));
+  });
+  it('valores inválidos são negados (número fora da faixa, texto, etapa ou rito inexistente, campo extra)', async () => {
+    await assertFails(prazos('dal', { ...valido('dal'), diasPorEtapa: { E07: -1 } }));
+    await assertFails(prazos('dal', { ...valido('dal'), diasPorEtapa: { E07: 400 } }));
+    await assertFails(prazos('dal', { ...valido('dal'), diasPorEtapa: { E07: 'vinte' } }));
+    await assertFails(prazos('dal', { ...valido('dal'), diasPorEtapa: { E99: 5 } }));
+    await assertFails(prazos('dal', { ...valido('dal'), prazoAteContratoPorRito: { qualquer: 5 } }));
+    await assertFails(prazos('dal', { ...valido('dal'), extra: true }));
+  });
+  it('não dá para forjar quem atualizou', async () => {
+    await assertFails(prazos('dal', { ...valido('dal'), atualizado_por: uid('master') }));
+  });
+  it('só o documento "prazos" é aceito e só o master apaga', async () => {
+    await assertFails(setDoc(doc(como('dal'), 'config_fluxo', 'outro'), valido('dal')));
+    await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), 'config_fluxo', 'prazos'), { diasPorEtapa: {} }); });
+    await assertFails(deleteDoc(doc(como('dal'), 'config_fluxo', 'prazos')));
+    await assertSucceeds(deleteDoc(doc(como('master'), 'config_fluxo', 'prazos')));
+  });
+});

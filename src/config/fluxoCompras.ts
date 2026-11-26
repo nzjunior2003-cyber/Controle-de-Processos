@@ -273,3 +273,47 @@ export const RITO_ANTIGO_EQUIVALENTE: Partial<Record<RitoCompras, string>> = {
 
 /** Perfis que podem confirmar etapa, corrigir e responder as perguntas do fluxo (as Rules repetem esta lista). */
 export const PERFIS_QUE_CONFIRMAM_FLUXO = ['master', 'apoio', 'contratos'];
+
+// ---------------------------------------------------------------------------
+// PRAZOS (Fase C). Valores PROVISÓRIOS: DAL e Master os ajustam na tela
+// "Prazos do fluxo"; o que for salvo lá (coleção `config_fluxo`) vale no lugar
+// destes. Dias corridos.
+
+export interface MarcoFluxo {
+  id: string;
+  nome: string;
+  /** Etapa em que o marco é atingido (ao concluí-la). */
+  etapaId: string;
+}
+
+/** Marcos acompanhados. Para mudar a etapa de um marco, troque o `etapaId`. */
+export const MARCOS: MarcoFluxo[] = [
+  { id: 'contrato', nome: 'Contrato', etapaId: 'E19' },
+  { id: 'empenho', nome: 'Empenho', etapaId: 'E22' },
+  { id: 'entrega', nome: 'Entrega', etapaId: 'E27' },
+  { id: 'pagamento', nome: 'Pagamento', etapaId: 'E32' },
+];
+
+/** Última etapa da fase em que o prazo total do rito é repartido (a contratação). */
+export const ETAPA_FIM_PRAZO_RITO = 'E19';
+
+/**
+ * Dias de referência por etapa (PROVISÓRIOS).
+ * - E01–E19: servem de PESO. O prazo total do rito até a contratação (ex.: pregão
+ *   120 dias, em src/lib/prazosProcesso.ts) é repartido entre as etapas do
+ *   caminho do processo na proporção destes valores. Sem prazo total para o
+ *   rito (ex.: concorrência), valem estes dias como estão.
+ * - E20–E35: dias fixos de cada etapa.
+ */
+export const DIAS_PADRAO_ETAPA: Record<string, number> = {
+  E01: 1, E02: 2, E03: 2, E04: 2, E05: 2, E06: 3, E07: 20, E08: 5, E09: 3, E10: 7,
+  E11: 10, E12: 3, E13: 5, E14: 15, E15: 5, E16: 10, E17: 25, E18: 25, E19: 7,
+  E20: 3, E21: 5, E22: 3, E23: 2, E24: 1, E25: 2, E26: 2, E27: 15, E28: 5, E29: 3,
+  E30: 2, E31: 3, E32: 15, E33: 10, E34: 5, E35: 2,
+};
+
+/** Faltando até este nº de dias (ou menos) para o prazo, a situação vira "atenção". */
+export const DIAS_ATENCAO = 5;
+
+/** Etapas "caso necessário" entram na contagem e nos dias? Padrão: não (considera-se que foram puladas). */
+export const CONTAR_ETAPAS_OPCIONAIS = false;

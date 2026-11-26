@@ -14,7 +14,8 @@ import { useSituacaoPaesAcessorios } from '../hooks/useSituacaoPaesAcessorios';
 import { STATUS_PROCESSO_CORES as STATUS_CORES, STATUS_PROCESSO_LABELS as STATUS_LABELS, type StatusProcesso } from '../types';
 import { URL_PLANILHA_PROCESSOS } from '../lib/csv';
 import { agruparEstadasPorProcesso, calcularProgressoChecklist, ordenarPorProgresso } from '../lib/fluxoProcesso';
-import { calcularFluxo } from '../lib/fluxoCompras';
+import { calcularFluxo, ritoEfetivo } from '../lib/fluxoCompras';
+import { calcularPrazos, ROTULO_SITUACAO, type SituacaoPrazo } from '../lib/prazosFluxo';
 import { resumoProximoPasso } from '../lib/confirmacaoFluxo';
 import { useEtapasPorRito } from '../hooks/useEtapasPorRito';
 
@@ -120,8 +121,17 @@ function guardarPosicaoLista(posicao: PosicaoLista) {
 }
 
 export default function Aquisicoes() {
-  const { processos, setores, estadasProcesso, usuarioAtual, syncProcessosDaPlanilha, processosSemLinha, contratos, procedimentos } = useApp();
+  const { processos, setores, estadasProcesso, configPrazos, usuarioAtual, syncProcessosDaPlanilha, processosSemLinha, contratos, procedimentos } = useApp();
   const estadasPorProcesso = useMemo(() => agruparEstadasPorProcesso(estadasProcesso), [estadasProcesso]);
+  // Situação do prazo (primeiro marco ainda não atingido) de cada processo — usada no selo e no filtro.
+  const situacaoPrazoPorProcesso = useMemo(() => {
+    const mapa = new Map<string, SituacaoPrazo>();
+    // Só processos com rito definido: sem rito não há como estimar a etapa nem o prazo.
+    processos.forEach((p) => {
+      if (ritoEfetivo(p).rito) mapa.set(p.id, calcularPrazos(p, estadasPorProcesso.get(p.id) ?? [], configPrazos).principal);
+    });
+    return mapa;
+  }, [processos, estadasPorProcesso, configPrazos]);
   // Busca que também olha o contrato e a ata ligados ao processo (pelo PAE): fornecedor, nº do contrato, fiscal...
   const buscaVinculada = useMemo(
     () => criarBuscaVinculada({ processos, contratos, procedimentos }),
@@ -182,6 +192,8 @@ export default function Aquisicoes() {
   const setFiltroAno = (v: string) => definirParam('ano', v, '');
   const filtroDemandante = searchParams.get('demandante') ?? '';
   const setFiltroDemandante = (v: string) => definirParam('demandante', v, '');
+  const filtroPrazo = searchParams.get('prazo') ?? '';
+  const setFiltroPrazo = (v: string) => definirParam('prazo', v, '');
 
   const hoje = new Date();
   const podeEditarProcesso = usuarioAtual?.perfil === 'master' || usuarioAtual?.perfil === 'apoio';
@@ -205,7 +217,7 @@ export default function Aquisicoes() {
   }, {});
 
   const filtrosAtivos = [
-    filtroRito, filtroNatureza, filtroSetorAtual, filtroFonte, filtroDemandante, filtroStatus, filtroAno,
+    filtroRito, filtroNatureza, filtroSetorAtual, filtroFonte, filtroDemandante, filtroStatus, filtroAno, filtroPrazo,
   ].filter(Boolean).length + (filtroPrevisaoPca !== 'todos' ? 1 : 0);
 
   const filtradosSemOrdem = processos.filter(p => {
@@ -228,6 +240,7 @@ export default function Aquisicoes() {
     if (filtroSetorAtual && setorAtualEfetivo !== filtroSetorAtual) return false;
     if (filtroFonte && p.fonte !== filtroFonte) return false;
     if (filtroDemandante && p.unidade_demandante !== filtroDemandante) return false;
+    if (filtroPrazo && situacaoPrazoPorProcesso.get(p.id) !== filtroPrazo) return false;
     if (filtroPrevisaoPca === 'sim' && !p.pca_id) return false;
     if (filtroPrevisaoPca === 'nao' && p.pca_id) return false;
 
@@ -554,6 +567,15 @@ export default function Aquisicoes() {
                     {opcoesDemandante.map((op) => <option key={op} value={op}>{op}</option>)}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Situação do prazo</label>
+                  <select value={filtroPrazo} onChange={(e) => setFiltroPrazo(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2 px-3 border bg-white">
+                    <option value="">Todas</option>
+                    <option value="atrasado">Atrasado</option>
+                    <option value="atencao">Atenção</option>
+                    <option value="no_prazo">No prazo</option>
+                  </select>
+                </div>
                 {filtrosAtivos > 0 && (
                   <div className="sm:col-span-2 lg:col-span-3">
                     <button
@@ -566,6 +588,7 @@ export default function Aquisicoes() {
                         setFiltroPrevisaoPca('todos');
                         setFiltroDemandante('');
                         setFiltroStatus('');
+                        setFiltroPrazo('');
                       }}
                       className="text-sm text-red-600 hover:text-red-800 font-medium"
                     >
@@ -692,6 +715,11 @@ export default function Aquisicoes() {
                             {proximoPasso && (
                               <div className="mt-0.5 text-[11px] text-red-800 truncate" title={proximoPasso}>
                                 {proximoPasso}
+                                {(situacaoPrazoPorProcesso.get(proc.id) === 'atrasado' || situacaoPrazoPorProcesso.get(proc.id) === 'atencao') && (
+                                  <span className={`ml-1.5 px-1.5 py-0.5 rounded-full font-medium ${situacaoPrazoPorProcesso.get(proc.id) === 'atrasado' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-900'}`}>
+                                    {ROTULO_SITUACAO[situacaoPrazoPorProcesso.get(proc.id) as SituacaoPrazo]}
+                                  </span>
+                                )}
                               </div>
                             )}
                           </td>

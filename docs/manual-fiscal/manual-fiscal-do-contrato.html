@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Manual do Fiscal do Contrato — CBMPA</title>
+<style>
+  @page { size: 100mm 178mm; margin: 6mm; }
+  * { box-sizing: border-box; }
+  html { font-family: "Helvetica Neue", Arial, "Liberation Sans", sans-serif; color: #1f2937; }
+  body { font-size: 10.6pt; line-height: 1.36; margin: 0; }
+  h1 { font-size: 21pt; line-height: 1.12; margin: 0 0 4mm; color: #7f1d1d; }
+  h2 { font-size: 14pt; line-height: 1.2; margin: 0 0 2.5mm; color: #991b1b; border-left: 3mm solid #b91c1c; padding-left: 3mm; }
+  h3 { font-size: 11.6pt; margin: 3mm 0 1.2mm; color: #111827; }
+  p { margin: 0 0 2mm; }
+  ul, ol { margin: 0 0 2.5mm; padding-left: 5mm; }
+  li { margin-bottom: 1mm; }
+  section { page-break-before: always; }
+  section.primeira { page-break-before: auto; }
+  .capa { text-align: center; padding-top: 2mm; }
+  .capa .selo { font-size: 28pt; }
+  .capa .sub { color: #4b5563; font-size: 11.5pt; }
+  .linha { display: flex; gap: 3mm; align-items: flex-start; }
+  .tela { flex: 0 0 43mm; }
+  .tela img { width: 100%; display: block; border: 0.3mm solid #cbd5e1; border-radius: 2mm; box-shadow: 0 0.5mm 1.5mm rgba(0,0,0,.25); }
+  .tela .legenda { font-size: 8pt; color: #6b7280; margin-top: 1mm; text-align: center; }
+  .texto { flex: 1; min-width: 0; }
+  .larga img { width: 100%; display: block; border: 0.3mm solid #cbd5e1; border-radius: 2mm; box-shadow: 0 0.5mm 1.5mm rgba(0,0,0,.25); margin-bottom: 2mm; }
+  .passo { display: flex; gap: 1.8mm; margin-bottom: 1.6mm; align-items: flex-start; font-size: 10pt; line-height: 1.3; }
+  .num { flex: 0 0 5.2mm; width: 5.2mm; height: 5.2mm; border-radius: 50%; background: #dc2626; color: #fff; font-weight: 700; text-align: center; line-height: 5.2mm; font-size: 9pt; margin-top: 0.3mm; }
+  .passo div:last-child { flex: 1; }
+  .caixa { border-radius: 2.2mm; padding: 1.8mm 2.4mm; margin: 2mm 0; font-size: 9.8pt; page-break-inside: avoid; }
+  .dica { background: #ecfdf5; border: 0.4mm solid #10b981; }
+  .aviso { background: #fffbeb; border: 0.4mm solid #f59e0b; }
+  .info { background: #eff6ff; border: 0.4mm solid #3b82f6; }
+  .botao { display: inline-block; background: #b91c1c; color: #fff; padding: 0.4mm 1.8mm; border-radius: 1.4mm; font-weight: 700; font-size: 9.6pt; }
+  .botao.cinza { background: #e5e7eb; color: #111827; }
+  .etiqueta { display: inline-block; padding: 0.3mm 1.6mm; border-radius: 3mm; font-size: 9.4pt; font-weight: 700; }
+  .verde { background: #d1fae5; color: #065f46; } .amarelo { background: #fef3c7; color: #92400e; } .vermelho { background: #fee2e2; color: #991b1b; } .cinza { background: #e5e7eb; color: #374151; }
+  table { border-collapse: collapse; width: 100%; font-size: 9.6pt; margin-bottom: 2mm; }
+  td, th { border: 0.3mm solid #d1d5db; padding: 1.2mm 1.8mm; text-align: left; vertical-align: top; }
+  th { background: #f3f4f6; }
+  .contato { background: #7f1d1d; color: #fff; border-radius: 2.5mm; padding: 3mm; margin-top: 3mm; font-size: 10.5pt; }
+  .contato strong { color: #fde68a; }
+  .rodape { color: #6b7280; font-size: 8.6pt; margin-top: 3mm; }
+</style>
+</head>
+<body>
+
+<section class="primeira">
+  <div class="capa">
+    <div class="selo">📋</div>
+    <h1>Manual do Fiscal do Contrato</h1>
+    <p class="sub">Passo a passo com telas do sistema, para ler no celular</p>
+    <p class="sub"><strong>CBMPA · DAL</strong></p>
+  </div>
+  <h3>Para que serve o módulo</h3>
+  <ul>
+    <li>Ver <strong>só os seus contratos</strong>, com vigência e saldo;</li>
+    <li>Registrar <strong>notas fiscais</strong> e recibos com o comprovante em PDF;</li>
+    <li>Registrar <strong>ocorrências</strong> (atraso, problema, pedido de aditivo);</li>
+    <li>Gerar o <strong>relatório</strong> do contrato.</li>
+  </ul>
+  <div class="caixa info">📱 Funciona no <strong>celular</strong> e no computador, pelo navegador. Telas do manual com <strong>dados de exemplo</strong>.</div>
+  <p><strong>Tenha em mãos:</strong> sua <strong>matrícula (MF)</strong> e o <strong>e-mail</strong> que consta no contrato (pode ser Gmail, Hotmail…).</p>
+  <div class="contato">📞 <strong>Dúvidas?</strong> E-mail: <strong>sipcdal@gmail.com</strong><br>WhatsApp: <strong>(91) 98208-3739</strong></div>
+</section>
+
+<section>
+  <h2>1. Primeiro acesso</h2>
+  <div class="linha">
+    <div class="tela"><img src="prints/p1-login.jpg"><div class="legenda">Tela “Acesso ao Sistema”</div></div>
+    <div class="texto">
+      <div class="passo"><div class="num">1</div><div>Digite a sua <strong>matrícula (MF)</strong>.</div></div>
+      <div class="passo"><div class="num">2</div><div>Crie uma <strong>senha</strong> de pelo menos 6 caracteres.</div></div>
+      <div class="passo"><div class="num">3</div><div>Toque em <span class="botao">Entrar</span>.</div></div>
+      <div class="passo"><div class="num">4</div><div><strong>Esqueci a senha</strong>: o sistema envia um e-mail para criar outra.</div></div>
+      <div class="passo"><div class="num">5</div><div>Matrícula não encontrada? Use <strong>Preencher meus dados manualmente</strong> (próxima página).</div></div>
+    </div>
+  </div>
+  <div class="caixa dica">✅ Se a matrícula estiver no efetivo do CBMPA, abre <strong>“Completar Cadastro”</strong>: confira o nome, preencha <strong>nome de guerra, UBM, e-mail</strong> e senha, e toque em <span class="botao">Enviar Solicitação</span>.</div>
+  <div class="caixa aviso">⚠️ Use o <strong>mesmo e-mail e a mesma matrícula</strong> do contrato: é assim que o sistema reconhece os seus contratos.</div>
+</section>
+
+<section>
+  <h2>2. Cadastro manual e aprovação</h2>
+  <div class="linha">
+    <div class="tela"><img src="prints/p2-solicitar.jpg"><div class="legenda">Tela “Solicitar Acesso”</div></div>
+    <div class="texto">
+      <p>Preencha todos os campos:</p>
+      <ul>
+        <li>Nome completo</li>
+        <li>Cargo / patente</li>
+        <li>MF (matrícula)</li>
+        <li>Nome de guerra e UBM</li>
+        <li>E-mail</li>
+        <li>Senha (mín. 6) e confirmação</li>
+      </ul>
+      <p>Toque em <span class="botao">Enviar Solicitação</span>.</p>
+    </div>
+  </div>
+  <div class="caixa info">⏳ Aparece <em>“Solicitação enviada com sucesso! Aguarde a aprovação”</em>. A DAL/administrador aprova o seu acesso. Depois da aprovação, é só <strong>entrar</strong> com e-mail ou matrícula e a senha.</div>
+  <div class="caixa aviso">⚠️ Só quem tem <strong>cadastro aprovado</strong> recebe os e-mails do sistema (por exemplo, o aviso de que foi designado fiscal).</div>
+</section>
+
+<section>
+  <h2>3. Seus contratos</h2>
+  <div class="linha">
+    <div class="tela"><img src="prints/p3-lista.jpg"><div class="legenda">Menu → Fiscal do Contrato</div></div>
+    <div class="texto">
+      <div class="passo"><div class="num">1</div><div><strong>Quadros</strong>: toque para filtrar a lista.</div></div>
+      <div class="passo"><div class="num">2</div><div><strong>Busca</strong> por PAE, contrato, empresa ou objeto.</div></div>
+      <div class="passo"><div class="num">3</div><div>Toque no <strong>número do contrato</strong> para abrir.</div></div>
+      <p style="font-size:9.5pt">📱 A tabela é larga: <strong>deslize para o lado</strong> para ver vigência e situação.</p>
+    </div>
+  </div>
+  <table>
+    <tr><th>Quadro</th><th>Significa</th></tr>
+    <tr><td><strong>Vigentes</strong></td><td>Mais de 90 dias de prazo</td></tr>
+    <tr><td><strong>Vencendo</strong></td><td>⚠️ Até 90 dias para vencer</td></tr>
+    <tr><td><strong>Vencidos</strong></td><td>Prazo acabou</td></tr>
+    <tr><td><strong>Concluídos</strong></td><td>Contratos encerrados</td></tr>
+  </table>
+  <p><span class="etiqueta verde">Vigente</span> <span class="etiqueta amarelo">Vencendo</span> <span class="etiqueta vermelho">Vencido</span></p>
+  <div class="caixa dica">Não vê nenhum contrato? Veja “Problemas comuns”, no fim do manual.</div>
+</section>
+
+<section>
+  <h2>4. Abrir e gerenciar o contrato</h2>
+  <div class="larga"><img src="prints/p4-detalhe.jpg"></div>
+  <div class="passo"><div class="num">1</div><div><span class="botao cinza">Visualizar Contrato</span>: abre o PDF do contrato, dentro do sistema.</div></div>
+  <div class="passo"><div class="num">2</div><div><span class="botao">Gerenciar Execução / Notificações</span>: entra na gestão do contrato.</div></div>
+  <div class="linha" style="margin-top:2mm">
+    <div class="tela"><img src="prints/p5-gestao.jpg"><div class="legenda">Gestão do contrato</div></div>
+    <div class="texto">
+      <div class="passo"><div class="num">1</div><div><span class="botao cinza">Gerar Relatório</span> do contrato (dá para imprimir ou salvar em PDF).</div></div>
+      <div class="passo"><div class="num">2</div><div>Abas: <strong>Execução Financeira</strong> e <strong>Ocorrências</strong>.</div></div>
+      <div class="passo"><div class="num">3</div><div><strong>Saldo restante</strong>: o que ainda pode ser usado.</div></div>
+      <p style="font-size:9.5pt">Também aparecem os botões <em>Ver Nota de Empenho</em> e <em>Voltar</em>.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>5. Registrar uma nota fiscal</h2>
+  <div class="linha">
+    <div class="tela"><img src="prints/p6-nf.jpg"><div class="legenda">Aba Execução Financeira</div></div>
+    <div class="texto">
+      <div class="passo"><div class="num">1</div><div><strong>Abatimento</strong>: por valor (serviços) ou por quantidade (bens).</div></div>
+      <div class="passo"><div class="num">2</div><div><strong>Tipo</strong>: NF/Fatura, Recibo de Pagamento ou Recebimento da NE.</div></div>
+      <div class="passo"><div class="num">3</div><div><strong>Nº da NF</strong>.</div></div>
+      <div class="passo"><div class="num">4</div><div><strong>Data</strong> do documento.</div></div>
+      <div class="passo"><div class="num">5</div><div><strong>Valor</strong> (R$) ou quantidade.</div></div>
+      <div class="passo"><div class="num">6</div><div><strong>Observação</strong>: a competência, ex. “Referente a novembro/2026”.</div></div>
+      <div class="passo"><div class="num">7</div><div><strong>Comprovante</strong>: anexe a NF em <strong>PDF</strong>.</div></div>
+      <div class="passo"><div class="num">8</div><div>Confira e toque em <span class="botao">Registrar Dedução</span>.</div></div>
+    </div>
+  </div>
+  <div class="caixa info">📝 <strong>Recibo</strong> e <strong>Recebimento da NE</strong> só confirmam: não abatem saldo (botão <span class="botao">Registrar</span>). A NF vai para a <strong>Linha do Tempo</strong> e o saldo se atualiza; acima do saldo, aparece <em>“Acima do saldo”</em>.</div>
+</section>
+
+<section>
+  <h2>6. Ocorrências e pagamento</h2>
+  <div class="linha">
+    <div class="tela"><img src="prints/p7-ocorrencias.jpg"><div class="legenda">Aba Ocorrências</div></div>
+    <div class="texto">
+      <div class="passo"><div class="num">1</div><div>Abra a aba <strong>Ocorrências</strong>.</div></div>
+      <div class="passo"><div class="num">2</div><div>Escolha o tipo: <em>Ocorrência</em>, <em>Solicitação de Aditivo</em> ou <em>de Esclarecimento</em>.</div></div>
+      <div class="passo"><div class="num">3</div><div>Descreva: atraso na entrega, item em desconformidade…</div></div>
+      <div class="passo"><div class="num">4</div><div>Toque em <span class="botao">Adicionar</span>.</div></div>
+    </div>
+  </div>
+  <p style="margin-top:2mm">O registro fica no <strong>histórico</strong>, com data e seu nome.</p>
+  <h3>Situação do pagamento</h3>
+  <p>Cada nota mostra como está o pagamento no Financeiro:</p>
+  <p><span class="etiqueta cinza">Aguardando pagamento</span> <span class="etiqueta amarelo">Em andamento no Financeiro</span> <span class="etiqueta verde">Pago</span></p>
+  <p>O valor da nota só <strong>sai do saldo</strong> depois do pagamento.</p>
+</section>
+
+<section>
+  <h2>7. Problemas comuns</h2>
+  <h3>Não vejo meu contrato</h3>
+  <p>O sistema mostra contratos em que a sua <strong>matrícula, e-mail ou nome</strong> batem com o fiscal do contrato. Confira os dados do seu cadastro. Se não aparecer, fale com a Gestão de Contratos.</p>
+  <h3>Não consigo entrar</h3>
+  <p>Confira e-mail/matrícula e senha, ou use <em>Esqueci a senha</em>. Se acabou de se cadastrar, <strong>aguarde a aprovação</strong>.</p>
+  <h3>Não recebo e-mails do sistema</h3>
+  <p>Só recebe quem tem <strong>cadastro aprovado</strong>, com o mesmo e-mail do contrato. Olhe o spam.</p>
+  <h3>O anexo não sobe</h3>
+  <p>Use <strong>PDF</strong> de até 50 MB. Se aparecer “Sessão expirada”, <strong>entre de novo</strong>.</p>
+  <h3>Registrei errado</h3>
+  <p>Não refaça por conta própria. Avise a <strong>Gestão de Contratos</strong>.</p>
+  <div class="contato">📞 <strong>Suporte:</strong> sipcdal@gmail.com<br>WhatsApp: <strong>(91) 98208-3739</strong></div>
+  <p class="rodape">Sistema de Controle de Processos — CBMPA. Telas com dados de exemplo; podem receber melhorias.</p>
+</section>
+
+</body>
+</html>

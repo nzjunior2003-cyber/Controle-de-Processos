@@ -294,6 +294,71 @@ service cloud.firestore {
       allow read: if ativo();
       allow write: if ativo() && perfilDoc().perfil in ['master', 'contratos', 'gestao'];
     }
+    // Prazos do fluxo de compras (Fase C): todo usuário ativo lê; só o Master e o
+    // perfil DAL gravam, em um único documento (`prazos`), com chaves e números válidos.
+    function numeroOk(mapa, chave) {
+      return !(chave in mapa) || (mapa[chave] is number && mapa[chave] >= 0 && mapa[chave] <= 365);
+    }
+    function configPrazosValida(d) {
+      return d.keys().hasOnly(['diasPorEtapa', 'prazoAteContratoPorRito', 'atualizado_em', 'atualizado_por'])
+        && (!('diasPorEtapa' in d) || (d.diasPorEtapa is map
+          && d.diasPorEtapa.keys().hasOnly(['E01', 'E02', 'E03', 'E04', 'E05', 'E06', 'E07', 'E08', 'E09', 'E10', 'E11', 'E12', 'E13', 'E14', 'E15', 'E16', 'E17', 'E18', 'E19', 'E20', 'E21', 'E22', 'E23', 'E24', 'E25', 'E26', 'E27', 'E28', 'E29', 'E30', 'E31', 'E32', 'E33', 'E34', 'E35'])
+          && numeroOk(d.diasPorEtapa, 'E01')
+        && numeroOk(d.diasPorEtapa, 'E02')
+        && numeroOk(d.diasPorEtapa, 'E03')
+        && numeroOk(d.diasPorEtapa, 'E04')
+        && numeroOk(d.diasPorEtapa, 'E05')
+        && numeroOk(d.diasPorEtapa, 'E06')
+        && numeroOk(d.diasPorEtapa, 'E07')
+        && numeroOk(d.diasPorEtapa, 'E08')
+        && numeroOk(d.diasPorEtapa, 'E09')
+        && numeroOk(d.diasPorEtapa, 'E10')
+        && numeroOk(d.diasPorEtapa, 'E11')
+        && numeroOk(d.diasPorEtapa, 'E12')
+        && numeroOk(d.diasPorEtapa, 'E13')
+        && numeroOk(d.diasPorEtapa, 'E14')
+        && numeroOk(d.diasPorEtapa, 'E15')
+        && numeroOk(d.diasPorEtapa, 'E16')
+        && numeroOk(d.diasPorEtapa, 'E17')
+        && numeroOk(d.diasPorEtapa, 'E18')
+        && numeroOk(d.diasPorEtapa, 'E19')
+        && numeroOk(d.diasPorEtapa, 'E20')
+        && numeroOk(d.diasPorEtapa, 'E21')
+        && numeroOk(d.diasPorEtapa, 'E22')
+        && numeroOk(d.diasPorEtapa, 'E23')
+        && numeroOk(d.diasPorEtapa, 'E24')
+        && numeroOk(d.diasPorEtapa, 'E25')
+        && numeroOk(d.diasPorEtapa, 'E26')
+        && numeroOk(d.diasPorEtapa, 'E27')
+        && numeroOk(d.diasPorEtapa, 'E28')
+        && numeroOk(d.diasPorEtapa, 'E29')
+        && numeroOk(d.diasPorEtapa, 'E30')
+        && numeroOk(d.diasPorEtapa, 'E31')
+        && numeroOk(d.diasPorEtapa, 'E32')
+        && numeroOk(d.diasPorEtapa, 'E33')
+        && numeroOk(d.diasPorEtapa, 'E34')
+        && numeroOk(d.diasPorEtapa, 'E35')))
+        && (!('prazoAteContratoPorRito' in d) || (d.prazoAteContratoPorRito is map
+          && d.prazoAteContratoPorRito.keys().hasOnly(['pregao_srp', 'pregao', 'concorrencia', 'dispensa_eletronica', 'inexigibilidade', 'gerenciador_ata', 'participe_ata', 'adesao_ata'])
+          && numeroOk(d.prazoAteContratoPorRito, 'pregao_srp')
+        && numeroOk(d.prazoAteContratoPorRito, 'pregao')
+        && numeroOk(d.prazoAteContratoPorRito, 'concorrencia')
+        && numeroOk(d.prazoAteContratoPorRito, 'dispensa_eletronica')
+        && numeroOk(d.prazoAteContratoPorRito, 'inexigibilidade')
+        && numeroOk(d.prazoAteContratoPorRito, 'gerenciador_ata')
+        && numeroOk(d.prazoAteContratoPorRito, 'participe_ata')
+        && numeroOk(d.prazoAteContratoPorRito, 'adesao_ata')))
+        && (!('atualizado_por' in d) || d.atualizado_por == request.auth.uid);
+    }
+    match /config_fluxo/{documento} {
+      allow read: if ativo();
+      allow create, update: if ativo()
+        && documento == 'prazos'
+        && perfilDoc().perfil in ['master', 'dal']
+        && configPrazosValida(request.resource.data);
+      allow delete: if master();
+    }
+
     // Itens incluídos/excluídos pelo master nos checklists dos ritos processuais.
     match /ajustes_rito/{documento} {
       allow read: if ativo();

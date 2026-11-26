@@ -34,7 +34,7 @@ const CORES_GANTT = [
 export default function DetalheProcesso() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { processos, setores, estadasProcesso, pcas, contratos, procedimentos, usuarioAtual, usuarios, updateProcesso, deleteProcesso } = useApp();
+  const { processos, setores, estadasProcesso, pcas, contratos, procedimentos, usuarioAtual, usuarios, configPrazos, updateProcesso, deleteProcesso } = useApp();
   const etapasPorRito = useEtapasPorRito();
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
@@ -297,6 +297,7 @@ export default function DetalheProcesso() {
           tramitacoes={estadasProcesso.filter((e) => e.processo_id === processo.id)}
           podeEditar={podeConfirmarFluxo(usuarioAtual.perfil)}
           usuarioId={usuarioAtual.id}
+          configPrazos={configPrazos}
           nomeConfirmador={usuarios.find((u) => u.id === processo.etapaConfirmadaPor)?.nome}
           onSalvar={(campos) => updateProcesso(processo.id, campos)}
         />
