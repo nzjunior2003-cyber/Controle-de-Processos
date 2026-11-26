@@ -281,3 +281,34 @@ describe('config_fluxo (prazos do fluxo de compras)', () => {
     await assertSucceeds(deleteDoc(doc(como('master'), 'config_fluxo', 'prazos')));
   });
 });
+
+describe('processos: histórico das etapas (Fase D)', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'processos', 'existente'), { teste: true, excluido: false });
+    });
+  });
+  const historico = [{ etapaId: 'E07', inicio: '2026-11-01T12:00:00Z', fim: '2026-11-16T12:00:00Z' }, { etapaId: 'E08', inicio: '2026-11-16T12:00:00Z' }];
+  const gravar = (p: string, h: unknown) => updateDoc(doc(como(p), 'processos', 'existente'), { historicoEtapas: h });
+
+  for (const p of PERFIS) {
+    const pode = ['master', 'apoio', 'contratos'].includes(p);
+    it(`${p} ${pode ? 'PODE' : 'NÃO pode'} gravar o histórico das etapas`, async () => {
+      await (pode ? assertSucceeds(gravar(p, historico)) : assertFails(gravar(p, historico)));
+    });
+  }
+  it('o histórico precisa ser uma lista de até 80 itens', async () => {
+    await assertFails(gravar('apoio', 'texto'));
+    await assertFails(gravar('apoio', { etapaId: 'E07' }));
+    await assertFails(gravar('apoio', Array.from({ length: 81 }, () => ({ etapaId: 'E07', inicio: 'x' }))));
+    await assertSucceeds(gravar('apoio', Array.from({ length: 80 }, () => ({ etapaId: 'E07', inicio: 'x' }))));
+  });
+  it('confirmar etapa junto com o histórico, em nome próprio, é aceito; forjar o autor não', async () => {
+    const campos = (p: string, por: string) => updateDoc(doc(como(p), 'processos', 'existente'), {
+      etapaAtualId: 'E08', etapaOrigem: 'manual', etapaConfirmadaEm: new Date().toISOString(), etapaConfirmadaPor: por, historicoEtapas: historico,
+    });
+    await assertSucceeds(campos('contratos', uid('contratos')));
+    await assertFails(campos('contratos', uid('master')));
+  });
+});
+

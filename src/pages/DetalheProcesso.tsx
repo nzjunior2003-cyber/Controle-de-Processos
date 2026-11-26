@@ -21,6 +21,7 @@ import { ehItemDotacaoOrcamentaria, limparClassificacoes } from '../lib/orcament
 import { valorUtilizadoNaArp } from '../lib/arp';
 import PaesAcessoriosCard from '../components/PaesAcessoriosCard';
 import CartaoFluxoCompras from '../components/processo/CartaoFluxoCompras';
+import { useMedianasEtapas } from '../hooks/useMedianasEtapas';
 import { podeConfirmarFluxo } from '../lib/confirmacaoFluxo';
 import DotacaoOrcamentariaEditor from '../components/processo/DotacaoOrcamentariaEditor';
 import { AdicionarEtapa, BotaoExcluirEtapa } from '../components/processo/ControlesChecklistMaster';
@@ -44,6 +45,7 @@ export default function DetalheProcesso() {
   const [dotacoesDraft, setDotacoesDraft] = useState<ClassificacaoOrcamentaria[] | null>(null);
   const [salvandoDotacoes, setSalvandoDotacoes] = useState(false);
 
+  const medianas = useMedianasEtapas();
   const processo = processos.find(p => p.id === id);
   if (!processo) {
     return <div className="p-6">Processo não encontrado.</div>;
@@ -298,6 +300,7 @@ export default function DetalheProcesso() {
           podeEditar={podeConfirmarFluxo(usuarioAtual.perfil)}
           usuarioId={usuarioAtual.id}
           configPrazos={configPrazos}
+          medianas={medianas}
           nomeConfirmador={usuarios.find((u) => u.id === processo.etapaConfirmadaPor)?.nome}
           onSalvar={(campos) => updateProcesso(processo.id, campos)}
         />

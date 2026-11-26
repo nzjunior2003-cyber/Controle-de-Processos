@@ -9,14 +9,17 @@ import {
   type RitoCompras,
 } from '../../config/fluxoCompras';
 import { calcularFluxo, type ProcessoFluxo, type TramitacaoFluxo } from '../../lib/fluxoCompras';
-import { camposConfirmacao, camposRito, camposResposta } from '../../lib/confirmacaoFluxo';
-import { calcularPrazos, ROTULO_SITUACAO, textoFaixa, type ConfigPrazos, type SituacaoPrazo } from '../../lib/prazosFluxo';
+import { camposConfirmacaoComHistorico, camposRito, camposResposta } from '../../lib/confirmacaoFluxo';
+import { linhaDoTempo, type MedianaEtapa, type ModoRegistro } from '../../lib/historicoEtapas';
+import { calcularPrazos, diasPorEtapaDoProcesso, ROTULO_SITUACAO, textoFaixa, type ConfigPrazos, type SituacaoPrazo } from '../../lib/prazosFluxo';
 import type { Processo } from '../../types';
 
 interface Props {
   processo: ProcessoFluxo & Pick<Processo, 'id'> & Partial<Pick<Processo, 'data_entrada' | 'data_abertura'>>;
   /** Prazos editados por DAL/Master (sem isso valem os padrões). */
   configPrazos?: ConfigPrazos;
+  /** Mediana real por etapa (Fase D), calculada com todos os processos. */
+  medianas?: Map<string, MedianaEtapa>;
   tramitacoes: TramitacaoFluxo[];
   /** master, apoio ou contratos; os demais só veem. */
   podeEditar: boolean;
@@ -39,18 +42,22 @@ const COR_SITUACAO: Record<SituacaoPrazo, string> = {
 
 const dataBR = (d: Date | null) => (d ? format(d, 'dd/MM/yyyy') : '—');
 
-export default function CartaoFluxoCompras({ processo, tramitacoes, podeEditar, usuarioId, nomeConfirmador, configPrazos, onSalvar }: Props) {
+export default function CartaoFluxoCompras({ processo, tramitacoes, podeEditar, usuarioId, nomeConfirmador, configPrazos, medianas, onSalvar }: Props) {
   const fluxo = useMemo(() => calcularFluxo(processo, tramitacoes), [processo, tramitacoes]);
-  const prazos = useMemo(() => calcularPrazos(processo, tramitacoes, configPrazos), [processo, tramitacoes, configPrazos]);
+  const prazos = useMemo(() => calcularPrazos(processo, tramitacoes, configPrazos, new Date(), medianas), [processo, tramitacoes, configPrazos, medianas]);
+  const linha = useMemo(() => linhaDoTempo(processo), [processo]);
+  const metas = useMemo(() => diasPorEtapaDoProcesso(processo, configPrazos), [processo, configPrazos]);
+  const [chegada, setChegada] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [corrigindo, setCorrigindo] = useState(false);
   const [escolhida, setEscolhida] = useState('');
 
-  const salvar = async (campos: Partial<Processo>) => {
+  const salvar = async (campos: Partial<Processo> | (() => Partial<Processo>)) => {
     setSalvando(true);
     try {
-      await onSalvar(campos);
+      await onSalvar(typeof campos === 'function' ? campos() : campos);
       setCorrigindo(false);
+      setChegada('');
     } catch (erro) {
       alert('Não foi possível salvar: ' + (erro instanceof Error ? erro.message : String(erro)));
     } finally {
@@ -67,7 +74,14 @@ export default function CartaoFluxoCompras({ processo, tramitacoes, podeEditar, 
     );
   }
 
-  const confirmar = (etapaId: string) => salvar(camposConfirmacao(etapaId, fluxo.sugestao?.etapaId, usuarioId));
+  const confirmar = (etapaId: string, modo: ModoRegistro) =>
+    salvar(() =>
+      camposConfirmacaoComHistorico(processo, etapaId, fluxo.sugestao?.etapaId, usuarioId, {
+        modo,
+        chegada: chegada ? new Date(`${chegada}T12:00:00`) : undefined,
+      }),
+    );
+  const hoje = format(new Date(), 'yyyy-MM-dd');
   const bloqueio = fluxo.decisoesPendentes.find((d) => d.bloqueiaProximo);
   const outrasPerguntas = fluxo.decisoesPendentes.filter((d) => !d.bloqueiaProximo);
   const dataConfirmacao = processo.etapaConfirmadaEm ? new Date(processo.etapaConfirmadaEm) : null;
@@ -140,7 +154,7 @@ export default function CartaoFluxoCompras({ processo, tramitacoes, podeEditar, 
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-sky-50 border border-sky-200 px-3 py-2 text-sm text-sky-900">
           <span>O andamento indica a etapa <strong>{fluxo.sugestao.etapaId}</strong> ({ETAPAS.find((e) => e.id === fluxo.sugestao?.etapaId)?.nome}).</span>
           {podeEditar && (
-            <button type="button" disabled={salvando} onClick={() => confirmar(fluxo.sugestao!.etapaId)} className="font-medium underline disabled:opacity-50">
+            <button type="button" disabled={salvando} onClick={() => confirmar(fluxo.sugestao!.etapaId, 'avancar')} className="font-medium underline disabled:opacity-50">
               Atualizar para {fluxo.sugestao.etapaId}
             </button>
           )}
@@ -203,6 +217,11 @@ export default function CartaoFluxoCompras({ processo, tramitacoes, podeEditar, 
                       {m.contagem.incerto && <span title="Responda as perguntas em aberto para fechar a conta"> (estimativa)</span>}
                     </span>
                     {m.situacao !== 'sem_data' && <span className="text-xs text-gray-600">previsão {dataBR(m.previsao)} · prazo {dataBR(m.prazo)}</span>}
+                    {m.previsaoHistorico && (
+                      <span className="text-xs text-sky-800" title="Usa a mediana real de dias das etapas com casos suficientes">
+                        pelo histórico: {dataBR(m.previsaoHistorico)} (mediana de {m.casosHistorico} casos)
+                      </span>
+                    )}
                     <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${COR_SITUACAO[m.situacao]}`}>
                       {m.situacao === 'atrasado' ? `Atrasado há ${m.diasAtraso} dia(s)` : ROTULO_SITUACAO[m.situacao]}
                     </span>
@@ -217,15 +236,39 @@ export default function CartaoFluxoCompras({ processo, tramitacoes, podeEditar, 
         </div>
       )}
 
+      {linha.length > 0 && (
+        <div className="text-sm" aria-label="Linha do tempo das etapas">
+          <p className="text-xs font-medium text-gray-500 uppercase">Por onde o processo passou</p>
+          <ul className="mt-1 space-y-1">
+            {linha.map((p, i) => (
+              <li key={`${p.etapaId}-${i}`} className="text-gray-800">
+                <strong>{p.etapaId}</strong> — {ETAPAS.find((e) => e.id === p.etapaId)?.nome}
+                <span className="block text-xs text-gray-500">
+                  {p.emAndamento ? `desde ${dataBR(new Date(p.inicio))} · há ${p.dias} dia(s) (em andamento)` : `${dataBR(new Date(p.inicio))} a ${dataBR(new Date(p.fim as string))} · ${p.dias} dia(s)`}
+                  {metas[p.etapaId] ? ` · meta ${Math.round(metas[p.etapaId])}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {podeEditar && (
+        <label className="flex flex-wrap items-center gap-2 text-sm text-gray-800">
+          Quando o processo chegou na etapa? <span className="text-xs text-gray-500">(opcional; padrão: hoje)</span>
+          <input type="date" value={chegada} max={hoje} onChange={(e) => setChegada(e.target.value)} className="rounded-md border-gray-300 text-sm" aria-label="Data de chegada na etapa" />
+        </label>
+      )}
+
       {podeEditar && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
           {mostrarConfirmar && (
-            <button type="button" disabled={salvando} onClick={() => confirmar(fluxo.sugestao!.etapaId)} className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:opacity-50">
+            <button type="button" disabled={salvando} onClick={() => confirmar(fluxo.sugestao!.etapaId, 'confirmar')} className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:opacity-50">
               <CheckCircle2 className="h-4 w-4 mr-1" />Confirmar etapa atual
             </button>
           )}
           {fluxo.confirmada && fluxo.proxima && !fluxo.concluido && (
-            <button type="button" disabled={salvando} onClick={() => confirmar(fluxo.proxima!.id)} className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50">
+            <button type="button" disabled={salvando} onClick={() => confirmar(fluxo.proxima!.id, 'avancar')} className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50">
               <ArrowRight className="h-4 w-4 mr-1" />{fluxo.proximaOpcional ? 'Pular (não necessário)' : 'Avançar para a próxima etapa'}
             </button>
           )}
@@ -245,7 +288,7 @@ export default function CartaoFluxoCompras({ processo, tramitacoes, podeEditar, 
               </optgroup>
             ))}
           </select>
-          <button type="button" disabled={!escolhida || salvando} onClick={() => confirmar(escolhida)} className="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:opacity-50">
+          <button type="button" disabled={!escolhida || salvando} onClick={() => confirmar(escolhida, 'corrigir')} className="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:opacity-50">
             Salvar etapa
           </button>
         </div>

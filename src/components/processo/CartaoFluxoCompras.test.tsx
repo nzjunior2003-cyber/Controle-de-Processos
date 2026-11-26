@@ -118,4 +118,62 @@ describe('CartaoFluxoCompras', () => {
     montar({});
     expect(screen.queryByText('Contrato')).toBeNull();
   });
+
+  it('mostra a linha do tempo das etapas percorridas, com dias e a etapa em andamento', () => {
+    montar({
+      ritoProcessual: 'pregao', etapaAtualId: 'E08', etapaOrigem: 'manual', etapaConfirmadaPor: 'u1', etapaConfirmadaEm: '2026-11-16T12:00:00Z',
+      historicoEtapas: [
+        { etapaId: 'E07', inicio: '2026-11-01T12:00:00Z', fim: '2026-11-16T12:00:00Z' },
+        { etapaId: 'E08', inicio: '2026-11-16T12:00:00Z' },
+      ],
+    });
+    expect(screen.getByText('Por onde o processo passou')).toBeTruthy();
+    expect(screen.getByText(/15 dia\(s\)/)).toBeTruthy();
+    expect(screen.getByText(/\(em andamento\)/)).toBeTruthy();
+  });
+
+  it('avançar grava a data de chegada informada e fecha a etapa anterior', async () => {
+    const onSalvar = montar({
+      ritoProcessual: 'pregao', cbmGerenciadorOuParticipeArp: false, etapaAtualId: 'E14', etapaOrigem: 'manual',
+      etapaConfirmadaPor: 'u2', etapaConfirmadaEm: '2026-01-10T12:00:00Z',
+    });
+    fireEvent.change(screen.getByLabelText('Data de chegada na etapa'), { target: { value: '2026-02-01' } });
+    fireEvent.click(screen.getByText('Avançar para a próxima etapa'));
+    await waitFor(() => expect(onSalvar).toHaveBeenCalled());
+    const campos = onSalvar.mock.calls[0][0];
+    expect(campos.etapaAtualId).toBe('E15');
+    expect(campos.historicoEtapas).toHaveLength(2);
+    expect(campos.historicoEtapas[0]).toMatchObject({ etapaId: 'E14' });
+    expect(campos.historicoEtapas[0].fim).toContain('2026-02-01');
+    expect(campos.historicoEtapas[1].inicio).toContain('2026-02-01');
+  });
+
+  it('data de chegada futura é recusada com aviso e nada é gravado', async () => {
+    const alerta = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    const onSalvar = montar({ ritoProcessual: 'pregao' });
+    fireEvent.change(screen.getByLabelText('Data de chegada na etapa'), { target: { value: '2999-01-01' } });
+    fireEvent.click(screen.getByText('Confirmar etapa atual'));
+    await waitFor(() => expect(alerta).toHaveBeenCalled());
+    expect(onSalvar).not.toHaveBeenCalled();
+    alerta.mockRestore();
+  });
+
+  it('corrigir a etapa substitui a passagem em andamento', async () => {
+    const onSalvar = montar({
+      ritoProcessual: 'pregao', etapaAtualId: 'E07', etapaOrigem: 'auto', etapaConfirmadaPor: 'u2', etapaConfirmadaEm: '2026-01-10T12:00:00Z',
+    });
+    fireEvent.click(screen.getByText('Corrigir etapa'));
+    fireEvent.change(screen.getByLabelText('Etapa correta'), { target: { value: 'E12' } });
+    fireEvent.click(screen.getByText('Salvar etapa'));
+    await waitFor(() => expect(onSalvar).toHaveBeenCalled());
+    expect(onSalvar.mock.calls[0][0].historicoEtapas.map((p: { etapaId: string }) => p.etapaId)).toEqual(['E12']);
+  });
+
+  it('quem não pode editar vê a linha do tempo, mas não o campo de data', () => {
+    montar({
+      ritoProcessual: 'pregao', etapaAtualId: 'E07', etapaConfirmadaPor: 'u2', etapaConfirmadaEm: '2026-01-10T12:00:00Z',
+    }, { podeEditar: false });
+    expect(screen.getByText('Por onde o processo passou')).toBeTruthy();
+    expect(screen.queryByLabelText('Data de chegada na etapa')).toBeNull();
+  });
 });
