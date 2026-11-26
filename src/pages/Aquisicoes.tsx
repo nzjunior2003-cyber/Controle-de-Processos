@@ -387,7 +387,7 @@ export default function Aquisicoes() {
       <StatusRobo />
 
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+        <nav className="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
           <button
             onClick={() => setActiveTab('processos')}
             className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
@@ -599,32 +599,107 @@ export default function Aquisicoes() {
               </div>
             )}
 
-            <div className="overflow-x-auto">
+            {/* Celular: cartões (a tabela de 7 colunas não cabe na tela) */}
+            <div className="lg:hidden divide-y divide-gray-200" aria-label="Lista de processos (celular e tablet)">
+              {filtrados.length === 0 ? (
+                <p className="px-4 py-10 text-center text-gray-500">Nenhum processo encontrado.</p>
+              ) : (
+                filtrados.map((proc) => {
+                  const diasNoSetor = proc.ultima_tramitacao
+                    ? Math.max(0, differenceInDays(hoje, new Date(proc.ultima_tramitacao)))
+                    : null;
+                  const progresso = calcularProgressoChecklist(proc, etapasPorRito);
+                  const proximoPasso = resumoProximoPasso(calcularFluxo(proc, estadasPorProcesso.get(proc.id) ?? []));
+                  const situacaoPrazo = situacaoPrazoPorProcesso.get(proc.id);
+                  const setorAtual = proc.localizacao_atual || setores.find((s) => s.id === proc.fase_atual_id)?.sigla;
+                  return (
+                    <Link
+                      key={proc.id}
+                      to={`/sistema/processos/${proc.id}`}
+                      className="block px-4 py-3 bg-white active:bg-gray-100"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="flex items-center text-sm font-semibold text-gray-900 break-all">
+                            {proc.possui_alerta && <AlertCircle className="h-4 w-4 text-amber-500 mr-1 flex-shrink-0" />}
+                            {proc.numero_processo}
+                          </p>
+                          {proc.ordem != null && <p className="text-[11px] text-gray-500">Nº de ordem {proc.ordem}</p>}
+                        </div>
+                        <span
+                          className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium outline outline-1 outline-offset-1 text-center ${STATUS_CORES[proc.status]}`}
+                        >
+                          {STATUS_LABELS[proc.status]}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-sm text-gray-900 line-clamp-3 break-words">{proc.objeto}</p>
+                      {proximoPasso && (
+                        <p className="mt-1 text-xs text-red-800 break-words">
+                          {proximoPasso}
+                          {(situacaoPrazo === 'atrasado' || situacaoPrazo === 'atencao') && (
+                            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full font-medium ${situacaoPrazo === 'atrasado' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-900'}`}>
+                              {ROTULO_SITUACAO[situacaoPrazo as SituacaoPrazo]}
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                        <div className="min-w-0">
+                          <dt className="text-[10px] font-medium text-gray-500 uppercase">Setor atual</dt>
+                          <dd className="text-gray-900 break-words">{setorAtual || '-'}</dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-[10px] font-medium text-gray-500 uppercase">Rito</dt>
+                          <dd className="text-gray-900 break-words">{proc.rito_processual || '-'}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-medium text-gray-500 uppercase">Dias no setor</dt>
+                          <dd className="text-gray-900">{diasNoSetor === null ? '-' : `${diasNoSetor} dias`}</dd>
+                        </div>
+                        {progresso !== null && (
+                          <div>
+                            <dt className="text-[10px] font-medium text-gray-500 uppercase">Checklist</dt>
+                            <dd className="flex items-center gap-1.5">
+                              <span className="w-16 bg-gray-200 rounded-full h-1.5 inline-block">
+                                <span className="block bg-red-600 h-1.5 rounded-full" style={{ width: `${progresso}%` }} />
+                              </span>
+                              <span className="text-gray-600">{progresso}%</span>
+                            </dd>
+                          </div>
+                        )}
+                      </dl>
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full table-fixed divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="w-[6%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="Nº de ordem na planilha de processos">
+                    <th scope="col" className="w-[5%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="Nº de ordem na planilha de processos">
                       Nº
                     </th>
-                    <th scope="col" className="w-[13%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Nº PAE
                     </th>
-                    <th scope="col" className="w-[23%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[22%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Objeto
                     </th>
-                    <th scope="col" className="w-[19%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Setor Atual
                     </th>
-                    <th scope="col" className="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[19%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Rito
                     </th>
-                    <th scope="col" className="w-[8%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="w-[7%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Dias no Setor
                     </th>
                     <th
                       scope="col"
                       aria-sort={ordemStatus === 'asc' ? 'ascending' : ordemStatus === 'desc' ? 'descending' : 'none'}
-                      className="w-[19%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
                       <button
                         type="button"
@@ -713,7 +788,7 @@ export default function Aquisicoes() {
                               {proc.objeto}
                             </div>
                             {proximoPasso && (
-                              <div className="mt-0.5 text-[11px] text-red-800 truncate" title={proximoPasso}>
+                              <div className="mt-0.5 text-[11px] text-red-800 line-clamp-2 break-words" title={proximoPasso}>
                                 {proximoPasso}
                                 {(situacaoPrazoPorProcesso.get(proc.id) === 'atrasado' || situacaoPrazoPorProcesso.get(proc.id) === 'atencao') && (
                                   <span className={`ml-1.5 px-1.5 py-0.5 rounded-full font-medium ${situacaoPrazoPorProcesso.get(proc.id) === 'atrasado' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-900'}`}>
@@ -732,7 +807,7 @@ export default function Aquisicoes() {
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <div className="text-sm text-gray-700 truncate" title={proc.rito_processual}>
+                            <div className="text-sm text-gray-700 line-clamp-3 break-words" title={proc.rito_processual}>
                               {proc.rito_processual || '-'}
                             </div>
                           </td>
