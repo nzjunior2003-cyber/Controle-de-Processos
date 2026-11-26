@@ -7,7 +7,7 @@ const salvarConfigPrazos = vi.fn().mockResolvedValue(undefined);
 let perfil = 'dal';
 
 vi.mock('../../context/AppContext', () => ({
-  useApp: () => ({ usuarioAtual: { id: 'u1', perfil }, configPrazos: undefined, salvarConfigPrazos, usuarios: [] }),
+  useApp: () => ({ usuarioAtual: { id: 'u1', perfil }, configPrazos: undefined, salvarConfigPrazos, usuarios: [], processos: [] }),
 }));
 
 afterEach(() => { cleanup(); salvarConfigPrazos.mockClear(); });

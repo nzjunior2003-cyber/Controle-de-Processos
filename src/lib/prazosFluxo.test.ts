@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { MedianaEtapa } from './historicoEtapas';
 import { DIAS_PADRAO_ETAPA, ETAPAS, MARCOS } from '../config/fluxoCompras';
 import {
   calcularPrazos,
@@ -188,3 +189,58 @@ describe('datas e situação do prazo', () => {
     expect(inicioDaEtapaAtual({}, [], abertura)).toBe(abertura);
   });
 });
+
+describe('histórico real nos prazos (Fase D)', () => {
+  const base = {
+    ...respondido, ritoProcessual: 'pregao' as const, data_entrada: '2026-01-01T00:00:00Z',
+    etapaAtualId: 'E07', etapaOrigem: 'manual' as const, etapaConfirmadaPor: 'u1',
+  };
+  const agora = new Date('2026-01-10T00:00:00Z');
+  const cont = (r: ReturnType<typeof calcularPrazos>) => r.marcos.find((m) => m.marco.id === 'contrato')!;
+  const med = (etapaId: string, mediana: number, casos: number): [string, MedianaEtapa] => [etapaId, { etapaId, mediana, casos, suficiente: casos >= 5 }];
+
+  it('o início da etapa atual vem da data de chegada do histórico, não da confirmação', () => {
+    const p = {
+      ...base, etapaConfirmadaEm: '2026-01-09T00:00:00Z',
+      historicoEtapas: [{ etapaId: 'E07', inicio: '2026-01-02T00:00:00Z' }],
+    };
+    const r = calcularPrazos(p, [], undefined, agora);
+    expect(r.etapaAtual?.diasNaEtapa).toBe(8);
+  });
+
+  it('sem histórico, continua usando a data da confirmação (processo da Fase B)', () => {
+    const r = calcularPrazos({ ...base, etapaConfirmadaEm: '2026-01-09T00:00:00Z' }, [], undefined, agora);
+    expect(r.etapaAtual?.diasNaEtapa).toBe(1);
+  });
+
+  it('sem medianas, não há previsão pelo histórico', () => {
+    const r = calcularPrazos({ ...base, etapaConfirmadaEm: '2026-01-09T00:00:00Z' }, [], undefined, agora);
+    expect(cont(r).previsaoHistorico).toBeNull();
+    expect(cont(r).casosHistorico).toBe(0);
+  });
+
+  it('medianas com poucos casos são ignoradas', () => {
+    const medianas = new Map([med('E14', 30, 3)]);
+    const r = calcularPrazos({ ...base, etapaConfirmadaEm: '2026-01-09T00:00:00Z' }, [], undefined, agora, medianas);
+    expect(cont(r).previsaoHistorico).toBeNull();
+  });
+
+  it('com casos suficientes, troca a meta pela mediana real e informa o nº de casos', () => {
+    const pela_meta = calcularPrazos({ ...base, etapaConfirmadaEm: '2026-01-09T00:00:00Z' }, [], undefined, agora);
+    const medianas = new Map([med('E14', 60, 7), med('E17', 90, 9)]);
+    const r = calcularPrazos({ ...base, etapaConfirmadaEm: '2026-01-09T00:00:00Z' }, [], undefined, agora, medianas);
+    expect(cont(r).previsaoHistorico).not.toBeNull();
+    expect(cont(r).casosHistorico).toBe(7);
+    expect(cont(r).previsaoHistorico!.getTime()).toBeGreaterThan(cont(pela_meta).previsao!.getTime());
+    // o prazo (meta) e a previsão pela meta não mudam
+    expect(cont(r).prazo?.getTime()).toBe(cont(pela_meta).prazo?.getTime());
+    expect(cont(r).previsao?.getTime()).toBe(cont(pela_meta).previsao?.getTime());
+  });
+
+  it('mediana de etapa fora do trecho que falta não gera previsão pelo histórico', () => {
+    const medianas = new Map([med('E01', 5, 10)]);
+    const r = calcularPrazos({ ...base, etapaConfirmadaEm: '2026-01-09T00:00:00Z' }, [], undefined, agora, medianas);
+    expect(cont(r).previsaoHistorico).toBeNull();
+  });
+});
+

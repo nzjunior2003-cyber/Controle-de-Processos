@@ -5,6 +5,8 @@ import { ArrowLeft } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { DIAS_PADRAO_ETAPA, ETAPAS, ETAPA_FIM_PRAZO_RITO, MARCOS, ROTULO_RITO, type RitoCompras } from '../../config/fluxoCompras';
 import { prazoTotalDoRito } from '../../lib/prazosFluxo';
+import { useMedianasEtapas } from '../../hooks/useMedianasEtapas';
+import { MIN_CASOS_HISTORICO } from '../../config/fluxoCompras';
 
 const ETAPAS_RITO = ETAPAS.filter((_, i) => i <= ETAPAS.findIndex((e) => e.id === ETAPA_FIM_PRAZO_RITO)).map((e) => e.id);
 
@@ -24,6 +26,7 @@ export default function PrazosFluxo() {
   const [ritos, setRitos] = useState<Record<string, string>>(() =>
     Object.fromEntries((Object.keys(ROTULO_RITO) as RitoCompras[]).map((r) => [r, configPrazos?.prazoAteContratoPorRito?.[r] != null ? String(configPrazos.prazoAteContratoPorRito[r]) : ''])),
   );
+  const medianas = useMedianasEtapas();
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState('');
 
@@ -109,12 +112,12 @@ export default function PrazosFluxo() {
         <h2 className="text-lg font-medium text-gray-900">Dias de cada etapa</h2>
         <p className="mt-1 text-sm text-gray-500">
           E01–E19: dias de <strong>referência</strong> (servem de proporção para repartir o prazo total do rito).
-          E20–E35: dias <strong>fixos</strong>. Marcos acompanhados: {MARCOS.map((m) => `${m.nome} (${m.etapaId})`).join(', ')}.
+          E20–E35: dias <strong>fixos</strong>. A coluna <strong>Histórico real</strong> mostra a mediana dos processos que já passaram pela etapa (só com {MIN_CASOS_HISTORICO} casos ou mais). Marcos acompanhados: {MARCOS.map((m) => `${m.nome} (${m.etapaId})`).join(', ')}.
         </p>
         <table className="mt-4 min-w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase text-gray-500">
-              <th className="py-2 pr-2">Etapa</th><th className="py-2 pr-2">Quem age</th><th className="py-2 pr-2">Tipo</th><th className="py-2 text-right">Dias</th><th className="py-2 pl-3 text-gray-400">padrão</th>
+              <th className="py-2 pr-2">Etapa</th><th className="py-2 pr-2">Quem age</th><th className="py-2 pr-2">Tipo</th><th className="py-2 text-right">Dias</th><th className="py-2 pl-3 text-gray-400">padrão</th><th className="py-2 pl-3">Histórico real</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -125,6 +128,13 @@ export default function PrazosFluxo() {
                 <td className="py-1.5 pr-2 text-xs text-gray-500">{ETAPAS_RITO.includes(e.id) ? 'referência' : 'fixo'}</td>
                 <td className="py-1.5 text-right">{editor(dias[e.id], (v) => setDias((a) => ({ ...a, [e.id]: v })), `Dias da etapa ${e.id}`)}</td>
                 <td className="py-1.5 pl-3 text-xs text-gray-400">{DIAS_PADRAO_ETAPA[e.id]}</td>
+                <td className="py-1.5 pl-3 text-xs text-gray-700">
+                  {medianas.get(e.id)
+                    ? medianas.get(e.id)!.suficiente
+                      ? `mediana ${Math.round(medianas.get(e.id)!.mediana)} dia(s) · ${medianas.get(e.id)!.casos} casos`
+                      : `poucos dados (${medianas.get(e.id)!.casos} de ${MIN_CASOS_HISTORICO} casos)`
+                    : '—'}
+                </td>
               </tr>
             ))}
           </tbody>

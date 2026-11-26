@@ -9,8 +9,9 @@ import {
   type CampoDecisao,
   type RitoCompras,
 } from '../config/fluxoCompras';
-import type { Processo } from '../types';
-import type { FluxoCalculado } from './fluxoCompras';
+import type { PassagemEtapa, Processo } from '../types';
+import { historicoEfetivo, registrarEtapa, type ModoRegistro } from './historicoEtapas';
+import type { FluxoCalculado, ProcessoFluxo } from './fluxoCompras';
 
 export function podeConfirmarFluxo(perfil: string | undefined): boolean {
   return !!perfil && PERFIS_QUE_CONFIRMAM_FLUXO.includes(perfil);
@@ -35,6 +36,27 @@ export function camposConfirmacao(
     etapaConfirmadaEm: agora.toISOString(),
     etapaConfirmadaPor: usuarioId,
   };
+}
+
+/**
+ * Confirmação com histórico (Fase D): os mesmos campos de `camposConfirmacao` mais a
+ * linha do tempo atualizada. `chegada` = quando o processo chegou nesta etapa
+ * (padrão: agora). Modos: 'confirmar' (1ª vez), 'avancar' (fecha a etapa atual e abre
+ * a próxima) e 'corrigir' (a etapa registrada estava errada: substitui, não conta).
+ */
+export function camposConfirmacaoComHistorico(
+  processo: ProcessoFluxo,
+  etapaId: string,
+  sugeridaId: string | null | undefined,
+  usuarioId: string,
+  opcoes: { modo: ModoRegistro; chegada?: Date; agora?: Date },
+): CamposConfirmacao & { historicoEtapas: PassagemEtapa[] } {
+  const agora = opcoes.agora ?? new Date();
+  const base = camposConfirmacao(etapaId, sugeridaId, usuarioId, agora);
+  const historicoEtapas = registrarEtapa(
+    historicoEfetivo(processo), etapaId, opcoes.modo, opcoes.chegada ?? agora, usuarioId, base.etapaOrigem ?? 'manual', agora,
+  );
+  return { ...base, historicoEtapas };
 }
 
 /** Resposta de uma pergunta do fluxo: grava só o campo da decisão. */

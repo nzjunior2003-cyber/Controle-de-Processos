@@ -94,7 +94,7 @@ service cloud.firestore {
     function camposFluxo() {
       return ['etapaAtualId', 'etapaOrigem', 'etapaConfirmadaEm', 'etapaConfirmadaPor', 'ritoProcessual',
         'dispensaAteMetadeLimite', 'necessitaDotacao', 'cbmGerenciadorOuParticipeArp',
-        'parecerJuridicoAprovadoSemRecomendacoes', 'haveraFaseExterna'];
+        'parecerJuridicoAprovadoSemRecomendacoes', 'haveraFaseExterna', 'historicoEtapas'];
     }
     function perfilFluxo() {
       return perfilDoc().perfil in ['master', 'apoio', 'contratos'];
@@ -107,7 +107,8 @@ service cloud.firestore {
         && (!('necessitaDotacao' in d) || d.necessitaDotacao is bool)
         && (!('cbmGerenciadorOuParticipeArp' in d) || d.cbmGerenciadorOuParticipeArp is bool)
         && (!('parecerJuridicoAprovadoSemRecomendacoes' in d) || d.parecerJuridicoAprovadoSemRecomendacoes is bool)
-        && (!('haveraFaseExterna' in d) || d.haveraFaseExterna is bool);
+        && (!('haveraFaseExterna' in d) || d.haveraFaseExterna is bool)
+        && (!('historicoEtapas' in d) || (d.historicoEtapas is list && d.historicoEtapas.size() <= 80));
     }
     // Atualização: se mexe em algum campo do fluxo, perfil permitido + valores válidos
     // + (ao mudar a etapa) confirmação em nome de quem está logado.
