@@ -316,6 +316,15 @@ export interface PaeAcessorio {
   criado_em: string;
 }
 
+/** Uma passagem do processo por uma etapa do fluxo de compras (`fim` ausente = em andamento). */
+export interface PassagemEtapa {
+  etapaId: string;
+  inicio: string;
+  fim?: string;
+  por?: string;
+  origem?: 'auto' | 'manual';
+}
+
 export interface Processo {
   id: string;
   /** Exclusão lógica: processo "excluído" some do sistema mas continua no banco (recuperável). */
@@ -356,6 +365,8 @@ export interface Processo {
   etapaOrigem?: 'auto' | 'manual';
   etapaConfirmadaEm?: string;
   etapaConfirmadaPor?: string;
+  /** Linha do tempo real das etapas (Fase D): cada passagem com início, fim e quem registrou. */
+  historicoEtapas?: PassagemEtapa[];
   /** Nº de ordem do processo na planilha de processos (coluna A) — sequencial, o sistema continua a numeração ao criar. */
   ordem?: number;
   /** "SIM"/"NÃO" da coluna "Previsão no PCA" da planilha de processos (o painel de processos usa). */

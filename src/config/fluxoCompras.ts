@@ -317,3 +317,9 @@ export const DIAS_ATENCAO = 5;
 
 /** Etapas "caso necessário" entram na contagem e nos dias? Padrão: não (considera-se que foram puladas). */
 export const CONTAR_ETAPAS_OPCIONAIS = false;
+
+/** Mínimo de passagens FECHADAS de uma etapa para usar a mediana real (Fase D); abaixo disso fica "poucos dados". */
+export const MIN_CASOS_HISTORICO = 5;
+
+/** Máximo de passagens guardadas por processo (as Rules também limitam). */
+export const MAX_PASSAGENS_POR_PROCESSO = 80;
