@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import Breadcrumbs from './Breadcrumbs';
+import TabelasResponsivas from './TabelasResponsivas';
 import { useSincronizacaoAutomatica } from '../../hooks/useSincronizacaoAutomatica';
 
 export default function Layout() {
@@ -17,10 +18,11 @@ export default function Layout() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-slate-950 font-sans">
+      <TabelasResponsivas />
       <Header setSidebarOpen={setSidebarOpen} sidebarOpen={sidebarOpen} />
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50 dark:bg-slate-950 flex flex-col w-full relative">
+        <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 bg-gray-50 dark:bg-slate-950 flex flex-col w-full relative">
           {/*
             Filho extra com w-full explícito: como `main` é flex, um filho
             direto com `mx-auto` (usado em toda tela para centralizar) para
@@ -29,7 +31,7 @@ export default function Layout() {
             wrapper garante 100% da largura antes do mx-auto de cada tela
             entrar em cena, num contexto de bloco normal (não mais flex).
           */}
-          <div className="w-full">
+          <div className="w-full min-w-0 max-w-full">
             <Breadcrumbs />
             <Outlet />
           </div>

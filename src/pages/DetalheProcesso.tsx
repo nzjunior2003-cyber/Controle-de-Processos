@@ -212,8 +212,8 @@ export default function DetalheProcesso() {
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-20">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center space-x-4 min-w-0">
           <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100">
             <ArrowLeft className="h-6 w-6" />
           </button>
@@ -233,7 +233,7 @@ export default function DetalheProcesso() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
             processo.status === 'em_andamento' ? 'bg-blue-100 text-blue-800' :
             processo.status === 'contratado_aditivado' ? 'bg-purple-100 text-purple-800' :

@@ -342,7 +342,7 @@ export default function Aquisicoes() {
           <p className="mt-1 text-sm text-gray-500">Gestão de aquisições e controle do PCA</p>
         </div>
         {isMasterOrApoio && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleSincronizar}
