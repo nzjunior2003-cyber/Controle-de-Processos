@@ -46,6 +46,7 @@ export type ProcessoFluxo = Partial<
     | 'etapaOrigem'
     | 'etapaConfirmadaEm'
     | 'etapaConfirmadaPor'
+    | 'historicoEtapas'
     | 'andamento'
     | 'localizacao_atual'
     | 'ultima_tramitacao'

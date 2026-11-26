@@ -30,6 +30,7 @@ import {
 } from '../config/fluxoCompras';
 import { calcularFluxo, etapaPorId, etapasPossiveis, ritoEfetivo, type ProcessoFluxo, type TramitacaoFluxo } from './fluxoCompras';
 import { prazoAlvoDoRito } from './prazosProcesso';
+import { historicoEfetivo, passagemEmAndamento, type MedianaEtapa } from './historicoEtapas';
 
 /** O que DAL/Master editam (guardado em `config_fluxo/prazos`). Tudo opcional: o que faltar vem do padrão. */
 export interface ConfigPrazos {
@@ -60,6 +61,10 @@ export interface PrazoMarco {
   contagem: ContagemMarco;
   prazo: Date | null;
   previsao: Date | null;
+  /** Previsão trocando a meta pela mediana REAL das etapas com casos suficientes (Fase D); null se não há. */
+  previsaoHistorico: Date | null;
+  /** Menor nº de casos entre as etapas que usaram a mediana na previsão pelo histórico. */
+  casosHistorico: number;
   situacao: SituacaoPrazo;
   /** Dias de atraso (previsão depois do prazo); 0 se não estiver atrasado. */
   diasAtraso: number;
@@ -188,6 +193,12 @@ export function contarEtapasAteMarco(processo: ProcessoFluxo, marco: MarcoFluxo,
 
 /** Início (aproximado) da etapa atual. */
 export function inicioDaEtapaAtual(processo: ProcessoFluxo, tramitacoes: TramitacaoFluxo[], abertura: Date | null): Date | null {
+  // 1) Histórico real: a passagem em andamento pela etapa atual (data de chegada informada).
+  const emAndamento = passagemEmAndamento(historicoEfetivo(processo));
+  if (emAndamento && emAndamento.etapaId === processo.etapaAtualId) {
+    const chegada = dataValida(emAndamento.inicio);
+    if (chegada) return chegada;
+  }
   const confirmada = etapaPorId(processo.etapaAtualId) ? dataValida(processo.etapaConfirmadaEm) : null;
   if (confirmada) return confirmada;
   const aberta = tramitacoes
@@ -208,6 +219,7 @@ export function calcularPrazos(
   tramitacoes: TramitacaoFluxo[] = [],
   config?: ConfigPrazos,
   agora: Date = new Date(),
+  medianas?: Map<string, MedianaEtapa>,
 ): PrazosCalculados {
   const fluxo = calcularFluxo(processo, tramitacoes, agora);
   const atualId = fluxo.etapaAtual?.id ?? null;
@@ -220,8 +232,9 @@ export function calcularPrazos(
 
   const marcos: PrazoMarco[] = MARCOS.map((marco) => {
     const contagem = contarEtapasAteMarco(processo, marco, atualId);
-    if (contagem.concluido) return { marco, contagem, prazo: null, previsao: null, situacao: 'concluido' as const, diasAtraso: 0 };
-    if (!abertura) return { marco, contagem, prazo: null, previsao: null, situacao: 'sem_data' as const, diasAtraso: 0 };
+    const semPrevisao = { previsaoHistorico: null, casosHistorico: 0 };
+    if (contagem.concluido) return { marco, contagem, prazo: null, previsao: null, ...semPrevisao, situacao: 'concluido' as const, diasAtraso: 0 };
+    if (!abertura) return { marco, contagem, prazo: null, previsao: null, ...semPrevisao, situacao: 'sem_data' as const, diasAtraso: 0 };
 
     const prazo = somarDias(abertura, soma(maisLongo(caminhosAteMarco(processo, marco.etapaId))));
 
@@ -229,13 +242,24 @@ export function calcularPrazos(
     const origem = atualId ?? ETAPAS[0].id;
     const restante = maisLongo(caminhosAteMarco(processo, marco.etapaId, origem));
     const inicio = inicioAtual ?? abertura;
-    const fimDaEtapaAtual = somarDias(inicio, dias[origem] ?? 0);
-    const base = fimDaEtapaAtual.getTime() > agora.getTime() ? fimDaEtapaAtual : agora;
-    const previsao = somarDias(base, soma(restante.filter((id) => id !== origem)));
+    const prever = (diasUsados: Record<string, number>) => {
+      const somaUsada = (ids: string[]) => ids.reduce((acc, id) => acc + (diasUsados[id] ?? 0), 0);
+      const fim = somarDias(inicio, diasUsados[origem] ?? 0);
+      const base = fim.getTime() > agora.getTime() ? fim : agora;
+      return somarDias(base, somaUsada(restante.filter((id) => id !== origem)));
+    };
+    const previsao = prever(dias);
+
+    // Pela mediana real (Fase D): só se alguma etapa do trecho tem casos suficientes.
+    const comMediana = restante.filter((id) => !ehOpcional(id) && medianas?.get(id)?.suficiente);
+    const diasHistorico = { ...dias };
+    comMediana.forEach((id) => { diasHistorico[id] = medianas!.get(id)!.mediana; });
+    const previsaoHistorico = comMediana.length > 0 ? prever(diasHistorico) : null;
+    const casosHistorico = comMediana.length > 0 ? Math.min(...comMediana.map((id) => medianas!.get(id)!.casos)) : 0;
 
     const folga = Math.floor((prazo.getTime() - previsao.getTime()) / DIA_MS);
     const situacao = situacaoPorFolga(folga);
-    return { marco, contagem, prazo, previsao, situacao, diasAtraso: situacao === 'atrasado' ? -folga : 0 };
+    return { marco, contagem, prazo, previsao, previsaoHistorico, casosHistorico, situacao, diasAtraso: situacao === 'atrasado' ? -folga : 0 };
   });
 
   let etapaAtual: PrazoEtapaAtual | null = null;
