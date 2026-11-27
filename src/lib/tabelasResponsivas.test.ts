@@ -47,4 +47,35 @@ describe('tabelas responsivas', () => {
     prepararTabela(t);
     expect(t.querySelectorAll('td')[1].getAttribute('data-rotulo')).toBe('A');
   });
+
+  describe('classificação das células para o cartão', () => {
+    const montarLinha = (cabecalho: string[], celulas: string[]) => {
+      const t = montar(`<table><thead><tr>${cabecalho.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody><tr>${celulas.map((c) => `<td>${c}</td>`).join('')}</tr></tbody></table>`);
+      prepararTabela(t);
+      return Array.from(t.querySelectorAll('td'));
+    };
+
+    it('a primeira célula com texto é o título; texto longo ocupa a linha toda; curto fica em meia linha', () => {
+      const [a, b, c] = montarLinha(['PAE', 'Objeto', 'Valor'], ['2026/1', 'Aquisição de material de limpeza para as unidades', 'R$ 10,00']);
+      expect(a.hasAttribute('data-primeira')).toBe(true);
+      expect(b.getAttribute('data-largura')).toBe('total');
+      expect(c.hasAttribute('data-largura')).toBe(false);
+      expect(c.hasAttribute('data-primeira')).toBe(false);
+    });
+
+    it('célula só com ícones/botões sem texto vira "ações"; célula vazia é marcada para esconder', () => {
+      const [, acoes, vazia] = montarLinha(['A', 'Ações', 'B'], ['x', '<button><svg></svg></button><a href="#"><svg></svg></a>', '']);
+      expect(acoes.hasAttribute('data-acoes')).toBe(true);
+      expect(acoes.hasAttribute('data-largura')).toBe(false);
+      expect(vazia.hasAttribute('data-vazia')).toBe(true);
+    });
+
+    it('reaplicar não duplica nem perde marcas (estável para o MutationObserver)', () => {
+      const t = montar('<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>Um texto bem comprido para a linha</td></tr></tbody></table>');
+      prepararTabela(t);
+      const antes = t.innerHTML;
+      prepararTabela(t);
+      expect(t.innerHTML).toBe(antes);
+    });
+  });
 });
