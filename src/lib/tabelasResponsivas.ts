@@ -21,13 +21,37 @@ export function prepararTabela(tabela: HTMLTableElement): void {
   Array.from(tabela.tBodies).forEach((corpo) => {
     Array.from(corpo.rows).forEach((linha) => {
       let coluna = 0;
+      let primeiraComTexto = true;
       Array.from(linha.cells).forEach((celula) => {
         const rotulo = celula.colSpan > 1 ? '' : (rotulos[coluna] ?? '');
-        if (celula.getAttribute('data-rotulo') !== rotulo) celula.setAttribute('data-rotulo', rotulo);
+        definir(celula, 'data-rotulo', rotulo);
         coluna += Math.max(1, celula.colSpan);
+
+        const texto = (celula.textContent ?? '').replace(/\s+/g, ' ').trim();
+        const temAcao = !!celula.querySelector('button, a, input, select, textarea');
+        const vazia = !texto && !temAcao && !celula.querySelector('svg, img');
+        const soAcoes = !texto && temAcao;
+        // Larga (linha inteira): texto longo, vários blocos ou controles; curta: cabe em meia linha.
+        const larga = celula.colSpan > 1 || texto.length > 24 || (temAcao && !!texto) || celula.children.length > 2;
+        definir(celula, 'data-vazia', vazia ? '' : null);
+        definir(celula, 'data-acoes', soAcoes ? '' : null);
+        definir(celula, 'data-largura', larga && !vazia && !soAcoes ? 'total' : null);
+        // A primeira célula com conteúdo é o "título" do cartão (identificação do item).
+        const titulo = primeiraComTexto && !!texto && celula.colSpan === 1;
+        if (titulo) primeiraComTexto = false;
+        definir(celula, 'data-primeira', titulo ? '' : null);
       });
     });
   });
+}
+
+/** Só mexe no DOM quando o valor muda (evita laço com o MutationObserver). */
+function definir(el: Element, nome: string, valor: string | null): void {
+  if (valor === null) {
+    if (el.hasAttribute(nome)) el.removeAttribute(nome);
+  } else if (el.getAttribute(nome) !== valor) {
+    el.setAttribute(nome, valor);
+  }
 }
 
 export function prepararTodas(raiz: ParentNode): void {

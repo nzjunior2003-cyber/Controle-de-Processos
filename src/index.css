@@ -11,39 +11,54 @@
   table[data-responsiva] { display: block; width: 100%; min-width: 0; }
   table[data-responsiva] thead { display: none; }
   table[data-responsiva] tbody { display: block; }
+  /* Cartão: grade de 2 colunas; célula curta ocupa meia linha, a longa a linha toda. */
   table[data-responsiva] tbody tr {
-    display: block;
-    padding: 0.5rem 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem 0.9rem;
+    padding: 0.7rem 0.85rem;
     border-bottom: 1px solid var(--color-gray-200);
   }
   table[data-responsiva] tbody td {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.2rem 0;
-    border: 0;
-    text-align: right;
-    white-space: normal;
-    max-width: none;
+    display: block;
     min-width: 0;
+    max-width: none;
+    padding: 0;
+    border: 0;
+    text-align: left;
+    white-space: normal;
     overflow-wrap: anywhere;
+    font-size: 0.875rem;
   }
   table[data-responsiva] tbody td::before {
     content: attr(data-rotulo);
-    flex: 0 0 36%;
-    max-width: 36%;
-    font-size: 0.68rem;
+    display: block;
+    margin-bottom: 0.1rem;
+    font-size: 0.65rem;
     font-weight: 600;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    text-align: left;
     color: var(--color-gray-500);
   }
   table[data-responsiva] tbody td[data-rotulo=""]::before { display: none; }
-  table[data-responsiva] tbody td[data-rotulo=""] { display: block; text-align: left; }
-  table[data-responsiva] tbody td[colspan] { display: block; text-align: left; }
+  table[data-responsiva] tbody td[data-largura="total"],
+  table[data-responsiva] tbody td[data-primeira],
+  table[data-responsiva] tbody td[colspan] { grid-column: 1 / -1; }
+  table[data-responsiva] tbody td[data-primeira] { font-weight: 600; }
+  table[data-responsiva] tbody td[data-acoes] {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+  table[data-responsiva] tbody td[data-acoes]::before,
   table[data-responsiva] tbody td[colspan]::before { display: none; }
+  table[data-responsiva] tbody td[data-vazia] { display: none; }
+  /* Botões empilhados dentro do cartão ocupam a largura toda (mais fáceis de tocar). */
+  table[data-responsiva] tbody td .flex-col { align-items: stretch; }
+  table[data-responsiva] tbody td .flex-col > button,
+  table[data-responsiva] tbody td .flex-col > a { justify-content: center; }
 }
 @layer components {
   /* Cores alternadas nos cartões (só onde a linha não define a própria cor). */
